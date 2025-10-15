@@ -162,6 +162,7 @@ const toobitBestAsk = ref(0)
 
 // WebSocket服务实例
 let wsService = null
+let reconnectTimer = null
 
 // 计算属性
 const priceDifference = computed(() => {
@@ -290,24 +291,58 @@ const handleToobitData = (data) => {
 // 事件处理
 const onSymbolChange = () => {
     console.log('币对变更:', selectedSymbol.value)
-    closeWebSockets()
-    setTimeout(() => {
-        initializeWebSockets()
-    }, 1000)
+    handleConnectionChange()
 }
 
 const onExchangeTypeChange = () => {
     console.log('交易所类型变更:', exchangeType.value)
+    handleConnectionChange()
+}
+
+// 统一的连接变更处理
+const handleConnectionChange = () => {
+    // 清除之前的重连定时器
+    if (reconnectTimer) {
+        clearTimeout(reconnectTimer)
+        reconnectTimer = null
+    }
+
+    // 立即清空数据和重置状态
     closeWebSockets()
-    setTimeout(() => {
+
+    // 延迟重新连接，确保旧连接完全关闭
+    reconnectTimer = setTimeout(() => {
+        console.log('重新初始化WebSocket连接')
         initializeWebSockets()
-    }, 1000)
+        reconnectTimer = null
+    }, 1500)
 }
 
 const closeWebSockets = () => {
     if (wsService) {
+        console.log('关闭所有WebSocket连接')
         wsService.disconnectAll()
     }
+
+    // 清空所有数据
+    binanceAsks.value = []
+    binanceBids.value = []
+    toobitAsks.value = []
+    toobitBids.value = []
+
+    // 重置最佳价格
+    binanceBestBid.value = 0
+    binanceBestAsk.value = 0
+    toobitBestBid.value = 0
+    toobitBestAsk.value = 0
+
+    // 重置状态
+    binanceStatus.value = 'disconnected'
+    toobitStatus.value = 'disconnected'
+    binanceLastUpdate.value = '--'
+    toobitLastUpdate.value = '--'
+
+    console.log('数据已清空，状态已重置')
 }
 
 // 监听器
@@ -323,6 +358,14 @@ onMounted(() => {
 
 onUnmounted(() => {
     console.log('组件卸载，关闭WebSocket')
+
+    // 清除重连定时器
+    if (reconnectTimer) {
+        clearTimeout(reconnectTimer)
+        reconnectTimer = null
+    }
+
+    // 关闭所有连接
     closeWebSockets()
 })
 </script>

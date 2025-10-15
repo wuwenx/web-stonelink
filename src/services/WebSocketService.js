@@ -243,9 +243,25 @@ export class WebSocketService {
   disconnect(connectionId) {
     const ws = this.connections.get(connectionId)
     if (ws) {
-      ws.close()
+      console.log(`正在关闭连接: ${connectionId}`)
+      
+      // 移除事件监听器，防止在关闭过程中触发回调
+      ws.onopen = null
+      ws.onmessage = null
+      ws.onclose = null
+      ws.onerror = null
+      
+      // 关闭连接
+      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+        ws.close(1000, 'Connection closed by user')
+      }
+      
+      // 清理资源
       this.connections.delete(connectionId)
       this.stopHeartbeat(connectionId)
+      this.reconnectAttempts.delete(connectionId)
+      
+      console.log(`连接已关闭: ${connectionId}`)
     }
   }
 
@@ -253,9 +269,24 @@ export class WebSocketService {
    * 断开所有连接
    */
   disconnectAll() {
-    for (const [connectionId] of this.connections) {
+    console.log('开始断开所有WebSocket连接')
+    const connectionIds = Array.from(this.connections.keys())
+    
+    for (const connectionId of connectionIds) {
       this.disconnect(connectionId)
     }
+    
+    // 确保所有资源都被清理
+    this.connections.clear()
+    this.reconnectAttempts.clear()
+    
+    // 停止所有心跳定时器
+    for (const [connectionId] of this.heartbeatTimers) {
+      this.stopHeartbeat(connectionId)
+    }
+    this.heartbeatTimers.clear()
+    
+    console.log('所有WebSocket连接已断开，资源已清理')
   }
 
   /**
