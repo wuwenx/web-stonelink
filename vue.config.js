@@ -5,7 +5,6 @@ module.exports = defineConfig({
   publicPath: process.env.NODE_ENV === 'production' 
     ? '/web-stonelink/'  // 仓库名：web-stonelink
     : '/',
-    base: '/web-stonelink/',
   // 输出目录
   outputDir: 'dist',
   // 静态资源目录
