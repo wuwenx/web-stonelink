@@ -1,19 +1,20 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import DepthAggregatorTailwind from '../components/DepthAggregatorTailwind.vue';
-import BaseLayout from '../layouts/BaseLayout.vue';
-// import SimpleLayout from '../layouts/SimpleLayout.vue'
+// import BaseLayout from '../layouts/BaseLayout.vue';
+import SimpleLayout from '../layouts/SimpleLayout.vue';
 // import AuthLayout from '../layouts/AuthLayout.vue'
 // import FullScreenLayout from '../layouts/FullScreenLayout.vue'
+import index from '../pages/index.vue';
 
 const routes = [
   {
     path: '/',
-    component: BaseLayout,
+    component: SimpleLayout,
     children: [
       {
         path: '',
         name: 'Home',
-        component: DepthAggregatorTailwind,
+        component: index,
         meta: { title: '首页' },
       },
       {
@@ -21,7 +22,7 @@ const routes = [
         name: 'DepthAggregator',
         component: DepthAggregatorTailwind,
         meta: { title: '深度聚合器' },
-      },
+      }
       // {
       //   path: 'analytics',
       //   name: 'Analytics',

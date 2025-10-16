@@ -1,5 +1,5 @@
 <template>
-  <div class="container mx-auto p-5 font-sans bg-gray-50 min-h-screen">
+  <div class="container mx-auto p-5 font-sans bg-gray-50 dark:bg-gray-900 min-h-screen transition-colors duration-300">
     <!-- 页面标题 -->
     <div class="text-center mb-8 bg-gradient-to-r from-primary-500 to-purple-600 text-white p-8 rounded-lg shadow-lg">
       <h1 class="text-4xl font-light mb-2">
@@ -11,13 +11,13 @@
     </div>
 
     <!-- 控制面板 -->
-    <div class="flex justify-between items-center bg-white p-5 rounded-lg shadow-md mb-5 flex-wrap gap-4">
+    <div class="flex justify-between items-center bg-white dark:bg-gray-800 p-5 rounded-lg shadow-md mb-5 flex-wrap gap-4 transition-colors duration-300">
       <div class="flex items-center gap-3">
-        <label for="exchangeType" class="font-semibold text-gray-700 whitespace-nowrap">选择交易所类型：</label>
+        <label for="exchangeType" class="font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">选择交易所类型：</label>
         <select
           id="exchangeType"
           v-model="exchangeType"
-          class="px-3 py-2 border-2 border-gray-300 rounded-md text-sm bg-white cursor-pointer transition-colors duration-200 min-w-32 focus:outline-none focus:border-primary-500"
+          class="px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 cursor-pointer transition-colors duration-200 min-w-32 focus:outline-none focus:border-primary-500"
           @change="onExchangeTypeChange"
         >
           <option value="spot">
@@ -30,11 +30,11 @@
       </div>
 
       <div class="flex items-center gap-3">
-        <label for="symbol" class="font-semibold text-gray-700 whitespace-nowrap">选择交易对：</label>
+        <label for="symbol" class="font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">选择交易对：</label>
         <select
           id="symbol"
           v-model="selectedSymbol"
-          class="px-3 py-2 border-2 border-gray-300 rounded-md text-sm bg-white cursor-pointer transition-colors duration-200 min-w-32 focus:outline-none focus:border-primary-500"
+          class="px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 cursor-pointer transition-colors duration-200 min-w-32 focus:outline-none focus:border-primary-500"
           @change="onSymbolChange"
         >
           <option value="BTCUSDT">
@@ -57,14 +57,14 @@
 
       <div class="flex gap-8">
         <div class="flex items-center gap-2">
-          <span class="font-semibold text-gray-700">Binance {{ exchangeType === 'spot' ? '现货' : 'U本位合约' }}:</span>
+          <span class="font-semibold text-gray-700 dark:text-gray-300">Binance {{ exchangeType === 'spot' ? '现货' : 'U本位合约' }}:</span>
           <span :class="getStatusClass(binanceStatus)" />
-          <span class="text-sm text-gray-600">{{ getStatusText(binanceStatus) }}</span>
+          <span class="text-sm text-gray-600 dark:text-gray-400">{{ getStatusText(binanceStatus) }}</span>
         </div>
         <div class="flex items-center gap-2">
-          <span class="font-semibold text-gray-700">Toobit:</span>
+          <span class="font-semibold text-gray-700 dark:text-gray-300">Toobit:</span>
           <span :class="getStatusClass(toobitStatus)" />
-          <span class="text-sm text-gray-600">{{ getStatusText(toobitStatus) }}</span>
+          <span class="text-sm text-gray-600 dark:text-gray-400">{{ getStatusText(toobitStatus) }}</span>
         </div>
       </div>
     </div>
@@ -72,7 +72,7 @@
     <!-- 深度数据展示区域 -->
     <div class="flex flex-col gap-5 mb-5">
       <!-- 卖盘对比区域 -->
-      <div class="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
+      <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden transition-colors duration-300">
         <div class="bg-gradient-to-r from-danger-500 to-red-600 text-white p-4 flex justify-between items-center">
           <h2 class="text-2xl font-light">
             卖盘对比 (Asks)
@@ -82,40 +82,40 @@
           </div>
         </div>
         <div class="max-h-96 overflow-y-auto">
-          <div class="grid grid-cols-2 border-b border-gray-200 bg-gray-50 sticky top-0 z-10">
-            <div class="border-r border-gray-200 flex flex-col">
-              <div class="px-4 py-2 text-sm font-semibold bg-gray-100 text-gray-700 text-center">
+          <div class="grid grid-cols-2 border-b border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 transition-colors duration-300">
+            <div class="border-r border-gray-200 dark:border-gray-600 flex flex-col">
+              <div class="px-4 py-2 text-sm font-semibold bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-200 text-center transition-colors duration-300">
                 Binance {{ exchangeType === 'spot' ? '现货' : 'U本位合约' }}
               </div>
-              <div class="grid grid-cols-3 px-4 py-2 text-xs font-semibold text-gray-600 bg-gray-50">
+              <div class="grid grid-cols-3 px-4 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 transition-colors duration-300">
                 <span>价格</span>
                 <span>数量</span>
                 <span>总计</span>
               </div>
             </div>
             <div class="flex flex-col">
-              <div class="px-4 py-2 text-sm font-semibold bg-gray-100 text-gray-700 text-center">
+              <div class="px-4 py-2 text-sm font-semibold bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-200 text-center transition-colors duration-300">
                 Toobit
               </div>
-              <div class="grid grid-cols-3 px-4 py-2 text-xs font-semibold text-gray-600 bg-gray-50">
+              <div class="grid grid-cols-3 px-4 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 transition-colors duration-300">
                 <span>价格</span>
                 <span>数量</span>
                 <span>总计</span>
               </div>
             </div>
           </div>
-          <div v-for="(item, index) in Math.max(binanceAsks.length, toobitAsks.length)" :key="`ask-${index}`" class="grid grid-cols-2 border-b border-gray-100">
-            <div class="border-r border-gray-200">
+          <div v-for="(item, index) in Math.max(binanceAsks.length, toobitAsks.length)" :key="`ask-${index}`" class="grid grid-cols-2 border-b border-gray-100 dark:border-gray-600">
+            <div class="border-r border-gray-200 dark:border-gray-600">
               <div
                 v-if="binanceAsks[index]"
-                class="grid grid-cols-3 px-4 py-2 text-sm font-mono hover:bg-red-50 transition-colors duration-200"
+                class="grid grid-cols-3 px-4 py-2 text-sm font-mono hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors duration-200"
                 :style="{ backgroundColor: `rgba(239, 68, 68, ${0.1 + (index / Math.max(binanceAsks.length, 1)) * 0.2})` }"
               >
-                <span class="text-danger-600 font-semibold">{{ formatPrice(binanceAsks[index].price) }}</span>
-                <span class="text-gray-600 text-right">{{ formatQuantity(binanceAsks[index].quantity) }}</span>
-                <span class="text-gray-600 text-right">{{ formatQuantity(binanceAsks[index].total) }}</span>
+                <span class="text-danger-600 dark:text-danger-400 font-semibold">{{ formatPrice(binanceAsks[index].price) }}</span>
+                <span class="text-gray-600 dark:text-gray-300 text-right">{{ formatQuantity(binanceAsks[index].quantity) }}</span>
+                <span class="text-gray-600 dark:text-gray-300 text-right">{{ formatQuantity(binanceAsks[index].total) }}</span>
               </div>
-              <div v-else class="grid grid-cols-3 px-4 py-2 text-sm font-mono text-gray-400 italic">
+              <div v-else class="grid grid-cols-3 px-4 py-2 text-sm font-mono text-gray-400 dark:text-gray-500 italic">
                 <span>--</span>
                 <span class="text-right">--</span>
                 <span class="text-right">--</span>
@@ -124,14 +124,14 @@
             <div>
               <div
                 v-if="toobitAsks[index]"
-                class="grid grid-cols-3 px-4 py-2 text-sm font-mono hover:bg-red-50 transition-colors duration-200"
+                class="grid grid-cols-3 px-4 py-2 text-sm font-mono hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors duration-200"
                 :style="{ backgroundColor: `rgba(239, 68, 68, ${0.1 + (index / Math.max(toobitAsks.length, 1)) * 0.2})` }"
               >
-                <span class="text-danger-600 font-semibold">{{ formatPrice(toobitAsks[index].price) }}</span>
-                <span class="text-gray-600 text-right">{{ formatQuantity(toobitAsks[index].quantity) }}</span>
-                <span class="text-gray-600 text-right">{{ formatQuantity(toobitAsks[index].total) }}</span>
+                <span class="text-danger-600 dark:text-danger-400 font-semibold">{{ formatPrice(toobitAsks[index].price) }}</span>
+                <span class="text-gray-600 dark:text-gray-300 text-right">{{ formatQuantity(toobitAsks[index].quantity) }}</span>
+                <span class="text-gray-600 dark:text-gray-300 text-right">{{ formatQuantity(toobitAsks[index].total) }}</span>
               </div>
-              <div v-else class="grid grid-cols-3 px-4 py-2 text-sm font-mono text-gray-400 italic">
+              <div v-else class="grid grid-cols-3 px-4 py-2 text-sm font-mono text-gray-400 dark:text-gray-500 italic">
                 <span>--</span>
                 <span class="text-right">--</span>
                 <span class="text-right">--</span>
@@ -142,7 +142,7 @@
       </div>
 
       <!-- 买盘对比区域 -->
-      <div class="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
+      <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden transition-colors duration-300">
         <div class="bg-gradient-to-r from-success-500 to-green-600 text-white p-4 flex justify-between items-center">
           <h2 class="text-2xl font-light">
             买盘对比 (Bids)
@@ -152,40 +152,40 @@
           </div>
         </div>
         <div class="max-h-96 overflow-y-auto">
-          <div class="grid grid-cols-2 border-b border-gray-200 bg-gray-50 sticky top-0 z-10">
-            <div class="border-r border-gray-200 flex flex-col">
-              <div class="px-4 py-2 text-sm font-semibold bg-gray-100 text-gray-700 text-center">
+          <div class="grid grid-cols-2 border-b border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 transition-colors duration-300">
+            <div class="border-r border-gray-200 dark:border-gray-600 flex flex-col">
+              <div class="px-4 py-2 text-sm font-semibold bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-200 text-center transition-colors duration-300">
                 Binance {{ exchangeType === 'spot' ? '现货' : 'U本位合约' }}
               </div>
-              <div class="grid grid-cols-3 px-4 py-2 text-xs font-semibold text-gray-600 bg-gray-50">
+              <div class="grid grid-cols-3 px-4 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 transition-colors duration-300">
                 <span>价格</span>
                 <span>数量</span>
                 <span>总计</span>
               </div>
             </div>
             <div class="flex flex-col">
-              <div class="px-4 py-2 text-sm font-semibold bg-gray-100 text-gray-700 text-center">
+              <div class="px-4 py-2 text-sm font-semibold bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-200 text-center transition-colors duration-300">
                 Toobit
               </div>
-              <div class="grid grid-cols-3 px-4 py-2 text-xs font-semibold text-gray-600 bg-gray-50">
+              <div class="grid grid-cols-3 px-4 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 transition-colors duration-300">
                 <span>价格</span>
                 <span>数量</span>
                 <span>总计</span>
               </div>
             </div>
           </div>
-          <div v-for="(item, index) in Math.max(binanceBids.length, toobitBids.length)" :key="`bid-${index}`" class="grid grid-cols-2 border-b border-gray-100">
-            <div class="border-r border-gray-200">
+          <div v-for="(item, index) in Math.max(binanceBids.length, toobitBids.length)" :key="`bid-${index}`" class="grid grid-cols-2 border-b border-gray-100 dark:border-gray-600">
+            <div class="border-r border-gray-200 dark:border-gray-600">
               <div
                 v-if="binanceBids[index]"
-                class="grid grid-cols-3 px-4 py-2 text-sm font-mono hover:bg-green-50 transition-colors duration-200"
+                class="grid grid-cols-3 px-4 py-2 text-sm font-mono hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors duration-200"
                 :style="{ backgroundColor: `rgba(34, 197, 94, ${0.1 + (index / Math.max(binanceBids.length, 1)) * 0.2})` }"
               >
-                <span class="text-success-600 font-semibold">{{ formatPrice(binanceBids[index].price) }}</span>
-                <span class="text-gray-600 text-right">{{ formatQuantity(binanceBids[index].quantity) }}</span>
-                <span class="text-gray-600 text-right">{{ formatQuantity(binanceBids[index].total) }}</span>
+                <span class="text-success-600 dark:text-success-400 font-semibold">{{ formatPrice(binanceBids[index].price) }}</span>
+                <span class="text-gray-600 dark:text-gray-300 text-right">{{ formatQuantity(binanceBids[index].quantity) }}</span>
+                <span class="text-gray-600 dark:text-gray-300 text-right">{{ formatQuantity(binanceBids[index].total) }}</span>
               </div>
-              <div v-else class="grid grid-cols-3 px-4 py-2 text-sm font-mono text-gray-400 italic">
+              <div v-else class="grid grid-cols-3 px-4 py-2 text-sm font-mono text-gray-400 dark:text-gray-500 italic">
                 <span>--</span>
                 <span class="text-right">--</span>
                 <span class="text-right">--</span>
@@ -194,14 +194,14 @@
             <div>
               <div
                 v-if="toobitBids[index]"
-                class="grid grid-cols-3 px-4 py-2 text-sm font-mono hover:bg-green-50 transition-colors duration-200"
+                class="grid grid-cols-3 px-4 py-2 text-sm font-mono hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors duration-200"
                 :style="{ backgroundColor: `rgba(34, 197, 94, ${0.1 + (index / Math.max(toobitBids.length, 1)) * 0.2})` }"
               >
-                <span class="text-success-600 font-semibold">{{ formatPrice(toobitBids[index].price) }}</span>
-                <span class="text-gray-600 text-right">{{ formatQuantity(toobitBids[index].quantity) }}</span>
-                <span class="text-gray-600 text-right">{{ formatQuantity(toobitBids[index].total) }}</span>
+                <span class="text-success-600 dark:text-success-400 font-semibold">{{ formatPrice(toobitBids[index].price) }}</span>
+                <span class="text-gray-600 dark:text-gray-300 text-right">{{ formatQuantity(toobitBids[index].quantity) }}</span>
+                <span class="text-gray-600 dark:text-gray-300 text-right">{{ formatQuantity(toobitBids[index].total) }}</span>
               </div>
-              <div v-else class="grid grid-cols-3 px-4 py-2 text-sm font-mono text-gray-400 italic">
+              <div v-else class="grid grid-cols-3 px-4 py-2 text-sm font-mono text-gray-400 dark:text-gray-500 italic">
                 <span>--</span>
                 <span class="text-right">--</span>
                 <span class="text-right">--</span>
@@ -213,34 +213,34 @@
     </div>
 
     <!-- 统计信息 -->
-    <div class="bg-white p-5 rounded-lg shadow-md grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-      <div class="flex justify-between items-center p-3 bg-gray-50 rounded-md border-l-4 border-primary-500">
-        <span class="font-semibold text-gray-700">Binance 最佳买价:</span>
-        <span class="font-mono font-semibold text-gray-800">{{ formatPrice(binanceBestBid) }}</span>
+    <div class="bg-white dark:bg-gray-800 p-5 rounded-lg shadow-md grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 transition-colors duration-300">
+      <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-md border-l-4 border-primary-500 transition-colors duration-300">
+        <span class="font-semibold text-gray-700 dark:text-gray-300">Binance 最佳买价:</span>
+        <span class="font-mono font-semibold text-gray-800 dark:text-gray-200">{{ formatPrice(binanceBestBid) }}</span>
       </div>
-      <div class="flex justify-between items-center p-3 bg-gray-50 rounded-md border-l-4 border-primary-500">
-        <span class="font-semibold text-gray-700">Binance 最佳卖价:</span>
-        <span class="font-mono font-semibold text-gray-800">{{ formatPrice(binanceBestAsk) }}</span>
+      <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-md border-l-4 border-primary-500 transition-colors duration-300">
+        <span class="font-semibold text-gray-700 dark:text-gray-300">Binance 最佳卖价:</span>
+        <span class="font-mono font-semibold text-gray-800 dark:text-gray-200">{{ formatPrice(binanceBestAsk) }}</span>
       </div>
-      <div class="flex justify-between items-center p-3 bg-gray-50 rounded-md border-l-4 border-primary-500">
-        <span class="font-semibold text-gray-700">Toobit 最佳买价:</span>
-        <span class="font-mono font-semibold text-gray-800">{{ formatPrice(toobitBestBid) }}</span>
+      <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-md border-l-4 border-primary-500 transition-colors duration-300">
+        <span class="font-semibold text-gray-700 dark:text-gray-300">Toobit 最佳买价:</span>
+        <span class="font-mono font-semibold text-gray-800 dark:text-gray-200">{{ formatPrice(toobitBestBid) }}</span>
       </div>
-      <div class="flex justify-between items-center p-3 bg-gray-50 rounded-md border-l-4 border-primary-500">
-        <span class="font-semibold text-gray-700">Toobit 最佳卖价:</span>
-        <span class="font-mono font-semibold text-gray-800">{{ formatPrice(toobitBestAsk) }}</span>
+      <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-md border-l-4 border-primary-500 transition-colors duration-300">
+        <span class="font-semibold text-gray-700 dark:text-gray-300">Toobit 最佳卖价:</span>
+        <span class="font-mono font-semibold text-gray-800 dark:text-gray-200">{{ formatPrice(toobitBestAsk) }}</span>
       </div>
-      <div class="flex justify-between items-center p-3 bg-gray-50 rounded-md border-l-4 border-primary-500">
-        <span class="font-semibold text-gray-700">价差 (Binance - Toobit):</span>
-        <span class="font-mono font-semibold text-gray-800">{{ formatPrice(priceDifference) }}</span>
+      <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-md border-l-4 border-primary-500 transition-colors duration-300">
+        <span class="font-semibold text-gray-700 dark:text-gray-300">价差 (Binance - Toobit):</span>
+        <span class="font-mono font-semibold text-gray-800 dark:text-gray-200">{{ formatPrice(priceDifference) }}</span>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
-import { WebSocketService, DepthDataProcessor } from '../services/WebSocketService.js';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { DepthDataProcessor, WebSocketService } from '../services/WebSocketService.js';
 
 // 响应式数据
 const selectedSymbol = ref('BTCUSDT');
