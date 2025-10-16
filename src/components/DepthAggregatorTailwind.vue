@@ -55,14 +55,28 @@
         </select>
       </div>
 
+      <div class="flex items-center gap-3">
+        <label for="depthLevels" class="font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">深度档位：</label>
+        <select
+          id="depthLevels"
+          v-model="depthLevels"
+          class="px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 cursor-pointer transition-colors duration-200 min-w-24 focus:outline-none focus:border-primary-500"
+          @change="onDepthLevelsChange"
+        >
+          <option :value="5">5档</option>
+          <option :value="10">10档</option>
+          <option :value="20">20档</option>
+        </select>
+      </div>
+
       <div class="flex gap-8">
         <div class="flex items-center gap-2">
-          <span class="font-semibold text-gray-700 dark:text-gray-300">Binance {{ exchangeType === 'spot' ? '现货' : 'U本位合约' }}:</span>
+          <span class="font-semibold text-gray-700 dark:text-gray-300">Binance :</span>
           <span :class="getStatusClass(binanceStatus)" />
           <span class="text-sm text-gray-600 dark:text-gray-400">{{ getStatusText(binanceStatus) }}</span>
         </div>
         <div class="flex items-center gap-2">
-          <span class="font-semibold text-gray-700 dark:text-gray-300">Toobit:</span>
+          <span class="font-semibold text-gray-700 dark:text-gray-300">Toobit :</span>
           <span :class="getStatusClass(toobitStatus)" />
           <span class="text-sm text-gray-600 dark:text-gray-400">{{ getStatusText(toobitStatus) }}</span>
         </div>
@@ -85,7 +99,7 @@
           <div class="grid grid-cols-2 border-b border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 transition-colors duration-300">
             <div class="border-r border-gray-200 dark:border-gray-600 flex flex-col">
               <div class="px-4 py-2 text-sm font-semibold bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-200 text-center transition-colors duration-300">
-                Binance {{ exchangeType === 'spot' ? '现货' : 'U本位合约' }}
+                Binance
               </div>
               <div class="grid grid-cols-3 px-4 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 transition-colors duration-300">
                 <span>价格</span>
@@ -155,7 +169,7 @@
           <div class="grid grid-cols-2 border-b border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 transition-colors duration-300">
             <div class="border-r border-gray-200 dark:border-gray-600 flex flex-col">
               <div class="px-4 py-2 text-sm font-semibold bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-200 text-center transition-colors duration-300">
-                Binance {{ exchangeType === 'spot' ? '现货' : 'U本位合约' }}
+                Binance
               </div>
               <div class="grid grid-cols-3 px-4 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 transition-colors duration-300">
                 <span>价格</span>
@@ -215,7 +229,7 @@
     <!-- 标记价格信息 -->
     <div class="bg-white dark:bg-gray-800 p-5 rounded-lg shadow-md mb-5 transition-colors duration-300">
       <h3 class="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-4 flex items-center">
-        <span class="w-3 h-3 bg-blue-500 rounded-full mr-2"></span>
+        <span class="w-3 h-3 bg-blue-500 rounded-full mr-2" />
         Binance 标记价格信息
         <span class="ml-2 text-sm font-normal text-gray-500 dark:text-gray-400">
           ({{ binanceMarkPriceLastUpdate }})
@@ -275,6 +289,7 @@ import { DepthDataProcessor, WebSocketService } from '../services/WebSocketServi
 // 响应式数据
 const selectedSymbol = ref('BTCUSDT');
 const exchangeType = ref('futures');
+const depthLevels = ref(5);
 const binanceStatus = ref('disconnected');
 const toobitStatus = ref('disconnected');
 const binanceMarkPriceStatus = ref('disconnected');
@@ -349,14 +364,21 @@ const initializeWebSockets = () => {
   wsService = new WebSocketService();
   connectBinance();
   connectToobit();
-  connectBinanceMarkPrice();
 };
 
 const connectBinance = () => {
   if (exchangeType.value === 'futures') {
-    wsService.connectBinanceFutures(selectedSymbol.value, handleBinanceData, status => {
-      binanceStatus.value = status;
-    });
+    // 使用合并连接，同时获取深度数据和标记价格
+    wsService.connectBinanceFuturesWithMarkPrice(
+      selectedSymbol.value, 
+      handleBinanceData, 
+      handleBinanceMarkPriceData, 
+      status => {
+        binanceStatus.value = status;
+        binanceMarkPriceStatus.value = status; // 标记价格状态与深度数据状态同步
+      },
+      depthLevels.value // 传递深度档位参数
+    );
   } else {
     wsService.connectBinance(selectedSymbol.value, handleBinanceData, status => {
       binanceStatus.value = status;
@@ -370,17 +392,11 @@ const connectToobit = () => {
   });
 };
 
-const connectBinanceMarkPrice = () => {
-  wsService.connectBinanceMarkPrice(selectedSymbol.value, handleBinanceMarkPriceData, status => {
-    binanceMarkPriceStatus.value = status;
-  });
-};
-
 // 数据处理
 const handleBinanceData = data => {
   if (data.e === 'depthUpdate') {
-    const processedAsks = DepthDataProcessor.processDepthData(data.a, 'asks');
-    const processedBids = DepthDataProcessor.processDepthData(data.b, 'bids');
+    const processedAsks = DepthDataProcessor.processDepthData(data.a, 'asks', depthLevels.value);
+    const processedBids = DepthDataProcessor.processDepthData(data.b, 'bids', depthLevels.value);
 
     binanceAsks.value = processedAsks;
     binanceBids.value = processedBids;
@@ -401,8 +417,8 @@ const handleToobitData = data => {
     return;
   }
 
-  const processedAsks = DepthDataProcessor.processDepthData(data.a, 'asks');
-  const processedBids = DepthDataProcessor.processDepthData(data.b, 'bids');
+  const processedAsks = DepthDataProcessor.processDepthData(data.a, 'asks', depthLevels.value);
+  const processedBids = DepthDataProcessor.processDepthData(data.b, 'bids', depthLevels.value);
 
   toobitAsks.value = processedAsks;
   toobitBids.value = processedBids;
@@ -433,6 +449,12 @@ const onSymbolChange = () => {
 };
 
 const onExchangeTypeChange = () => {
+  handleConnectionChange();
+};
+
+const onDepthLevelsChange = () => {
+  // 深度档位变更时需要重新连接以获取新的深度数据
+  console.log('深度档位变更:', depthLevels.value);
   handleConnectionChange();
 };
 

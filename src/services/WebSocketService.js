@@ -69,13 +69,15 @@ export class WebSocketService {
   }
 
   /**
-   * 连接Binance U本位合约标记价格WebSocket
+   * 连接Binance U本位合约WebSocket（包含深度数据和标记价格）
    * @param {string} symbol - 交易对符号
-   * @param {Function} onMessage - 消息处理回调
+   * @param {Function} onDepthMessage - 深度数据消息处理回调
+   * @param {Function} onMarkPriceMessage - 标记价格消息处理回调
    * @param {Function} onStatusChange - 状态变更回调
+   * @param {number} depthLevels - 深度档位数，默认20
    */
-  connectBinanceMarkPrice(symbol, onMessage, onStatusChange) {
-    const connectionId = `binance_markprice_${symbol}`;
+  connectBinanceFuturesWithMarkPrice(symbol, onDepthMessage, onMarkPriceMessage, onStatusChange, depthLevels = 20) {
+    const connectionId = `binance_futures_combined_${symbol}`;
 
     // 如果已存在连接，先关闭
     if (this.connections.has(connectionId)) {
@@ -94,10 +96,13 @@ export class WebSocketService {
         this.reconnectAttempts.set(connectionId, 0);
         this.startHeartbeat(connectionId);
 
-        // 订阅标记价格流
+        // 订阅深度数据流和标记价格流
         const subscribeMessage = {
           method: 'SUBSCRIBE',
-          params: [`${binanceSymbol(symbol).toLowerCase()}@markPrice@1s`],
+          params: [
+            `${binanceSymbol(symbol).toLowerCase()}@depth${depthLevels}@500ms`,
+            `${binanceSymbol(symbol).toLowerCase()}@markPrice@1s`
+          ],
           id: Date.now(),
         };
         ws.send(JSON.stringify(subscribeMessage));
@@ -106,80 +111,7 @@ export class WebSocketService {
       ws.onmessage = event => {
         try {
           const data = JSON.parse(event.data);
-          // 处理ping消息 - 必须回复pong
-          if (data.ping) {
-            ws.send(JSON.stringify({ pong: data.ping }));
-            return;
-          }
-
-          // 处理标记价格流
-          if (data.p) {
-            onMessage(data);
-          } else if (data.result === null && data.id) {
-            // 处理订阅确认
-          }
-        } catch (error) {
-        }
-      };
-
-      ws.onclose = event => {
-        onStatusChange('disconnected');
-        this.stopHeartbeat(connectionId);
-        this.scheduleReconnect(connectionId, () => {
-          this.connectBinanceMarkPrice(symbol, onMessage, onStatusChange);
-        });
-      };
-
-      ws.onerror = error => {
-        onStatusChange('error');
-      };
-
-      onStatusChange('connecting');
-    } catch (error) {
-      onStatusChange('error');
-    }
-  }
-
-  /**
-   * 连接Binance U本位合约WebSocket
-   * @param {string} symbol - 交易对符号
-   * @param {Function} onMessage - 消息处理回调
-   * @param {Function} onStatusChange - 状态变更回调
-   */
-  connectBinanceFutures(symbol, onMessage, onStatusChange) {
-    const connectionId = `binance_futures_${symbol}`;
-
-    // 如果已存在连接，先关闭
-    if (this.connections.has(connectionId)) {
-      this.disconnect(connectionId);
-    }
-
-    try {
-      // U本位合约使用正确的WebSocket端点
-      const wsUrl = binanceFuturesWebSocketUrl;
-
-      const ws = new WebSocket(wsUrl);
-      this.connections.set(connectionId, ws);
-      this.reconnectAttempts.set(connectionId, 0);
-
-      ws.onopen = () => {
-        onStatusChange('connected');
-        this.reconnectAttempts.set(connectionId, 0);
-        this.startHeartbeat(connectionId);
-
-        // 订阅深度数据流
-        const subscribeMessage = {
-          method: 'SUBSCRIBE',
-          params: [`${binanceSymbol(symbol).toLowerCase()}@depth20@100ms`],
-          id: Date.now(),
-        };
-        ws.send(JSON.stringify(subscribeMessage));
-      };
-
-      ws.onmessage = event => {
-        try {
-          const data = JSON.parse(event.data);
-
+          
           // 处理ping消息 - 必须回复pong
           if (data.ping) {
             ws.send(JSON.stringify({ pong: data.ping }));
@@ -188,14 +120,22 @@ export class WebSocketService {
 
           // 处理深度数据流
           if (data.stream && data.stream.includes('depth')) {
-            onMessage(data.data);
+            onDepthMessage(data.data);
+          } else if (data.stream && data.stream.includes('markPrice')) {
+            // 处理标记价格流
+            onMarkPriceMessage(data.data);
           } else if (data.e === 'depthUpdate') {
             // 处理直接深度数据（U本位合约格式）
-            onMessage(data);
+            onDepthMessage(data);
+          } else if (data.p && data.i) {
+            // 处理直接标记价格数据
+            onMarkPriceMessage(data);
           } else if (data.result === null && data.id) {
             // 处理订阅确认
+            // 订阅成功确认
           }
         } catch (error) {
+          // 静默处理错误
         }
       };
 
@@ -203,7 +143,7 @@ export class WebSocketService {
         onStatusChange('disconnected');
         this.stopHeartbeat(connectionId);
         this.scheduleReconnect(connectionId, () => {
-          this.connectBinanceFutures(symbol, onMessage, onStatusChange);
+          this.connectBinanceFuturesWithMarkPrice(symbol, onDepthMessage, onMarkPriceMessage, onStatusChange);
         });
       };
 
