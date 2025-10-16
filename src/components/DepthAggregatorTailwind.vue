@@ -103,7 +103,7 @@
               <div class="grid grid-cols-3 px-4 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 transition-colors duration-300">
                 <span>价格</span>
                 <span>数量</span>
-                <span>总计</span>
+                <span>总计</span> 
               </div>
             </div>
           </div>
