@@ -1,6 +1,6 @@
-import { createRouter, createWebHistory } from 'vue-router'
-import DepthAggregatorTailwind from '../components/DepthAggregatorTailwind.vue'
-import BaseLayout from '../layouts/BaseLayout.vue'
+import { createRouter, createWebHistory } from 'vue-router';
+import DepthAggregatorTailwind from '../components/DepthAggregatorTailwind.vue';
+import BaseLayout from '../layouts/BaseLayout.vue';
 // import SimpleLayout from '../layouts/SimpleLayout.vue'
 // import AuthLayout from '../layouts/AuthLayout.vue'
 // import FullScreenLayout from '../layouts/FullScreenLayout.vue'
@@ -14,14 +14,14 @@ const routes = [
         path: '',
         name: 'Home',
         component: DepthAggregatorTailwind,
-        meta: { title: '首页' }
+        meta: { title: '首页' },
       },
       {
         path: 'depth',
         name: 'DepthAggregator',
         component: DepthAggregatorTailwind,
-        meta: { title: '深度聚合器' }
-      }
+        meta: { title: '深度聚合器' },
+      },
       // {
       //   path: 'analytics',
       //   name: 'Analytics',
@@ -40,8 +40,8 @@ const routes = [
       //   component: () => import('../views/Settings.vue'),
       //   meta: { title: '设置' }
       // }
-    ]
-  }
+    ],
+  },
   // {
   //   path: '/simple',
   //   component: SimpleLayout,
@@ -96,11 +96,11 @@ const routes = [
   //     }
   //   ]
   // }
-]
+];
 
 const router = createRouter({
   history: createWebHistory(process.env.BASE_URL),
-  routes
-})
+  routes,
+});
 
-export default router
+export default router;

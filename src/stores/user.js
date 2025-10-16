@@ -1,63 +1,63 @@
-import { defineStore } from 'pinia'
-import request from '../utils/request'
+import { defineStore } from 'pinia';
+import request from '../utils/request';
 
 export const useUserStore = defineStore('user', {
   state: () => ({
     userInfo: null,
     token: localStorage.getItem('token') || '',
-    loading: false
+    loading: false,
   }),
 
   getters: {
-    isLoggedIn: (state) => !!state.token,
-    userName: (state) => state.userInfo?.name || '未登录'
+    isLoggedIn: state => !!state.token,
+    userName: state => state.userInfo?.name || '未登录',
   },
 
   actions: {
     // 登录
     async login(loginForm) {
-      this.loading = true
+      this.loading = true;
       try {
         const response = await request({
           url: '/auth/login',
           method: 'post',
-          data: loginForm
-        })
+          data: loginForm,
+        });
 
-        this.token = response.data.token
-        this.userInfo = response.data.userInfo
-        localStorage.setItem('token', this.token)
+        this.token = response.data.token;
+        this.userInfo = response.data.userInfo;
+        localStorage.setItem('token', this.token);
 
-        return response
+        return response;
       } catch (error) {
-        throw error
+        throw error;
       } finally {
-        this.loading = false
+        this.loading = false;
       }
     },
 
     // 登出
     logout() {
-      this.token = ''
-      this.userInfo = null
-      localStorage.removeItem('token')
+      this.token = '';
+      this.userInfo = null;
+      localStorage.removeItem('token');
     },
 
     // 获取用户信息
     async getUserInfo() {
-      if (!this.token) return
+      if (!this.token) return;
 
       try {
         const response = await request({
           url: '/auth/userinfo',
-          method: 'get'
-        })
+          method: 'get',
+        });
 
-        this.userInfo = response.data
-        return response.data
+        this.userInfo = response.data;
+        return response.data;
       } catch (error) {
-        this.logout()
-        throw error
+        this.logout();
+        throw error;
       }
     },
 
@@ -67,14 +67,14 @@ export const useUserStore = defineStore('user', {
         const response = await request({
           url: '/auth/userinfo',
           method: 'put',
-          data: userData
-        })
+          data: userData,
+        });
 
-        this.userInfo = { ...this.userInfo, ...response.data }
-        return response.data
+        this.userInfo = { ...this.userInfo, ...response.data };
+        return response.data;
       } catch (error) {
-        throw error
+        throw error;
       }
-    }
-  }
-})
+    },
+  },
+});

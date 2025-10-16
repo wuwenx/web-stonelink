@@ -1,7 +1,7 @@
-const toobitFuturesWebSocketUrl = 'wss://stream.toobit.com/quote/ws/v1'
-const binanceFuturesWebSocketUrl = 'wss://fstream.binance.com/ws'
-const binanceSpotWebSocketUrl = 'wss://stream.binance.com:9443/ws'
-export { toobitFuturesWebSocketUrl, binanceFuturesWebSocketUrl, binanceSpotWebSocketUrl }
+const toobitFuturesWebSocketUrl = 'wss://stream.toobit.com/quote/ws/v1';
+const binanceFuturesWebSocketUrl = 'wss://fstream.binance.com/ws';
+const binanceSpotWebSocketUrl = 'wss://stream.binance.com:9443/ws';
+export { toobitFuturesWebSocketUrl, binanceFuturesWebSocketUrl, binanceSpotWebSocketUrl };
 
 /**
  * 币对映射函数
@@ -12,43 +12,43 @@ export { toobitFuturesWebSocketUrl, binanceFuturesWebSocketUrl, binanceSpotWebSo
  */
 function mapSymbol(symbol, exchange) {
   if (!symbol || !exchange) {
-    return symbol
+    return symbol;
   }
 
   // 支持的报价币种列表
-  const quoteCurrencies = ['USDT', 'USDC', 'BUSD', 'DAI', 'TUSD']
+  const quoteCurrencies = ['USDT', 'USDC', 'BUSD', 'DAI', 'TUSD'];
 
   // 提取基础币种和报价币种
-  let baseCurrency = symbol
-  let quoteCurrency = ''
+  let baseCurrency = symbol;
+  let quoteCurrency = '';
 
   // 查找报价币种
   for (const quote of quoteCurrencies) {
     if (symbol.endsWith(quote)) {
-      baseCurrency = symbol.slice(0, -quote.length)
-      quoteCurrency = quote
-      break
+      baseCurrency = symbol.slice(0, -quote.length);
+      quoteCurrency = quote;
+      break;
     }
   }
 
   // 如果没有找到支持的报价币种，默认使用 USDT
   if (!quoteCurrency) {
-    baseCurrency = symbol.replace('USDT', '')
-    quoteCurrency = 'USDT'
+    baseCurrency = symbol.replace('USDT', '');
+    quoteCurrency = 'USDT';
   }
 
   switch (exchange.toLowerCase()) {
   case 'toobit':
     // Toobit 格式: BTCUSDT -> BTC-SWAP-USDT, BTCUSDC -> BTC-SWAP-USDC
-    return `${baseCurrency}-SWAP-${quoteCurrency}`
+    return `${baseCurrency}-SWAP-${quoteCurrency}`;
 
   case 'binance':
     // Binance 格式: BTCUSDT -> btcusdt, BTCUSDC -> btcusdc
-    return `${baseCurrency.toLowerCase()}${quoteCurrency.toLowerCase()}`
+    return `${baseCurrency.toLowerCase()}${quoteCurrency.toLowerCase()}`;
 
   default:
     // 默认返回原始格式
-    return symbol
+    return symbol;
   }
 }
 
@@ -58,7 +58,7 @@ function mapSymbol(symbol, exchange) {
  * @returns {string} Toobit 格式的币对
  */
 function toobitSymbol(symbol) {
-  return mapSymbol(symbol, 'toobit')
+  return mapSymbol(symbol, 'toobit');
 }
 
 /**
@@ -67,7 +67,7 @@ function toobitSymbol(symbol) {
  * @returns {string} Binance 格式的币对
  */
 function binanceSymbol(symbol) {
-  return mapSymbol(symbol, 'binance')
+  return mapSymbol(symbol, 'binance');
 }
 
-export { mapSymbol, toobitSymbol, binanceSymbol }
+export { mapSymbol, toobitSymbol, binanceSymbol };
