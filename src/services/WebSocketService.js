@@ -2,7 +2,7 @@
  * WebSocket服务类
  * 用于管理交易所WebSocket连接，提供统一的数据处理接口
  */
-import { binanceFuturesWebSocketUrl, binanceSpotWebSocketUrl, binanceSymbol, toobitFuturesWebSocketUrl, toobitSymbol } from '../config/const';
+import { binanceFuturesWebSocketUrl, binanceSpotWebSocketUrl, binanceSymbol, okxFuturesWebSocketUrl, okxSymbol, toobitFuturesWebSocketUrl, toobitSymbol } from '../config/const';
 
 export class WebSocketService {
   constructor() {
@@ -144,6 +144,84 @@ export class WebSocketService {
         this.stopHeartbeat(connectionId);
         this.scheduleReconnect(connectionId, () => {
           this.connectBinanceFuturesWithMarkPrice(symbol, onDepthMessage, onMarkPriceMessage, onStatusChange);
+        });
+      };
+
+      ws.onerror = error => {
+        onStatusChange('error');
+      };
+
+      onStatusChange('connecting');
+    } catch (error) {
+      onStatusChange('error');
+    }
+  }
+
+  /**
+   * 连接OKX WebSocket
+   * @param {string} symbol - 交易对符号
+   * @param {Function} onMessage - 消息处理回调
+   * @param {Function} onStatusChange - 状态变更回调
+   */
+  connectOKX(symbol, onMessage, onStatusChange) {
+    const connectionId = `okx_${symbol}`;
+
+    // 如果已存在连接，先关闭
+    if (this.connections.has(connectionId)) {
+      this.disconnect(connectionId);
+    }
+
+    try {
+      const wsUrl = okxFuturesWebSocketUrl;
+
+      const ws = new WebSocket(wsUrl);
+      this.connections.set(connectionId, ws);
+      this.reconnectAttempts.set(connectionId, 0);
+
+      ws.onopen = () => {
+        onStatusChange('connected');
+        this.reconnectAttempts.set(connectionId, 0);
+        this.startHeartbeat(connectionId);
+
+        // 订阅深度数据
+        const subscribeMessage = {
+          op: 'subscribe',
+          args: [
+            {
+              channel: 'books',
+              instId: okxSymbol(symbol)
+            }
+          ]
+        };
+        ws.send(JSON.stringify(subscribeMessage));
+      };
+
+      ws.onmessage = event => {
+        try {
+          const data = JSON.parse(event.data);
+
+          // 处理深度数据
+          if (data.data && Array.isArray(data.data) && data.data.length > 0) {
+            const depthData = data.data[0];
+            if (depthData.asks && depthData.bids) {
+              // 转换OKX格式到通用格式
+              const convertedData = {
+                a: depthData.asks.map(ask => [ask[0], ask[1]]), // asks: [price, quantity]
+                b: depthData.bids.map(bid => [bid[0], bid[1]])  // bids: [price, quantity]
+              };
+              onMessage(convertedData);
+            }
+          }
+        } catch (error) {
+          // 静默处理错误
+        }
+      };
+
+      ws.onclose = event => {
+        onStatusChange('disconnected');
+        this.stopHeartbeat(connectionId);
+        this.scheduleReconnect(connectionId, () => {
+          this.connectOKX(symbol, onMessage, onStatusChange);
         });
       };
 

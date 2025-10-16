@@ -6,12 +6,26 @@
         深度聚合 - 实时对比
       </h1>
       <p class="text-lg opacity-90">
-        实时展示Binance和Toobit交易所的深度数据对比
+        实时展示交易所深度数据对比
       </p>
     </div>
 
     <!-- 控制面板 -->
     <div class="flex justify-between items-center bg-white dark:bg-gray-800 p-5 rounded-lg shadow-md mb-5 flex-wrap gap-4 transition-colors duration-300">
+      <div class="flex items-center gap-3">
+        <label class="font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">选择交易所：</label>
+        <el-select
+          v-model="selectedExchange"
+          placeholder="请选择交易所"
+          size="default"
+          class="min-w-32"
+          @change="onExchangeChange"
+        >
+          <el-option label="币安" value="binance" />
+          <el-option label="OKX" value="okx" />
+        </el-select>
+      </div>
+
       <div class="flex items-center gap-3">
         <label class="font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">选择交易所类型：</label>
         <el-select
@@ -60,9 +74,9 @@
 
       <div class="flex gap-8">
         <div class="flex items-center gap-2">
-          <span class="font-semibold text-gray-700 dark:text-gray-300">Binance :</span>
-          <span :class="getStatusClass(binanceStatus)" />
-          <span class="text-sm text-gray-600 dark:text-gray-400">{{ getStatusText(binanceStatus) }}</span>
+          <span class="font-semibold text-gray-700 dark:text-gray-300">{{ getExchangeDisplayName(selectedExchange) }} :</span>
+          <span :class="getStatusClass(selectedExchangeStatus)" />
+          <span class="text-sm text-gray-600 dark:text-gray-400">{{ getStatusText(selectedExchangeStatus) }}</span>
         </div>
         <div class="flex items-center gap-2">
           <span class="font-semibold text-gray-700 dark:text-gray-300">Toobit :</span>
@@ -81,14 +95,14 @@
             卖盘对比 (Asks)
           </h2>
           <div class="text-sm opacity-90">
-            Binance: {{ binanceLastUpdate }} | Toobit: {{ toobitLastUpdate }}
+            {{ getExchangeDisplayName(selectedExchange) }}: {{ selectedExchangeLastUpdate }} | Toobit: {{ toobitLastUpdate }}
           </div>
         </div>
         <div class=" min-h-[150px] max-h-96 overflow-y-auto relative " v-loading="isLoadingData" element-loading-text="正在获取卖盘数据..." element-loading-background="rgba(255, 255, 255, 0.8)" element-loading-spinner="el-icon-loading" element-loading-svg-view-box="-10, -10, 50, 50">
           <div class="grid grid-cols-2 border-b border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 transition-colors duration-300">
             <div class="border-r border-gray-200 dark:border-gray-600 flex flex-col">
               <div class="px-4 py-2 text-sm font-semibold bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-200 text-center transition-colors duration-300">
-                Binance
+                {{ getExchangeDisplayName(selectedExchange) }}
               </div>
               <div class="grid grid-cols-3 px-4 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 transition-colors duration-300">
                 <span>价格</span>
@@ -107,16 +121,16 @@
               </div>
             </div>
           </div>
-          <div v-for="(item, index) in Math.max(binanceAsks.length, toobitAsks.length)" :key="`ask-${index}`" class="grid grid-cols-2 border-b border-gray-100 dark:border-gray-600">
+          <div v-for="(item, index) in Math.max(selectedExchangeAsks.length, toobitAsks.length)" :key="`ask-${index}`" class="grid grid-cols-2 border-b border-gray-100 dark:border-gray-600">
             <div class="border-r border-gray-200 dark:border-gray-600">
               <div
-                v-if="binanceAsks[index]"
+                v-if="selectedExchangeAsks[index]"
                 class="grid grid-cols-3 px-4 py-2 text-sm font-mono hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors duration-200"
-                :style="{ backgroundColor: `rgba(239, 68, 68, ${0.1 + (index / Math.max(binanceAsks.length, 1)) * 0.2})` }"
+                :style="{ backgroundColor: `rgba(239, 68, 68, ${0.1 + (index / Math.max(selectedExchangeAsks.length, 1)) * 0.2})` }"
               >
-                <span class="text-danger-600 dark:text-danger-400 font-semibold">{{ formatPrice(binanceAsks[index].price) }}</span>
-                <span class="text-gray-600 dark:text-gray-300 text-right">{{ formatQuantity(binanceAsks[index].quantity) }}</span>
-                <span class="text-gray-600 dark:text-gray-300 text-right">{{ formatQuantity(binanceAsks[index].total) }}</span>
+                <span class="text-danger-600 dark:text-danger-400 font-semibold">{{ formatPrice(selectedExchangeAsks[index].price) }}</span>
+                <span class="text-gray-600 dark:text-gray-300 text-right">{{ formatQuantity(selectedExchangeAsks[index].quantity) }}</span>
+                <span class="text-gray-600 dark:text-gray-300 text-right">{{ formatQuantity(selectedExchangeAsks[index].total) }}</span>
               </div>
               <div v-else class="grid grid-cols-3 px-4 py-2 text-sm font-mono text-gray-400 dark:text-gray-500 italic">
                 <span>--</span>
@@ -151,14 +165,14 @@
             买盘对比 (Bids)
           </h2>
           <div class="text-sm opacity-90">
-            Binance: {{ binanceLastUpdate }} | Toobit: {{ toobitLastUpdate }}
+            {{ getExchangeDisplayName(selectedExchange) }}: {{ selectedExchangeLastUpdate }} | Toobit: {{ toobitLastUpdate }}
           </div>
         </div>
         <div class=" min-h-[150px] max-h-96 overflow-y-auto relative" v-loading="isLoadingData" element-loading-text="正在获取买盘数据..." element-loading-background="rgba(255, 255, 255, 0.8)" element-loading-spinner="el-icon-loading" element-loading-svg-view-box="-10, -10, 50, 50">
           <div class="grid grid-cols-2 border-b border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 transition-colors duration-300">
             <div class="border-r border-gray-200 dark:border-gray-600 flex flex-col">
               <div class="px-4 py-2 text-sm font-semibold bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-200 text-center transition-colors duration-300">
-                Binance
+                {{ getExchangeDisplayName(selectedExchange) }}
               </div>
               <div class="grid grid-cols-3 px-4 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 transition-colors duration-300">
                 <span>价格</span>
@@ -177,16 +191,16 @@
               </div>
             </div>
           </div>
-          <div v-for="(item, index) in Math.max(binanceBids.length, toobitBids.length)" :key="`bid-${index}`" class="grid grid-cols-2 border-b border-gray-100 dark:border-gray-600">
+          <div v-for="(item, index) in Math.max(selectedExchangeBids.length, toobitBids.length)" :key="`bid-${index}`" class="grid grid-cols-2 border-b border-gray-100 dark:border-gray-600">
             <div class="border-r border-gray-200 dark:border-gray-600">
               <div
-                v-if="binanceBids[index]"
+                v-if="selectedExchangeBids[index]"
                 class="grid grid-cols-3 px-4 py-2 text-sm font-mono hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors duration-200"
-                :style="{ backgroundColor: `rgba(34, 197, 94, ${0.1 + (index / Math.max(binanceBids.length, 1)) * 0.2})` }"
+                :style="{ backgroundColor: `rgba(34, 197, 94, ${0.1 + (index / Math.max(selectedExchangeBids.length, 1)) * 0.2})` }"
               >
-                <span class="text-success-600 dark:text-success-400 font-semibold">{{ formatPrice(binanceBids[index].price) }}</span>
-                <span class="text-gray-600 dark:text-gray-300 text-right">{{ formatQuantity(binanceBids[index].quantity) }}</span>
-                <span class="text-gray-600 dark:text-gray-300 text-right">{{ formatQuantity(binanceBids[index].total) }}</span>
+                <span class="text-success-600 dark:text-success-400 font-semibold">{{ formatPrice(selectedExchangeBids[index].price) }}</span>
+                <span class="text-gray-600 dark:text-gray-300 text-right">{{ formatQuantity(selectedExchangeBids[index].quantity) }}</span>
+                <span class="text-gray-600 dark:text-gray-300 text-right">{{ formatQuantity(selectedExchangeBids[index].total) }}</span>
               </div>
               <div v-else class="grid grid-cols-3 px-4 py-2 text-sm font-mono text-gray-400 dark:text-gray-500 italic">
                 <span>--</span>
@@ -216,31 +230,31 @@
     </div>
 
     <!-- 标记价格信息 -->
-    <div class="bg-white dark:bg-gray-800 p-5 rounded-lg shadow-md mb-5 transition-colors duration-300">
+    <div v-if="selectedExchange === 'binance' " class="bg-white dark:bg-gray-800 p-5 rounded-lg shadow-md mb-5 transition-colors duration-300">
       <h3 class="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-4 flex items-center">
         <span class="w-3 h-3 bg-blue-500 rounded-full mr-2" />
-        Binance 标记价格信息
+        {{ getExchangeDisplayName(selectedExchange) }} 标记价格信息
         <span class="ml-2 text-sm font-normal text-gray-500 dark:text-gray-400">
-          ({{ binanceMarkPriceLastUpdate }})
+          ({{ selectedExchangeMarkPriceLastUpdate }})
         </span>
-        <span :class="getStatusClass(binanceMarkPriceStatus)" class="ml-2" />
+        <span :class="getStatusClass(selectedExchangeMarkPriceStatus)" class="ml-2" />
       </h3>
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div class="flex justify-between items-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md border-l-4 border-blue-500 transition-colors duration-300">
           <span class="font-semibold text-gray-700 dark:text-gray-300">标记价格:</span>
-          <span class="font-mono font-semibold text-blue-600 dark:text-blue-400">{{ formatMarkPrice(binanceMarkPrice) }}</span>
+          <span class="font-mono font-semibold text-blue-600 dark:text-blue-400">{{ formatMarkPrice(selectedExchangeMarkPrice) }}</span>
         </div>
         <div class="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900/20 rounded-md border-l-4 border-green-500 transition-colors duration-300">
           <span class="font-semibold text-gray-700 dark:text-gray-300">指数价格:</span>
-          <span class="font-mono font-semibold text-green-600 dark:text-green-400">{{ formatMarkPrice(binanceIndexPrice) }}</span>
+          <span class="font-mono font-semibold text-green-600 dark:text-green-400">{{ formatMarkPrice(selectedExchangeIndexPrice) }}</span>
         </div>
         <div class="flex justify-between items-center p-3 bg-purple-50 dark:bg-purple-900/20 rounded-md border-l-4 border-purple-500 transition-colors duration-300">
           <span class="font-semibold text-gray-700 dark:text-gray-300">资金费率:</span>
-          <span class="font-mono font-semibold text-purple-600 dark:text-purple-400">{{ formatFundingRate(binanceFundingRate) }}</span>
+          <span class="font-mono font-semibold text-purple-600 dark:text-purple-400">{{ formatFundingRate(selectedExchangeFundingRate) }}</span>
         </div>
         <div class="flex justify-between items-center p-3 bg-orange-50 dark:bg-orange-900/20 rounded-md border-l-4 border-orange-500 transition-colors duration-300">
           <span class="font-semibold text-gray-700 dark:text-gray-300">下次资金时间:</span>
-          <span class="font-mono font-semibold text-orange-600 dark:text-orange-400">{{ formatTimestamp(binanceNextFundingTime) }}</span>
+          <span class="font-mono font-semibold text-orange-600 dark:text-orange-400">{{ formatTimestamp(selectedExchangeNextFundingTime) }}</span>
         </div>
       </div>
     </div>
@@ -248,12 +262,12 @@
     <!-- 统计信息 -->
     <div class="bg-white dark:bg-gray-800 p-5 rounded-lg shadow-md grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 transition-colors duration-300">
       <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-md border-l-4 border-primary-500 transition-colors duration-300">
-        <span class="font-semibold text-gray-700 dark:text-gray-300">Binance 最佳买价:</span>
-        <span class="font-mono font-semibold text-gray-800 dark:text-gray-200">{{ formatPrice(binanceBestBid) }}</span>
+        <span class="font-semibold text-gray-700 dark:text-gray-300">{{ getExchangeDisplayName(selectedExchange) }} 最佳买价:</span>
+        <span class="font-mono font-semibold text-gray-800 dark:text-gray-200">{{ formatPrice(selectedExchangeBestBid) }}</span>
       </div>
       <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-md border-l-4 border-primary-500 transition-colors duration-300">
-        <span class="font-semibold text-gray-700 dark:text-gray-300">Binance 最佳卖价:</span>
-        <span class="font-mono font-semibold text-gray-800 dark:text-gray-200">{{ formatPrice(binanceBestAsk) }}</span>
+        <span class="font-semibold text-gray-700 dark:text-gray-300">{{ getExchangeDisplayName(selectedExchange) }} 最佳卖价:</span>
+        <span class="font-mono font-semibold text-gray-800 dark:text-gray-200">{{ formatPrice(selectedExchangeBestAsk) }}</span>
       </div>
       <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-md border-l-4 border-primary-500 transition-colors duration-300">
         <span class="font-semibold text-gray-700 dark:text-gray-300">Toobit 最佳买价:</span>
@@ -264,7 +278,7 @@
         <span class="font-mono font-semibold text-gray-800 dark:text-gray-200">{{ formatPrice(toobitBestAsk) }}</span>
       </div>
       <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-md border-l-4 border-primary-500 transition-colors duration-300">
-        <span class="font-semibold text-gray-700 dark:text-gray-300">价差 (Binance - Toobit):</span>
+        <span class="font-semibold text-gray-700 dark:text-gray-300">价差 ({{ getExchangeDisplayName(selectedExchange) }} - Toobit):</span>
         <span class="font-mono font-semibold text-gray-800 dark:text-gray-200">{{ formatPrice(priceDifference) }}</span>
       </div>
     </div>
@@ -277,27 +291,28 @@ import { DepthDataProcessor, WebSocketService } from '../services/WebSocketServi
 
 // 响应式数据
 const selectedSymbol = ref('BTCUSDT');
+const selectedExchange = ref('binance'); // 新增：选择的交易所
 const exchangeType = ref('futures');
 const depthLevels = ref(5);
-const binanceStatus = ref('disconnected');
+const selectedExchangeStatus = ref('disconnected'); // 新增：选择的交易所状态
 const toobitStatus = ref('disconnected');
-const binanceMarkPriceStatus = ref('disconnected');
+const selectedExchangeMarkPriceStatus = ref('disconnected'); // 新增：选择的交易所标记价格状态
 const isLoadingData = ref(false);
-const binanceLastUpdate = ref('--');
+const selectedExchangeLastUpdate = ref('--'); // 新增：选择的交易所最后更新时间
 const toobitLastUpdate = ref('--');
-const binanceMarkPriceLastUpdate = ref('--');
-const binanceAsks = ref([]);
-const binanceBids = ref([]);
+const selectedExchangeMarkPriceLastUpdate = ref('--'); // 新增：选择的交易所标记价格最后更新时间
+const selectedExchangeAsks = ref([]); // 新增：选择的交易所卖盘数据
+const selectedExchangeBids = ref([]); // 新增：选择的交易所买盘数据
 const toobitAsks = ref([]);
 const toobitBids = ref([]);
-const binanceBestBid = ref(0);
-const binanceBestAsk = ref(0);
+const selectedExchangeBestBid = ref(0); // 新增：选择的交易所最佳买价
+const selectedExchangeBestAsk = ref(0); // 新增：选择的交易所最佳卖价
 const toobitBestBid = ref(0);
 const toobitBestAsk = ref(0);
-const binanceMarkPrice = ref(0);
-const binanceIndexPrice = ref(0);
-const binanceFundingRate = ref(0);
-const binanceNextFundingTime = ref(0);
+const selectedExchangeMarkPrice = ref(0); // 新增：选择的交易所标记价格
+const selectedExchangeIndexPrice = ref(0); // 新增：选择的交易所指数价格
+const selectedExchangeFundingRate = ref(0); // 新增：选择的交易所资金费率
+const selectedExchangeNextFundingTime = ref(0); // 新增：选择的交易所下次资金时间
 
 // WebSocket服务实例
 let wsService = null;
@@ -305,7 +320,7 @@ let reconnectTimer = null;
 
 // 计算属性
 const priceDifference = computed(() => {
-  return binanceBestBid.value - toobitBestBid.value;
+  return selectedExchangeBestBid.value - toobitBestBid.value;
 });
 
 // 方法
@@ -349,11 +364,30 @@ const formatTimestamp = timestamp => {
   return DepthDataProcessor.formatTimestamp(timestamp);
 };
 
+// 新增：获取交易所显示名称
+const getExchangeDisplayName = exchange => {
+  const exchangeNames = {
+    binance: '币安',
+    okx: 'OKX',
+    toobit: 'Toobit'
+  };
+  return exchangeNames[exchange] || exchange;
+};
+
 // WebSocket连接管理
 const initializeWebSockets = () => {
   wsService = new WebSocketService();
-  connectBinance();
+  connectSelectedExchange();
   connectToobit();
+};
+
+// 新增：连接选择的交易所
+const connectSelectedExchange = () => {
+  if (selectedExchange.value === 'binance') {
+    connectBinance();
+  } else if (selectedExchange.value === 'okx') {
+    connectOKX();
+  }
 };
 
 const connectBinance = () => {
@@ -361,11 +395,11 @@ const connectBinance = () => {
     // 使用合并连接，同时获取深度数据和标记价格
     wsService.connectBinanceFuturesWithMarkPrice(
       selectedSymbol.value, 
-      handleBinanceData, 
-      handleBinanceMarkPriceData, 
+      handleSelectedExchangeData, 
+      handleSelectedExchangeMarkPriceData, 
       status => {
-        binanceStatus.value = status;
-        binanceMarkPriceStatus.value = status; // 标记价格状态与深度数据状态同步
+        selectedExchangeStatus.value = status;
+        selectedExchangeMarkPriceStatus.value = status; // 标记价格状态与深度数据状态同步
         
         // 连接成功后隐藏 loading
         if (status === 'connected') {
@@ -378,8 +412,8 @@ const connectBinance = () => {
       depthLevels.value // 传递深度档位参数
     );
   } else {
-    wsService.connectBinance(selectedSymbol.value, handleBinanceData, status => {
-      binanceStatus.value = status;
+    wsService.connectBinance(selectedSymbol.value, handleSelectedExchangeData, status => {
+      selectedExchangeStatus.value = status;
       
       // 连接成功后隐藏 loading
       if (status === 'connected') {
@@ -391,6 +425,19 @@ const connectBinance = () => {
   }
 };
 
+const connectOKX = () => {
+  wsService.connectOKX(selectedSymbol.value, handleSelectedExchangeData, status => {
+    selectedExchangeStatus.value = status;
+    
+    // 连接成功后隐藏 loading
+    if (status === 'connected') {
+      setTimeout(() => {
+        isLoadingData.value = false;
+      }, 1000);
+    }
+  });
+};
+
 const connectToobit = () => {
   wsService.connectToobit(selectedSymbol.value, handleToobitData, status => {
     toobitStatus.value = status;
@@ -398,19 +445,19 @@ const connectToobit = () => {
 };
 
 // 数据处理
-const handleBinanceData = data => {
-  if (data.e === 'depthUpdate') {
+const handleSelectedExchangeData = data => {
+  if (data.e === 'depthUpdate' || (data.a && data.b)) {
     const processedAsks = DepthDataProcessor.processDepthData(data.a, 'asks', depthLevels.value);
     const processedBids = DepthDataProcessor.processDepthData(data.b, 'bids', depthLevels.value);
 
-    binanceAsks.value = processedAsks;
-    binanceBids.value = processedBids;
+    selectedExchangeAsks.value = processedAsks;
+    selectedExchangeBids.value = processedBids;
 
     const bestPrices = DepthDataProcessor.calculateBestPrices(processedBids, processedAsks);
-    binanceBestBid.value = bestPrices.bestBid;
-    binanceBestAsk.value = bestPrices.bestAsk;
+    selectedExchangeBestBid.value = bestPrices.bestBid;
+    selectedExchangeBestAsk.value = bestPrices.bestAsk;
 
-    binanceLastUpdate.value = new Date().toLocaleTimeString();
+    selectedExchangeLastUpdate.value = new Date().toLocaleTimeString();
     
     // 隐藏 loading 状态
     isLoadingData.value = false;
@@ -441,21 +488,25 @@ const handleToobitData = data => {
   isLoadingData.value = false;
 };
 
-const handleBinanceMarkPriceData = data => {
+const handleSelectedExchangeMarkPriceData = data => {
   
   const processedData = DepthDataProcessor.processMarkPriceData(data);
   
-  binanceMarkPrice.value = processedData.markPrice;
-  binanceIndexPrice.value = processedData.indexPrice;
-  binanceFundingRate.value = processedData.lastFundingRate;
-  binanceNextFundingTime.value = processedData.nextFundingTime;
+  selectedExchangeMarkPrice.value = processedData.markPrice;
+  selectedExchangeIndexPrice.value = processedData.indexPrice;
+  selectedExchangeFundingRate.value = processedData.lastFundingRate;
+  selectedExchangeNextFundingTime.value = processedData.nextFundingTime;
   
-  binanceMarkPriceLastUpdate.value = new Date().toLocaleTimeString();
+  selectedExchangeMarkPriceLastUpdate.value = new Date().toLocaleTimeString();
   
 };
 
 // 事件处理
 const onSymbolChange = () => {
+  handleConnectionChange();
+};
+
+const onExchangeChange = () => {
   handleConnectionChange();
 };
 
@@ -496,31 +547,31 @@ const closeWebSockets = () => {
   }
 
   // 清空所有数据
-  binanceAsks.value = [];
-  binanceBids.value = [];
+  selectedExchangeAsks.value = [];
+  selectedExchangeBids.value = [];
   toobitAsks.value = [];
   toobitBids.value = [];
 
   // 重置最佳价格
-  binanceBestBid.value = 0;
-  binanceBestAsk.value = 0;
+  selectedExchangeBestBid.value = 0;
+  selectedExchangeBestAsk.value = 0;
   toobitBestBid.value = 0;
   toobitBestAsk.value = 0;
 
   // 重置状态
-  binanceStatus.value = 'disconnected';
+  selectedExchangeStatus.value = 'disconnected';
   toobitStatus.value = 'disconnected';
-  binanceMarkPriceStatus.value = 'disconnected';
-  binanceLastUpdate.value = '--';
+  selectedExchangeMarkPriceStatus.value = 'disconnected';
+  selectedExchangeLastUpdate.value = '--';
   toobitLastUpdate.value = '--';
-  binanceMarkPriceLastUpdate.value = '--';
+  selectedExchangeMarkPriceLastUpdate.value = '--';
 
   console.log('数据已清空，状态已重置');
 };
 
 // 监听器
-watch([selectedSymbol, exchangeType], () => {
-  console.log('监听器触发:', { symbol: selectedSymbol.value, type: exchangeType.value });
+watch([selectedSymbol, selectedExchange, exchangeType], () => {
+  console.log('监听器触发:', { symbol: selectedSymbol.value, exchange: selectedExchange.value, type: exchangeType.value });
 });
 
 // 生命周期

@@ -1,7 +1,8 @@
 const toobitFuturesWebSocketUrl = 'wss://stream.toobit.com/quote/ws/v1';
 const binanceFuturesWebSocketUrl = 'wss://fstream.binance.com/ws';
 const binanceSpotWebSocketUrl = 'wss://stream.binance.com:9443/ws';
-export { toobitFuturesWebSocketUrl, binanceFuturesWebSocketUrl, binanceSpotWebSocketUrl };
+const okxFuturesWebSocketUrl = 'wss://ws.okx.com:8443/ws/v5/public';
+export { binanceFuturesWebSocketUrl, binanceSpotWebSocketUrl, okxFuturesWebSocketUrl, toobitFuturesWebSocketUrl };
 
 /**
  * 币对映射函数
@@ -46,6 +47,10 @@ function mapSymbol(symbol, exchange) {
     // Binance 格式: BTCUSDT -> btcusdt, BTCUSDC -> btcusdc
     return `${baseCurrency.toLowerCase()}${quoteCurrency.toLowerCase()}`;
 
+  case 'okx':
+    // OKX 格式: BTCUSDT -> BTC-USDT-SWAP
+    return `${baseCurrency}-${quoteCurrency}-SWAP`;
+
   default:
     // 默认返回原始格式
     return symbol;
@@ -70,4 +75,14 @@ function binanceSymbol(symbol) {
   return mapSymbol(symbol, 'binance');
 }
 
-export { mapSymbol, toobitSymbol, binanceSymbol };
+/**
+ * 获取 OKX 格式的币对
+ * @param {string} symbol - 标准币对格式
+ * @returns {string} OKX 格式的币对
+ */
+function okxSymbol(symbol) {
+  return mapSymbol(symbol, 'okx');
+}
+
+export { binanceSymbol, mapSymbol, okxSymbol, toobitSymbol };
+
