@@ -79,7 +79,7 @@
                             </div>
                         </div>
                     </div>
-                    <div v-for="index in Math.max(binanceAsks.length, toobitAsks.length)" :key="`ask-${index}`"
+                    <div v-for="(item, index) in Math.max(binanceAsks.length, toobitAsks.length)" :key="`ask-${index}`"
                         class="grid grid-cols-2 border-b border-gray-100">
                         <div class="border-r border-gray-200">
                             <div v-if="binanceAsks[index]"
@@ -151,7 +151,7 @@
                             </div>
                         </div>
                     </div>
-                    <div v-for="index in Math.max(binanceBids.length, toobitBids.length)" :key="`bid-${index}`"
+                    <div v-for="(item, index) in Math.max(binanceBids.length, toobitBids.length)" :key="`bid-${index}`"
                         class="grid grid-cols-2 border-b border-gray-100">
                         <div class="border-r border-gray-200">
                             <div v-if="binanceBids[index]"

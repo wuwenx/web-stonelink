@@ -379,7 +379,7 @@ export class DepthDataProcessor {
    * @param {number} maxLevels - 最大档位数
    * @returns {Array} 处理后的深度数据
    */
-  static processDepthData(rawData, type, maxLevels = 20) {
+  static processDepthData(rawData, type, maxLevels = 5) {
     if (!rawData || !Array.isArray(rawData)) {
       return []
     }
@@ -392,18 +392,28 @@ export class DepthDataProcessor {
       }))
       .slice(0, maxLevels) // 限制档位数
     
-    // 计算累计数量
-    let total = 0
-    processed.forEach(item => {
-      total += item.quantity
-      item.total = total
-    })
-    
-    // 排序：asks升序，bids降序
+    // 排序：asks降序，bids升序
     if (type === 'asks') {
-      processed.sort((a, b) => a.price - b.price)
+      processed.sort((a, b) => b.price - a.price)  // 卖盘降序
     } else {
-      processed.sort((a, b) => b.price - a.price)
+      processed.sort((a, b) => a.price - b.price)  // 买盘升序
+    }
+    
+    // 计算累计数量（在排序后进行）
+    if (type === 'asks') {
+      // 卖盘：从最后一条（最接近市价）开始向上累计
+      let total = 0
+      for (let i = processed.length - 1; i >= 0; i--) {
+        total += processed[i].quantity
+        processed[i].total = total
+      }
+    } else {
+      // 买盘：从第一条（最接近市价）开始向下累计
+      let total = 0
+      processed.forEach(item => {
+        total += item.quantity
+        item.total = total
+      })
     }
     
     return processed
