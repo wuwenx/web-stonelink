@@ -1,5 +1,5 @@
 <template>
-    <div class="max-w-7xl mx-auto p-5 font-sans bg-gray-50 min-h-screen">
+    <div class="container mx-auto p-5 font-sans bg-gray-50 min-h-screen">
         <!-- 页面标题 -->
         <div
             class="text-center mb-8 bg-gradient-to-r from-primary-500 to-purple-600 text-white p-8 rounded-lg shadow-lg">
@@ -33,7 +33,7 @@
             <div class="flex gap-8">
                 <div class="flex items-center gap-2">
                     <span class="font-semibold text-gray-700">Binance {{ exchangeType === 'spot' ? '现货' : 'U本位合约'
-                    }}:</span>
+                        }}:</span>
                     <span :class="getStatusClass(binanceStatus)"></span>
                     <span class="text-sm text-gray-600">{{ getStatusText(binanceStatus) }}</span>
                 </div>
@@ -86,11 +86,11 @@
                                 class="grid grid-cols-3 px-4 py-2 text-sm font-mono hover:bg-red-50 transition-colors duration-200"
                                 :style="{ backgroundColor: `rgba(239, 68, 68, ${0.1 + (index / Math.max(binanceAsks.length, 1)) * 0.2})` }">
                                 <span class="text-danger-600 font-semibold">{{ formatPrice(binanceAsks[index].price)
-                                }}</span>
+                                    }}</span>
                                 <span class="text-gray-600 text-right">{{ formatQuantity(binanceAsks[index].quantity)
-                                }}</span>
+                                    }}</span>
                                 <span class="text-gray-600 text-right">{{ formatQuantity(binanceAsks[index].total)
-                                }}</span>
+                                    }}</span>
                             </div>
                             <div v-else class="grid grid-cols-3 px-4 py-2 text-sm font-mono text-gray-400 italic">
                                 <span>--</span>
@@ -103,11 +103,11 @@
                                 class="grid grid-cols-3 px-4 py-2 text-sm font-mono hover:bg-red-50 transition-colors duration-200"
                                 :style="{ backgroundColor: `rgba(239, 68, 68, ${0.1 + (index / Math.max(toobitAsks.length, 1)) * 0.2})` }">
                                 <span class="text-danger-600 font-semibold">{{ formatPrice(toobitAsks[index].price)
-                                }}</span>
+                                    }}</span>
                                 <span class="text-gray-600 text-right">{{ formatQuantity(toobitAsks[index].quantity)
-                                }}</span>
+                                    }}</span>
                                 <span class="text-gray-600 text-right">{{ formatQuantity(toobitAsks[index].total)
-                                }}</span>
+                                    }}</span>
                             </div>
                             <div v-else class="grid grid-cols-3 px-4 py-2 text-sm font-mono text-gray-400 italic">
                                 <span>--</span>
@@ -158,11 +158,11 @@
                                 class="grid grid-cols-3 px-4 py-2 text-sm font-mono hover:bg-green-50 transition-colors duration-200"
                                 :style="{ backgroundColor: `rgba(34, 197, 94, ${0.1 + (index / Math.max(binanceBids.length, 1)) * 0.2})` }">
                                 <span class="text-success-600 font-semibold">{{ formatPrice(binanceBids[index].price)
-                                }}</span>
+                                    }}</span>
                                 <span class="text-gray-600 text-right">{{ formatQuantity(binanceBids[index].quantity)
-                                }}</span>
+                                    }}</span>
                                 <span class="text-gray-600 text-right">{{ formatQuantity(binanceBids[index].total)
-                                }}</span>
+                                    }}</span>
                             </div>
                             <div v-else class="grid grid-cols-3 px-4 py-2 text-sm font-mono text-gray-400 italic">
                                 <span>--</span>
@@ -175,11 +175,11 @@
                                 class="grid grid-cols-3 px-4 py-2 text-sm font-mono hover:bg-green-50 transition-colors duration-200"
                                 :style="{ backgroundColor: `rgba(34, 197, 94, ${0.1 + (index / Math.max(toobitBids.length, 1)) * 0.2})` }">
                                 <span class="text-success-600 font-semibold">{{ formatPrice(toobitBids[index].price)
-                                }}</span>
+                                    }}</span>
                                 <span class="text-gray-600 text-right">{{ formatQuantity(toobitBids[index].quantity)
-                                }}</span>
+                                    }}</span>
                                 <span class="text-gray-600 text-right">{{ formatQuantity(toobitBids[index].total)
-                                }}</span>
+                                    }}</span>
                             </div>
                             <div v-else class="grid grid-cols-3 px-4 py-2 text-sm font-mono text-gray-400 italic">
                                 <span>--</span>

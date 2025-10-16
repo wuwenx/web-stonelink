@@ -2,6 +2,8 @@
  * WebSocket服务类
  * 用于管理交易所WebSocket连接，提供统一的数据处理接口
  */
+import { toobitFuturesWebSocketUrl, binanceSpotWebSocketUrl, binanceFuturesWebSocketUrl, toobitSymbol, binanceSymbol } from '../config/const'
+
 export class WebSocketService {
   constructor() {
     this.connections = new Map()
@@ -28,7 +30,7 @@ export class WebSocketService {
 
     try {
       const stream = `${symbol.toLowerCase()}@depth20@100ms`
-      const wsUrl = `wss://stream.binance.com:9443/ws/${stream}`
+      const wsUrl = binanceSpotWebSocketUrl + stream
       
       const ws = new WebSocket(wsUrl)
       this.connections.set(connectionId, ws)
@@ -88,7 +90,7 @@ export class WebSocketService {
 
     try {
       // U本位合约使用正确的WebSocket端点
-      const wsUrl = 'wss://fstream.binance.com/ws'
+      const wsUrl = binanceFuturesWebSocketUrl
       
       const ws = new WebSocket(wsUrl)
       this.connections.set(connectionId, ws)
@@ -103,7 +105,7 @@ export class WebSocketService {
         // 订阅深度数据流
         const subscribeMessage = {
           method: 'SUBSCRIBE',
-          params: [`${symbol.toLowerCase()}@depth20@100ms`],
+          params: [`${binanceSymbol(symbol).toLowerCase()}@depth20@100ms`],
           id: Date.now()
         }
         ws.send(JSON.stringify(subscribeMessage))
@@ -174,7 +176,7 @@ export class WebSocketService {
     }
 
     try {
-      const wsUrl = 'wss://stream.toobit.com/quote/ws/v1'
+      const wsUrl = toobitFuturesWebSocketUrl
       
       const ws = new WebSocket(wsUrl)
       this.connections.set(connectionId, ws)
@@ -188,7 +190,7 @@ export class WebSocketService {
         
         // 订阅深度数据
         const subscribeMessage = {
-          symbol: symbol,
+          symbol: toobitSymbol(symbol),
           topic: "depth",
           event: "sub"
         }
