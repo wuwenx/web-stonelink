@@ -75,7 +75,7 @@
     <!-- 深度数据展示区域 -->
     <div class="flex flex-col gap-5 mb-5">
       <!-- 卖盘对比区域 -->
-      <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden transition-colors duration-300">
+      <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden transition-colors duration-300 relative">
         <div class="bg-gradient-to-r from-danger-500 to-red-600 text-white p-4 flex justify-between items-center">
           <h2 class="text-2xl font-light">
             卖盘对比 (Asks)
@@ -84,7 +84,7 @@
             Binance: {{ binanceLastUpdate }} | Toobit: {{ toobitLastUpdate }}
           </div>
         </div>
-        <div class="max-h-96 overflow-y-auto">
+        <div class=" min-h-[150px] max-h-96 overflow-y-auto relative " v-loading="isLoadingData" element-loading-text="正在获取卖盘数据..." element-loading-background="rgba(255, 255, 255, 0.8)" element-loading-spinner="el-icon-loading" element-loading-svg-view-box="-10, -10, 50, 50">
           <div class="grid grid-cols-2 border-b border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 transition-colors duration-300">
             <div class="border-r border-gray-200 dark:border-gray-600 flex flex-col">
               <div class="px-4 py-2 text-sm font-semibold bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-200 text-center transition-colors duration-300">
@@ -145,7 +145,7 @@
       </div>
 
       <!-- 买盘对比区域 -->
-      <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden transition-colors duration-300">
+      <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden transition-colors duration-300 relative">
         <div class="bg-gradient-to-r from-success-500 to-green-600 text-white p-4 flex justify-between items-center">
           <h2 class="text-2xl font-light">
             买盘对比 (Bids)
@@ -154,7 +154,7 @@
             Binance: {{ binanceLastUpdate }} | Toobit: {{ toobitLastUpdate }}
           </div>
         </div>
-        <div class="max-h-96 overflow-y-auto">
+        <div class=" min-h-[150px] max-h-96 overflow-y-auto relative" v-loading="isLoadingData" element-loading-text="正在获取买盘数据..." element-loading-background="rgba(255, 255, 255, 0.8)" element-loading-spinner="el-icon-loading" element-loading-svg-view-box="-10, -10, 50, 50">
           <div class="grid grid-cols-2 border-b border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 transition-colors duration-300">
             <div class="border-r border-gray-200 dark:border-gray-600 flex flex-col">
               <div class="px-4 py-2 text-sm font-semibold bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-200 text-center transition-colors duration-300">
@@ -282,6 +282,7 @@ const depthLevels = ref(5);
 const binanceStatus = ref('disconnected');
 const toobitStatus = ref('disconnected');
 const binanceMarkPriceStatus = ref('disconnected');
+const isLoadingData = ref(false);
 const binanceLastUpdate = ref('--');
 const toobitLastUpdate = ref('--');
 const binanceMarkPriceLastUpdate = ref('--');
@@ -365,12 +366,27 @@ const connectBinance = () => {
       status => {
         binanceStatus.value = status;
         binanceMarkPriceStatus.value = status; // 标记价格状态与深度数据状态同步
+        
+        // 连接成功后隐藏 loading
+        if (status === 'connected') {
+          // 延迟隐藏 loading，确保数据已经加载
+          setTimeout(() => {
+            isLoadingData.value = false;
+          }, 1000);
+        }
       },
       depthLevels.value // 传递深度档位参数
     );
   } else {
     wsService.connectBinance(selectedSymbol.value, handleBinanceData, status => {
       binanceStatus.value = status;
+      
+      // 连接成功后隐藏 loading
+      if (status === 'connected') {
+        setTimeout(() => {
+          isLoadingData.value = false;
+        }, 1000);
+      }
     });
   }
 };
@@ -395,6 +411,9 @@ const handleBinanceData = data => {
     binanceBestAsk.value = bestPrices.bestAsk;
 
     binanceLastUpdate.value = new Date().toLocaleTimeString();
+    
+    // 隐藏 loading 状态
+    isLoadingData.value = false;
   } else {
   }
 };
@@ -417,6 +436,9 @@ const handleToobitData = data => {
   toobitBestAsk.value = bestPrices.bestAsk;
 
   toobitLastUpdate.value = new Date().toLocaleTimeString();
+  
+  // 隐藏 loading 状态
+  isLoadingData.value = false;
 };
 
 const handleBinanceMarkPriceData = data => {
@@ -449,6 +471,9 @@ const onDepthLevelsChange = () => {
 
 // 统一的连接变更处理
 const handleConnectionChange = () => {
+  // 显示 loading 状态
+  isLoadingData.value = true;
+  
   // 清除之前的重连定时器
   if (reconnectTimer) {
     clearTimeout(reconnectTimer);
@@ -517,3 +542,39 @@ onUnmounted(() => {
   closeWebSockets();
 });
 </script>
+
+<style scoped>
+/* 自定义 loading 样式 */
+:deep(.el-loading-mask) {
+  background-color: rgba(255, 255, 255, 0.9) !important;
+}
+
+:deep(.el-loading-spinner) {
+  margin-top: -25px;
+}
+
+:deep(.el-loading-spinner .el-loading-text) {
+  color: #409eff !important;
+  font-size: 14px;
+  font-weight: 500;
+  margin-top: 8px;
+}
+
+:deep(.el-loading-spinner .circular) {
+  width: 32px !important;
+  height: 32px !important;
+}
+
+/* 暗色模式下的 loading 样式 */
+.dark :deep(.el-loading-mask) {
+  background-color: rgba(31, 41, 55, 0.9) !important;
+}
+
+.dark :deep(.el-loading-spinner .el-loading-text) {
+  color: #60a5fa !important;
+}
+
+.dark :deep(.el-loading-spinner .circular) {
+  color: #60a5fa !important;
+}
+</style>
