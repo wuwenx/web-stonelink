@@ -20,9 +20,9 @@
           class="px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 cursor-pointer transition-colors duration-200 min-w-32 focus:outline-none focus:border-primary-500"
           @change="onExchangeTypeChange"
         >
-          <option value="spot">
+          <!-- <option value="spot">
             现货交易
-          </option>
+          </option> -->
           <option value="futures">
             U本位合约
           </option>
@@ -212,6 +212,36 @@
       </div>
     </div>
 
+    <!-- 标记价格信息 -->
+    <div class="bg-white dark:bg-gray-800 p-5 rounded-lg shadow-md mb-5 transition-colors duration-300">
+      <h3 class="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-4 flex items-center">
+        <span class="w-3 h-3 bg-blue-500 rounded-full mr-2"></span>
+        Binance 标记价格信息
+        <span class="ml-2 text-sm font-normal text-gray-500 dark:text-gray-400">
+          ({{ binanceMarkPriceLastUpdate }})
+        </span>
+        <span :class="getStatusClass(binanceMarkPriceStatus)" class="ml-2" />
+      </h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="flex justify-between items-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md border-l-4 border-blue-500 transition-colors duration-300">
+          <span class="font-semibold text-gray-700 dark:text-gray-300">标记价格:</span>
+          <span class="font-mono font-semibold text-blue-600 dark:text-blue-400">{{ formatMarkPrice(binanceMarkPrice) }}</span>
+        </div>
+        <div class="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900/20 rounded-md border-l-4 border-green-500 transition-colors duration-300">
+          <span class="font-semibold text-gray-700 dark:text-gray-300">指数价格:</span>
+          <span class="font-mono font-semibold text-green-600 dark:text-green-400">{{ formatMarkPrice(binanceIndexPrice) }}</span>
+        </div>
+        <div class="flex justify-between items-center p-3 bg-purple-50 dark:bg-purple-900/20 rounded-md border-l-4 border-purple-500 transition-colors duration-300">
+          <span class="font-semibold text-gray-700 dark:text-gray-300">资金费率:</span>
+          <span class="font-mono font-semibold text-purple-600 dark:text-purple-400">{{ formatFundingRate(binanceFundingRate) }}</span>
+        </div>
+        <div class="flex justify-between items-center p-3 bg-orange-50 dark:bg-orange-900/20 rounded-md border-l-4 border-orange-500 transition-colors duration-300">
+          <span class="font-semibold text-gray-700 dark:text-gray-300">下次资金时间:</span>
+          <span class="font-mono font-semibold text-orange-600 dark:text-orange-400">{{ formatTimestamp(binanceNextFundingTime) }}</span>
+        </div>
+      </div>
+    </div>
+
     <!-- 统计信息 -->
     <div class="bg-white dark:bg-gray-800 p-5 rounded-lg shadow-md grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 transition-colors duration-300">
       <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-md border-l-4 border-primary-500 transition-colors duration-300">
@@ -247,8 +277,10 @@ const selectedSymbol = ref('BTCUSDT');
 const exchangeType = ref('futures');
 const binanceStatus = ref('disconnected');
 const toobitStatus = ref('disconnected');
+const binanceMarkPriceStatus = ref('disconnected');
 const binanceLastUpdate = ref('--');
 const toobitLastUpdate = ref('--');
+const binanceMarkPriceLastUpdate = ref('--');
 const binanceAsks = ref([]);
 const binanceBids = ref([]);
 const toobitAsks = ref([]);
@@ -257,6 +289,10 @@ const binanceBestBid = ref(0);
 const binanceBestAsk = ref(0);
 const toobitBestBid = ref(0);
 const toobitBestAsk = ref(0);
+const binanceMarkPrice = ref(0);
+const binanceIndexPrice = ref(0);
+const binanceFundingRate = ref(0);
+const binanceNextFundingTime = ref(0);
 
 // WebSocket服务实例
 let wsService = null;
@@ -296,24 +332,33 @@ const formatQuantity = quantity => {
   return DepthDataProcessor.formatQuantity(quantity);
 };
 
+const formatMarkPrice = markPrice => {
+  return DepthDataProcessor.formatMarkPrice(markPrice);
+};
+
+const formatFundingRate = fundingRate => {
+  return DepthDataProcessor.formatFundingRate(fundingRate);
+};
+
+const formatTimestamp = timestamp => {
+  return DepthDataProcessor.formatTimestamp(timestamp);
+};
+
 // WebSocket连接管理
 const initializeWebSockets = () => {
-  console.log('初始化WebSocket连接');
   wsService = new WebSocketService();
   connectBinance();
   connectToobit();
+  connectBinanceMarkPrice();
 };
 
 const connectBinance = () => {
-  console.log('连接Binance WebSocket, 类型:', exchangeType.value);
   if (exchangeType.value === 'futures') {
     wsService.connectBinanceFutures(selectedSymbol.value, handleBinanceData, status => {
-      console.log('Binance U本位合约状态更新:', status);
       binanceStatus.value = status;
     });
   } else {
     wsService.connectBinance(selectedSymbol.value, handleBinanceData, status => {
-      console.log('Binance现货状态更新:', status);
       binanceStatus.value = status;
     });
   }
@@ -321,8 +366,13 @@ const connectBinance = () => {
 
 const connectToobit = () => {
   wsService.connectToobit(selectedSymbol.value, handleToobitData, status => {
-    console.log('Toobit状态更新:', status);
     toobitStatus.value = status;
+  });
+};
+
+const connectBinanceMarkPrice = () => {
+  wsService.connectBinanceMarkPrice(selectedSymbol.value, handleBinanceMarkPriceData, status => {
+    binanceMarkPriceStatus.value = status;
   });
 };
 
@@ -341,16 +391,13 @@ const handleBinanceData = data => {
 
     binanceLastUpdate.value = new Date().toLocaleTimeString();
   } else {
-    console.log('Binance数据格式不匹配:', data);
   }
 };
 
 const handleToobitData = data => {
-  console.log('收到Toobit数据:', data);
 
   // 检查数据格式是否正确
   if (!data || (!data.a && !data.b)) {
-    console.log('Toobit数据格式不正确:', data);
     return;
   }
 
@@ -365,22 +412,27 @@ const handleToobitData = data => {
   toobitBestAsk.value = bestPrices.bestAsk;
 
   toobitLastUpdate.value = new Date().toLocaleTimeString();
-  console.log('Toobit数据处理完成:', {
-    asksCount: toobitAsks.value.length,
-    bidsCount: toobitBids.value.length,
-    bestBid: toobitBestBid.value,
-    bestAsk: toobitBestAsk.value,
-  });
+};
+
+const handleBinanceMarkPriceData = data => {
+  
+  const processedData = DepthDataProcessor.processMarkPriceData(data);
+  
+  binanceMarkPrice.value = processedData.markPrice;
+  binanceIndexPrice.value = processedData.indexPrice;
+  binanceFundingRate.value = processedData.lastFundingRate;
+  binanceNextFundingTime.value = processedData.nextFundingTime;
+  
+  binanceMarkPriceLastUpdate.value = new Date().toLocaleTimeString();
+  
 };
 
 // 事件处理
 const onSymbolChange = () => {
-  console.log('币对变更:', selectedSymbol.value);
   handleConnectionChange();
 };
 
 const onExchangeTypeChange = () => {
-  console.log('交易所类型变更:', exchangeType.value);
   handleConnectionChange();
 };
 
@@ -397,7 +449,6 @@ const handleConnectionChange = () => {
 
   // 延迟重新连接，确保旧连接完全关闭
   reconnectTimer = setTimeout(() => {
-    console.log('重新初始化WebSocket连接');
     initializeWebSockets();
     reconnectTimer = null;
   }, 1500);
@@ -405,7 +456,6 @@ const handleConnectionChange = () => {
 
 const closeWebSockets = () => {
   if (wsService) {
-    console.log('关闭所有WebSocket连接');
     wsService.disconnectAll();
   }
 
@@ -424,8 +474,10 @@ const closeWebSockets = () => {
   // 重置状态
   binanceStatus.value = 'disconnected';
   toobitStatus.value = 'disconnected';
+  binanceMarkPriceStatus.value = 'disconnected';
   binanceLastUpdate.value = '--';
   toobitLastUpdate.value = '--';
+  binanceMarkPriceLastUpdate.value = '--';
 
   console.log('数据已清空，状态已重置');
 };

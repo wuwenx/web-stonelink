@@ -37,7 +37,6 @@ export class WebSocketService {
       this.reconnectAttempts.set(connectionId, 0);
 
       ws.onopen = () => {
-        console.log(`Binance现货WebSocket连接成功: ${symbol}`);
         onStatusChange('connected');
         this.reconnectAttempts.set(connectionId, 0);
         this.startHeartbeat(connectionId);
@@ -48,12 +47,10 @@ export class WebSocketService {
           const data = JSON.parse(event.data);
           onMessage(data);
         } catch (error) {
-          console.error('Binance现货数据解析错误:', error);
         }
       };
 
       ws.onclose = event => {
-        console.log(`Binance现货WebSocket连接关闭: ${symbol}`, event.code, event.reason);
         onStatusChange('disconnected');
         this.stopHeartbeat(connectionId);
         this.scheduleReconnect(connectionId, () => {
@@ -62,13 +59,83 @@ export class WebSocketService {
       };
 
       ws.onerror = error => {
-        console.error(`Binance现货WebSocket错误: ${symbol}`, error);
         onStatusChange('error');
       };
 
       onStatusChange('connecting');
     } catch (error) {
-      console.error('创建Binance现货WebSocket连接失败:', error);
+      onStatusChange('error');
+    }
+  }
+
+  /**
+   * 连接Binance U本位合约标记价格WebSocket
+   * @param {string} symbol - 交易对符号
+   * @param {Function} onMessage - 消息处理回调
+   * @param {Function} onStatusChange - 状态变更回调
+   */
+  connectBinanceMarkPrice(symbol, onMessage, onStatusChange) {
+    const connectionId = `binance_markprice_${symbol}`;
+
+    // 如果已存在连接，先关闭
+    if (this.connections.has(connectionId)) {
+      this.disconnect(connectionId);
+    }
+
+    try {
+      const wsUrl = binanceFuturesWebSocketUrl;
+
+      const ws = new WebSocket(wsUrl);
+      this.connections.set(connectionId, ws);
+      this.reconnectAttempts.set(connectionId, 0);
+
+      ws.onopen = () => {
+        onStatusChange('connected');
+        this.reconnectAttempts.set(connectionId, 0);
+        this.startHeartbeat(connectionId);
+
+        // 订阅标记价格流
+        const subscribeMessage = {
+          method: 'SUBSCRIBE',
+          params: [`${binanceSymbol(symbol).toLowerCase()}@markPrice@1s`],
+          id: Date.now(),
+        };
+        ws.send(JSON.stringify(subscribeMessage));
+      };
+
+      ws.onmessage = event => {
+        try {
+          const data = JSON.parse(event.data);
+          // 处理ping消息 - 必须回复pong
+          if (data.ping) {
+            ws.send(JSON.stringify({ pong: data.ping }));
+            return;
+          }
+
+          // 处理标记价格流
+          if (data.p) {
+            onMessage(data);
+          } else if (data.result === null && data.id) {
+            // 处理订阅确认
+          }
+        } catch (error) {
+        }
+      };
+
+      ws.onclose = event => {
+        onStatusChange('disconnected');
+        this.stopHeartbeat(connectionId);
+        this.scheduleReconnect(connectionId, () => {
+          this.connectBinanceMarkPrice(symbol, onMessage, onStatusChange);
+        });
+      };
+
+      ws.onerror = error => {
+        onStatusChange('error');
+      };
+
+      onStatusChange('connecting');
+    } catch (error) {
       onStatusChange('error');
     }
   }
@@ -96,7 +163,6 @@ export class WebSocketService {
       this.reconnectAttempts.set(connectionId, 0);
 
       ws.onopen = () => {
-        console.log(`Binance U本位合约WebSocket连接成功: ${symbol}`);
         onStatusChange('connected');
         this.reconnectAttempts.set(connectionId, 0);
         this.startHeartbeat(connectionId);
@@ -116,7 +182,6 @@ export class WebSocketService {
 
           // 处理ping消息 - 必须回复pong
           if (data.ping) {
-            console.log('收到ping消息，回复pong');
             ws.send(JSON.stringify({ pong: data.ping }));
             return;
           }
@@ -129,15 +194,12 @@ export class WebSocketService {
             onMessage(data);
           } else if (data.result === null && data.id) {
             // 处理订阅确认
-            console.log(`Binance U本位合约订阅成功: ${symbol}`);
           }
         } catch (error) {
-          console.error('Binance U本位合约数据解析错误:', error);
         }
       };
 
       ws.onclose = event => {
-        console.log(`Binance U本位合约WebSocket连接关闭: ${symbol}`, event.code, event.reason);
         onStatusChange('disconnected');
         this.stopHeartbeat(connectionId);
         this.scheduleReconnect(connectionId, () => {
@@ -146,13 +208,11 @@ export class WebSocketService {
       };
 
       ws.onerror = error => {
-        console.error(`Binance U本位合约WebSocket错误: ${symbol}`, error);
         onStatusChange('error');
       };
 
       onStatusChange('connecting');
     } catch (error) {
-      console.error('创建Binance U本位合约WebSocket连接失败:', error);
       onStatusChange('error');
     }
   }
@@ -179,7 +239,6 @@ export class WebSocketService {
       this.reconnectAttempts.set(connectionId, 0);
 
       ws.onopen = () => {
-        console.log(`Toobit WebSocket连接成功: ${symbol}`);
         onStatusChange('connected');
         this.reconnectAttempts.set(connectionId, 0);
         this.startHeartbeat(connectionId);
@@ -196,24 +255,20 @@ export class WebSocketService {
       ws.onmessage = event => {
         try {
           const data = JSON.parse(event.data);
-          console.log('收到Toobit原始数据:', data);
 
           // 处理深度数据
           if (data.topic && data.topic === 'depth' && data.data && Array.isArray(data.data)) {
             // Toobit返回的是数组格式，取第一个元素
             const depthData = data.data[0];
             if (depthData && (depthData.b || depthData.a)) {
-              console.log('处理Toobit深度数据:', depthData);
               onMessage(depthData);
             }
           }
         } catch (error) {
-          console.error('Toobit数据解析错误:', error);
         }
       };
 
       ws.onclose = event => {
-        console.log(`Toobit WebSocket连接关闭: ${symbol}`, event.code, event.reason);
         onStatusChange('disconnected');
         this.stopHeartbeat(connectionId);
         this.scheduleReconnect(connectionId, () => {
@@ -222,13 +277,11 @@ export class WebSocketService {
       };
 
       ws.onerror = error => {
-        console.error(`Toobit WebSocket错误: ${symbol}`, error);
         onStatusChange('error');
       };
 
       onStatusChange('connecting');
     } catch (error) {
-      console.error('创建Toobit WebSocket连接失败:', error);
       onStatusChange('error');
     }
   }
@@ -465,5 +518,68 @@ export class DepthDataProcessor {
       minimumFractionDigits: 0,
       maximumFractionDigits: decimals,
     });
+  }
+
+  /**
+   * 处理标记价格数据
+   * @param {Object} rawData - 原始标记价格数据
+   * @returns {Object} 处理后的标记价格数据
+   */
+  static processMarkPriceData(rawData) {
+    if (!rawData) {
+      return {
+        markPrice: 0,
+        indexPrice: 0,
+        estimatedSettlePrice: 0,
+        lastFundingRate: 0,
+        nextFundingTime: 0,
+        interestRate: 0,
+        time: 0,
+      };
+    }
+
+    return {
+      markPrice: parseFloat(rawData.p) || 0,
+      indexPrice: parseFloat(rawData.i) || 0,
+      estimatedSettlePrice: parseFloat(rawData.P) || 0,
+      lastFundingRate: parseFloat(rawData.r) || 0,
+      nextFundingTime: parseInt(rawData.T) || 0,
+      interestRate: parseFloat(rawData.R) || 0,
+      time: parseInt(rawData.E) || 0,
+    };
+  }
+
+  /**
+   * 格式化标记价格
+   * @param {number} markPrice - 标记价格
+   * @param {number} decimals - 小数位数
+   * @returns {string} 格式化后的标记价格
+   */
+  static formatMarkPrice(markPrice, decimals = 8) {
+    if (!markPrice || markPrice === 0) return '--';
+    return markPrice.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: decimals,
+    });
+  }
+
+  /**
+   * 格式化资金费率
+   * @param {number} fundingRate - 资金费率
+   * @returns {string} 格式化后的资金费率
+   */
+  static formatFundingRate(fundingRate) {
+    if (!fundingRate || fundingRate === 0) return '--';
+    return `${(fundingRate * 100).toFixed(4)}%`;
+  }
+
+  /**
+   * 格式化时间戳
+   * @param {number} timestamp - 时间戳
+   * @returns {string} 格式化后的时间
+   */
+  static formatTimestamp(timestamp) {
+    if (!timestamp || timestamp === 0) return '--';
+    return new Date(timestamp).toLocaleTimeString();
   }
 }
