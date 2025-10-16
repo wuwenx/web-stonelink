@@ -1,0 +1,29 @@
+# 依赖目录
+node_modules/
+dist/
+build/
+
+# 配置文件
+*.config.js
+babel.config.js
+postcss.config.js
+tailwind.config.js
+vue.config.js
+
+# 静态资源
+public/
+src/assets/
+
+# 其他
+*.min.js
+*.bundle.js
+coverage/
+.nyc_output/
+
+# IDE文件
+.vscode/
+.idea/
+
+# 系统文件
+.DS_Store
+Thumbs.db

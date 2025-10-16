@@ -22,7 +22,7 @@ export class WebSocketService {
    */
   connectBinance(symbol, onMessage, onStatusChange) {
     const connectionId = `binance_spot_${symbol}`
-    
+
     // 如果已存在连接，先关闭
     if (this.connections.has(connectionId)) {
       this.disconnect(connectionId)
@@ -31,18 +31,18 @@ export class WebSocketService {
     try {
       const stream = `${symbol.toLowerCase()}@depth20@100ms`
       const wsUrl = binanceSpotWebSocketUrl + stream
-      
+
       const ws = new WebSocket(wsUrl)
       this.connections.set(connectionId, ws)
       this.reconnectAttempts.set(connectionId, 0)
-      
+
       ws.onopen = () => {
         console.log(`Binance现货WebSocket连接成功: ${symbol}`)
         onStatusChange('connected')
         this.reconnectAttempts.set(connectionId, 0)
         this.startHeartbeat(connectionId)
       }
-      
+
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data)
@@ -51,7 +51,7 @@ export class WebSocketService {
           console.error('Binance现货数据解析错误:', error)
         }
       }
-      
+
       ws.onclose = (event) => {
         console.log(`Binance现货WebSocket连接关闭: ${symbol}`, event.code, event.reason)
         onStatusChange('disconnected')
@@ -60,14 +60,14 @@ export class WebSocketService {
           this.connectBinance(symbol, onMessage, onStatusChange)
         })
       }
-      
+
       ws.onerror = (error) => {
         console.error(`Binance现货WebSocket错误: ${symbol}`, error)
         onStatusChange('error')
       }
-      
+
       onStatusChange('connecting')
-      
+
     } catch (error) {
       console.error('创建Binance现货WebSocket连接失败:', error)
       onStatusChange('error')
@@ -82,7 +82,7 @@ export class WebSocketService {
    */
   connectBinanceFutures(symbol, onMessage, onStatusChange) {
     const connectionId = `binance_futures_${symbol}`
-    
+
     // 如果已存在连接，先关闭
     if (this.connections.has(connectionId)) {
       this.disconnect(connectionId)
@@ -91,17 +91,17 @@ export class WebSocketService {
     try {
       // U本位合约使用正确的WebSocket端点
       const wsUrl = binanceFuturesWebSocketUrl
-      
+
       const ws = new WebSocket(wsUrl)
       this.connections.set(connectionId, ws)
       this.reconnectAttempts.set(connectionId, 0)
-      
+
       ws.onopen = () => {
         console.log(`Binance U本位合约WebSocket连接成功: ${symbol}`)
         onStatusChange('connected')
         this.reconnectAttempts.set(connectionId, 0)
         this.startHeartbeat(connectionId)
-        
+
         // 订阅深度数据流
         const subscribeMessage = {
           method: 'SUBSCRIBE',
@@ -110,18 +110,18 @@ export class WebSocketService {
         }
         ws.send(JSON.stringify(subscribeMessage))
       }
-      
+
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data)
-          
+
           // 处理ping消息 - 必须回复pong
           if (data.ping) {
             console.log('收到ping消息，回复pong')
             ws.send(JSON.stringify({ pong: data.ping }))
             return
           }
-          
+
           // 处理深度数据流
           if (data.stream && data.stream.includes('depth')) {
             onMessage(data.data)
@@ -138,7 +138,7 @@ export class WebSocketService {
           console.error('Binance U本位合约数据解析错误:', error)
         }
       }
-      
+
       ws.onclose = (event) => {
         console.log(`Binance U本位合约WebSocket连接关闭: ${symbol}`, event.code, event.reason)
         onStatusChange('disconnected')
@@ -147,14 +147,14 @@ export class WebSocketService {
           this.connectBinanceFutures(symbol, onMessage, onStatusChange)
         })
       }
-      
+
       ws.onerror = (error) => {
         console.error(`Binance U本位合约WebSocket错误: ${symbol}`, error)
         onStatusChange('error')
       }
-      
+
       onStatusChange('connecting')
-      
+
     } catch (error) {
       console.error('创建Binance U本位合约WebSocket连接失败:', error)
       onStatusChange('error')
@@ -169,7 +169,7 @@ export class WebSocketService {
    */
   connectToobit(symbol, onMessage, onStatusChange) {
     const connectionId = `toobit_${symbol}`
-    
+
     // 如果已存在连接，先关闭
     if (this.connections.has(connectionId)) {
       this.disconnect(connectionId)
@@ -177,31 +177,31 @@ export class WebSocketService {
 
     try {
       const wsUrl = toobitFuturesWebSocketUrl
-      
+
       const ws = new WebSocket(wsUrl)
       this.connections.set(connectionId, ws)
       this.reconnectAttempts.set(connectionId, 0)
-      
+
       ws.onopen = () => {
         console.log(`Toobit WebSocket连接成功: ${symbol}`)
         onStatusChange('connected')
         this.reconnectAttempts.set(connectionId, 0)
         this.startHeartbeat(connectionId)
-        
+
         // 订阅深度数据
         const subscribeMessage = {
           symbol: toobitSymbol(symbol),
-          topic: "depth",
-          event: "sub"
+          topic: 'depth',
+          event: 'sub'
         }
         ws.send(JSON.stringify(subscribeMessage))
       }
-      
+
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data)
           console.log('收到Toobit原始数据:', data)
-          
+
           // 处理深度数据
           if (data.topic && data.topic === 'depth' && data.data && Array.isArray(data.data)) {
             // Toobit返回的是数组格式，取第一个元素
@@ -215,7 +215,7 @@ export class WebSocketService {
           console.error('Toobit数据解析错误:', error)
         }
       }
-      
+
       ws.onclose = (event) => {
         console.log(`Toobit WebSocket连接关闭: ${symbol}`, event.code, event.reason)
         onStatusChange('disconnected')
@@ -224,14 +224,14 @@ export class WebSocketService {
           this.connectToobit(symbol, onMessage, onStatusChange)
         })
       }
-      
+
       ws.onerror = (error) => {
         console.error(`Toobit WebSocket错误: ${symbol}`, error)
         onStatusChange('error')
       }
-      
+
       onStatusChange('connecting')
-      
+
     } catch (error) {
       console.error('创建Toobit WebSocket连接失败:', error)
       onStatusChange('error')
@@ -246,23 +246,23 @@ export class WebSocketService {
     const ws = this.connections.get(connectionId)
     if (ws) {
       console.log(`正在关闭连接: ${connectionId}`)
-      
+
       // 移除事件监听器，防止在关闭过程中触发回调
       ws.onopen = null
       ws.onmessage = null
       ws.onclose = null
       ws.onerror = null
-      
+
       // 关闭连接
       if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
         ws.close(1000, 'Connection closed by user')
       }
-      
+
       // 清理资源
       this.connections.delete(connectionId)
       this.stopHeartbeat(connectionId)
       this.reconnectAttempts.delete(connectionId)
-      
+
       console.log(`连接已关闭: ${connectionId}`)
     }
   }
@@ -273,21 +273,21 @@ export class WebSocketService {
   disconnectAll() {
     console.log('开始断开所有WebSocket连接')
     const connectionIds = Array.from(this.connections.keys())
-    
+
     for (const connectionId of connectionIds) {
       this.disconnect(connectionId)
     }
-    
+
     // 确保所有资源都被清理
     this.connections.clear()
     this.reconnectAttempts.clear()
-    
+
     // 停止所有心跳定时器
     for (const [connectionId] of this.heartbeatTimers) {
       this.stopHeartbeat(connectionId)
     }
     this.heartbeatTimers.clear()
-    
+
     console.log('所有WebSocket连接已断开，资源已清理')
   }
 
@@ -298,11 +298,11 @@ export class WebSocketService {
    */
   scheduleReconnect(connectionId, reconnectFn) {
     const attempts = this.reconnectAttempts.get(connectionId) || 0
-    
+
     if (attempts < this.maxReconnectAttempts) {
       this.reconnectAttempts.set(connectionId, attempts + 1)
       console.log(`${connectionId} 准备重连，第${attempts + 1}次尝试`)
-      
+
       setTimeout(() => {
         reconnectFn()
       }, this.reconnectDelay)
@@ -317,7 +317,7 @@ export class WebSocketService {
    */
   startHeartbeat(connectionId) {
     this.stopHeartbeat(connectionId)
-    
+
     // 对于U本位合约，服务器会每3分钟发送ping，我们不需要主动发送ping
     // 只需要监控连接状态
     const timer = setInterval(() => {
@@ -330,7 +330,7 @@ export class WebSocketService {
         this.stopHeartbeat(connectionId)
       }
     }, this.heartbeatInterval)
-    
+
     this.heartbeatTimers.set(connectionId, timer)
   }
 
@@ -354,18 +354,18 @@ export class WebSocketService {
   getConnectionStatus(connectionId) {
     const ws = this.connections.get(connectionId)
     if (!ws) return 'disconnected'
-    
+
     switch (ws.readyState) {
-      case WebSocket.CONNECTING:
-        return 'connecting'
-      case WebSocket.OPEN:
-        return 'connected'
-      case WebSocket.CLOSING:
-        return 'disconnecting'
-      case WebSocket.CLOSED:
-        return 'disconnected'
-      default:
-        return 'unknown'
+    case WebSocket.CONNECTING:
+      return 'connecting'
+    case WebSocket.OPEN:
+      return 'connected'
+    case WebSocket.CLOSING:
+      return 'disconnecting'
+    case WebSocket.CLOSED:
+      return 'disconnected'
+    default:
+      return 'unknown'
     }
   }
 }
@@ -385,7 +385,7 @@ export class DepthDataProcessor {
     if (!rawData || !Array.isArray(rawData)) {
       return []
     }
-    
+
     const processed = rawData
       .filter(item => parseFloat(item[1]) > 0) // 过滤数量为0的订单
       .map(item => ({
@@ -393,14 +393,14 @@ export class DepthDataProcessor {
         quantity: parseFloat(item[1])
       }))
       .slice(0, maxLevels) // 限制档位数
-    
+
     // 排序：asks降序，bids升序
     if (type === 'asks') {
       processed.sort((a, b) => b.price - a.price)  // 卖盘降序
     } else {
       processed.sort((a, b) => a.price - b.price)  // 买盘升序
     }
-    
+
     // 计算累计数量（在排序后进行）
     if (type === 'asks') {
       // 卖盘：从最后一条（最接近市价）开始向上累计
@@ -417,7 +417,7 @@ export class DepthDataProcessor {
         item.total = total
       })
     }
-    
+
     return processed
   }
 

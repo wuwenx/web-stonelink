@@ -1,17 +1,12 @@
 <template>
   <div id="app">
-    <DepthAggregatorTailwind />
+    <router-view />
   </div>
 </template>
 
 <script>
-import DepthAggregatorTailwind from './components/DepthAggregatorTailwind.vue'
-
 export default {
-  name: 'App',
-  components: {
-    DepthAggregatorTailwind
-  }
+  name: 'App'
 }
 </script>
 

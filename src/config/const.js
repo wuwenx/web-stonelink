@@ -17,11 +17,11 @@ function mapSymbol(symbol, exchange) {
 
   // 支持的报价币种列表
   const quoteCurrencies = ['USDT', 'USDC', 'BUSD', 'DAI', 'TUSD']
-  
+
   // 提取基础币种和报价币种
   let baseCurrency = symbol
   let quoteCurrency = ''
-  
+
   // 查找报价币种
   for (const quote of quoteCurrencies) {
     if (symbol.endsWith(quote)) {
@@ -30,7 +30,7 @@ function mapSymbol(symbol, exchange) {
       break
     }
   }
-  
+
   // 如果没有找到支持的报价币种，默认使用 USDT
   if (!quoteCurrency) {
     baseCurrency = symbol.replace('USDT', '')
@@ -38,17 +38,17 @@ function mapSymbol(symbol, exchange) {
   }
 
   switch (exchange.toLowerCase()) {
-    case 'toobit':
-      // Toobit 格式: BTCUSDT -> BTC-SWAP-USDT, BTCUSDC -> BTC-SWAP-USDC
-      return `${baseCurrency}-SWAP-${quoteCurrency}`
-    
-    case 'binance':
-      // Binance 格式: BTCUSDT -> btcusdt, BTCUSDC -> btcusdc
-      return `${baseCurrency.toLowerCase()}${quoteCurrency.toLowerCase()}`
-    
-    default:
-      // 默认返回原始格式
-      return symbol
+  case 'toobit':
+    // Toobit 格式: BTCUSDT -> BTC-SWAP-USDT, BTCUSDC -> BTC-SWAP-USDC
+    return `${baseCurrency}-SWAP-${quoteCurrency}`
+
+  case 'binance':
+    // Binance 格式: BTCUSDT -> btcusdt, BTCUSDC -> btcusdc
+    return `${baseCurrency.toLowerCase()}${quoteCurrency.toLowerCase()}`
+
+  default:
+    // 默认返回原始格式
+    return symbol
   }
 }
 

@@ -244,205 +244,205 @@ let reconnectTimer = null
 
 // 计算属性
 const priceDifference = computed(() => {
-    return binanceBestBid.value - toobitBestBid.value
+  return binanceBestBid.value - toobitBestBid.value
 })
 
 // 方法
 const getStatusText = (status) => {
-    const statusMap = {
-        connected: '已连接',
-        connecting: '连接中',
-        disconnected: '未连接',
-        error: '错误'
-    }
-    return statusMap[status] || '未知'
+  const statusMap = {
+    connected: '已连接',
+    connecting: '连接中',
+    disconnected: '未连接',
+    error: '错误'
+  }
+  return statusMap[status] || '未知'
 }
 
 const getStatusClass = (status) => {
-    const statusClasses = {
-        connected: 'w-3 h-3 bg-success-500 rounded-full animate-pulse',
-        connecting: 'w-3 h-3 bg-yellow-500 rounded-full animate-bounce',
-        disconnected: 'w-3 h-3 bg-danger-500 rounded-full',
-        error: 'w-3 h-3 bg-danger-500 rounded-full animate-pulse'
-    }
-    return statusClasses[status] || 'w-3 h-3 bg-gray-500 rounded-full'
+  const statusClasses = {
+    connected: 'w-3 h-3 bg-success-500 rounded-full animate-pulse',
+    connecting: 'w-3 h-3 bg-yellow-500 rounded-full animate-bounce',
+    disconnected: 'w-3 h-3 bg-danger-500 rounded-full',
+    error: 'w-3 h-3 bg-danger-500 rounded-full animate-pulse'
+  }
+  return statusClasses[status] || 'w-3 h-3 bg-gray-500 rounded-full'
 }
 
 const formatPrice = (price) => {
-    return DepthDataProcessor.formatPrice(price)
+  return DepthDataProcessor.formatPrice(price)
 }
 
 const formatQuantity = (quantity) => {
-    return DepthDataProcessor.formatQuantity(quantity)
+  return DepthDataProcessor.formatQuantity(quantity)
 }
 
 // WebSocket连接管理
 const initializeWebSockets = () => {
-    console.log('初始化WebSocket连接')
-    wsService = new WebSocketService()
-    connectBinance()
-    connectToobit()
+  console.log('初始化WebSocket连接')
+  wsService = new WebSocketService()
+  connectBinance()
+  connectToobit()
 }
 
 const connectBinance = () => {
-    console.log('连接Binance WebSocket, 类型:', exchangeType.value)
-    if (exchangeType.value === 'futures') {
-        wsService.connectBinanceFutures(
-            selectedSymbol.value,
-            handleBinanceData,
-            (status) => {
-                console.log('Binance U本位合约状态更新:', status)
-                binanceStatus.value = status
-            }
-        )
-    } else {
-        wsService.connectBinance(
-            selectedSymbol.value,
-            handleBinanceData,
-            (status) => {
-                console.log('Binance现货状态更新:', status)
-                binanceStatus.value = status
-            }
-        )
-    }
+  console.log('连接Binance WebSocket, 类型:', exchangeType.value)
+  if (exchangeType.value === 'futures') {
+    wsService.connectBinanceFutures(
+      selectedSymbol.value,
+      handleBinanceData,
+      (status) => {
+        console.log('Binance U本位合约状态更新:', status)
+        binanceStatus.value = status
+      }
+    )
+  } else {
+    wsService.connectBinance(
+      selectedSymbol.value,
+      handleBinanceData,
+      (status) => {
+        console.log('Binance现货状态更新:', status)
+        binanceStatus.value = status
+      }
+    )
+  }
 }
 
 const connectToobit = () => {
-    wsService.connectToobit(
-        selectedSymbol.value,
-        handleToobitData,
-        (status) => {
-            console.log('Toobit状态更新:', status)
-            toobitStatus.value = status
-        }
-    )
+  wsService.connectToobit(
+    selectedSymbol.value,
+    handleToobitData,
+    (status) => {
+      console.log('Toobit状态更新:', status)
+      toobitStatus.value = status
+    }
+  )
 }
 
 // 数据处理
 const handleBinanceData = (data) => {
-    if (data.e === 'depthUpdate') {
-        const processedAsks = DepthDataProcessor.processDepthData(data.a, 'asks')
-        const processedBids = DepthDataProcessor.processDepthData(data.b, 'bids')
-
-        binanceAsks.value = processedAsks
-        binanceBids.value = processedBids
-
-        const bestPrices = DepthDataProcessor.calculateBestPrices(processedBids, processedAsks)
-        binanceBestBid.value = bestPrices.bestBid
-        binanceBestAsk.value = bestPrices.bestAsk
-
-        binanceLastUpdate.value = new Date().toLocaleTimeString()
-    } else {
-        console.log('Binance数据格式不匹配:', data)
-    }
-}
-
-const handleToobitData = (data) => {
-    console.log('收到Toobit数据:', data)
-
-    // 检查数据格式是否正确
-    if (!data || (!data.a && !data.b)) {
-        console.log('Toobit数据格式不正确:', data)
-        return
-    }
-
+  if (data.e === 'depthUpdate') {
     const processedAsks = DepthDataProcessor.processDepthData(data.a, 'asks')
     const processedBids = DepthDataProcessor.processDepthData(data.b, 'bids')
 
-    toobitAsks.value = processedAsks
-    toobitBids.value = processedBids
+    binanceAsks.value = processedAsks
+    binanceBids.value = processedBids
 
     const bestPrices = DepthDataProcessor.calculateBestPrices(processedBids, processedAsks)
-    toobitBestBid.value = bestPrices.bestBid
-    toobitBestAsk.value = bestPrices.bestAsk
+    binanceBestBid.value = bestPrices.bestBid
+    binanceBestAsk.value = bestPrices.bestAsk
 
-    toobitLastUpdate.value = new Date().toLocaleTimeString()
-    console.log('Toobit数据处理完成:', {
-        asksCount: toobitAsks.value.length,
-        bidsCount: toobitBids.value.length,
-        bestBid: toobitBestBid.value,
-        bestAsk: toobitBestAsk.value
-    })
+    binanceLastUpdate.value = new Date().toLocaleTimeString()
+  } else {
+    console.log('Binance数据格式不匹配:', data)
+  }
+}
+
+const handleToobitData = (data) => {
+  console.log('收到Toobit数据:', data)
+
+  // 检查数据格式是否正确
+  if (!data || (!data.a && !data.b)) {
+    console.log('Toobit数据格式不正确:', data)
+    return
+  }
+
+  const processedAsks = DepthDataProcessor.processDepthData(data.a, 'asks')
+  const processedBids = DepthDataProcessor.processDepthData(data.b, 'bids')
+
+  toobitAsks.value = processedAsks
+  toobitBids.value = processedBids
+
+  const bestPrices = DepthDataProcessor.calculateBestPrices(processedBids, processedAsks)
+  toobitBestBid.value = bestPrices.bestBid
+  toobitBestAsk.value = bestPrices.bestAsk
+
+  toobitLastUpdate.value = new Date().toLocaleTimeString()
+  console.log('Toobit数据处理完成:', {
+    asksCount: toobitAsks.value.length,
+    bidsCount: toobitBids.value.length,
+    bestBid: toobitBestBid.value,
+    bestAsk: toobitBestAsk.value
+  })
 }
 
 // 事件处理
 const onSymbolChange = () => {
-    console.log('币对变更:', selectedSymbol.value)
-    handleConnectionChange()
+  console.log('币对变更:', selectedSymbol.value)
+  handleConnectionChange()
 }
 
 const onExchangeTypeChange = () => {
-    console.log('交易所类型变更:', exchangeType.value)
-    handleConnectionChange()
+  console.log('交易所类型变更:', exchangeType.value)
+  handleConnectionChange()
 }
 
 // 统一的连接变更处理
 const handleConnectionChange = () => {
-    // 清除之前的重连定时器
-    if (reconnectTimer) {
-        clearTimeout(reconnectTimer)
-        reconnectTimer = null
-    }
+  // 清除之前的重连定时器
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer)
+    reconnectTimer = null
+  }
 
-    // 立即清空数据和重置状态
-    closeWebSockets()
+  // 立即清空数据和重置状态
+  closeWebSockets()
 
-    // 延迟重新连接，确保旧连接完全关闭
-    reconnectTimer = setTimeout(() => {
-        console.log('重新初始化WebSocket连接')
-        initializeWebSockets()
-        reconnectTimer = null
-    }, 1500)
+  // 延迟重新连接，确保旧连接完全关闭
+  reconnectTimer = setTimeout(() => {
+    console.log('重新初始化WebSocket连接')
+    initializeWebSockets()
+    reconnectTimer = null
+  }, 1500)
 }
 
 const closeWebSockets = () => {
-    if (wsService) {
-        console.log('关闭所有WebSocket连接')
-        wsService.disconnectAll()
-    }
+  if (wsService) {
+    console.log('关闭所有WebSocket连接')
+    wsService.disconnectAll()
+  }
 
-    // 清空所有数据
-    binanceAsks.value = []
-    binanceBids.value = []
-    toobitAsks.value = []
-    toobitBids.value = []
+  // 清空所有数据
+  binanceAsks.value = []
+  binanceBids.value = []
+  toobitAsks.value = []
+  toobitBids.value = []
 
-    // 重置最佳价格
-    binanceBestBid.value = 0
-    binanceBestAsk.value = 0
-    toobitBestBid.value = 0
-    toobitBestAsk.value = 0
+  // 重置最佳价格
+  binanceBestBid.value = 0
+  binanceBestAsk.value = 0
+  toobitBestBid.value = 0
+  toobitBestAsk.value = 0
 
-    // 重置状态
-    binanceStatus.value = 'disconnected'
-    toobitStatus.value = 'disconnected'
-    binanceLastUpdate.value = '--'
-    toobitLastUpdate.value = '--'
+  // 重置状态
+  binanceStatus.value = 'disconnected'
+  toobitStatus.value = 'disconnected'
+  binanceLastUpdate.value = '--'
+  toobitLastUpdate.value = '--'
 
-    console.log('数据已清空，状态已重置')
+  console.log('数据已清空，状态已重置')
 }
 
 // 监听器
 watch([selectedSymbol, exchangeType], () => {
-    console.log('监听器触发:', { symbol: selectedSymbol.value, type: exchangeType.value })
+  console.log('监听器触发:', { symbol: selectedSymbol.value, type: exchangeType.value })
 })
 
 // 生命周期
 onMounted(() => {
-    console.log('组件挂载，初始化WebSocket')
-    initializeWebSockets()
+  console.log('组件挂载，初始化WebSocket')
+  initializeWebSockets()
 })
 
 onUnmounted(() => {
-    console.log('组件卸载，关闭WebSocket')
+  console.log('组件卸载，关闭WebSocket')
 
-    // 清除重连定时器
-    if (reconnectTimer) {
-        clearTimeout(reconnectTimer)
-        reconnectTimer = null
-    }
+  // 清除重连定时器
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer)
+    reconnectTimer = null
+  }
 
-    // 关闭所有连接
-    closeWebSockets()
+  // 关闭所有连接
+  closeWebSockets()
 })
 </script>
