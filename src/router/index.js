@@ -22,7 +22,7 @@ const routes = [
         name: 'DepthAggregator',
         component: DepthAggregatorTailwind,
         meta: { title: '深度聚合器' },
-      }
+      },
       // {
       //   path: 'analytics',
       //   name: 'Analytics',
@@ -96,7 +96,14 @@ const routes = [
   //       meta: { title: '全屏仪表板' }
   //     }
   //   ]
-  // }
+  // },
+  // 404 页面 - 必须放在最后
+  {
+    path: '/:pathMatch(.*)*',
+    name: 'NotFound',
+    component: () => import('../views/NotFound.vue'),
+    meta: { title: '404 - 页面未找到' }
+  }
 ];
 
 const router = createRouter({

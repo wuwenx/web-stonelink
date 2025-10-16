@@ -13,60 +13,49 @@
     <!-- 控制面板 -->
     <div class="flex justify-between items-center bg-white dark:bg-gray-800 p-5 rounded-lg shadow-md mb-5 flex-wrap gap-4 transition-colors duration-300">
       <div class="flex items-center gap-3">
-        <label for="exchangeType" class="font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">选择交易所类型：</label>
-        <select
-          id="exchangeType"
+        <label class="font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">选择交易所类型：</label>
+        <el-select
           v-model="exchangeType"
-          class="px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 cursor-pointer transition-colors duration-200 min-w-32 focus:outline-none focus:border-primary-500"
+          placeholder="请选择交易所类型"
+          size="default"
+          class="min-w-32"
           @change="onExchangeTypeChange"
         >
-          <!-- <option value="spot">
-            现货交易
-          </option> -->
-          <option value="futures">
-            U本位合约
-          </option>
-        </select>
+          <!-- <el-option label="现货交易" value="spot" /> -->
+          <el-option label="U本位合约" value="futures" />
+        </el-select>
       </div>
 
       <div class="flex items-center gap-3">
-        <label for="symbol" class="font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">选择交易对：</label>
-        <select
-          id="symbol"
+        <label class="font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">选择交易对：</label>
+        <el-select
           v-model="selectedSymbol"
-          class="px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 cursor-pointer transition-colors duration-200 min-w-32 focus:outline-none focus:border-primary-500"
+          placeholder="请选择交易对"
+          size="default"
+          class="min-w-32"
           @change="onSymbolChange"
         >
-          <option value="BTCUSDT">
-            BTC/USDT
-          </option>
-          <option value="ETHUSDT">
-            ETH/USDT
-          </option>
-          <option value="BNBUSDT">
-            BNB/USDT
-          </option>
-          <option value="ADAUSDT">
-            ADA/USDT
-          </option>
-          <option value="SOLUSDT">
-            SOL/USDT
-          </option>
-        </select>
+          <el-option label="BTC/USDT" value="BTCUSDT" />
+          <el-option label="ETH/USDT" value="ETHUSDT" />
+          <el-option label="BNB/USDT" value="BNBUSDT" />
+          <el-option label="ADA/USDT" value="ADAUSDT" />
+          <el-option label="SOL/USDT" value="SOLUSDT" />
+        </el-select>
       </div>
 
       <div class="flex items-center gap-3">
-        <label for="depthLevels" class="font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">深度档位：</label>
-        <select
-          id="depthLevels"
+        <label class="font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">深度档位：</label>
+        <el-select
           v-model="depthLevels"
-          class="px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 cursor-pointer transition-colors duration-200 min-w-24 focus:outline-none focus:border-primary-500"
+          placeholder="请选择深度档位"
+          size="default"
+          class="min-w-24"
           @change="onDepthLevelsChange"
         >
-          <option :value="5">5档</option>
-          <option :value="10">10档</option>
-          <option :value="20">20档</option>
-        </select>
+          <el-option label="5档" :value="5" />
+          <el-option label="10档" :value="10" />
+          <el-option label="20档" :value="20" />
+        </el-select>
       </div>
 
       <div class="flex gap-8">
