@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "vue-cli-service serve",
     "build": "vue-cli-service build",
+    "build:prod": "NODE_ENV=production vue-cli-service build",
+    "deploy": "npm run build:prod && gh-pages -d dist",
     "lint": "vue-cli-service lint",
     "lint:fix": "vue-cli-service lint --fix",
     "format": "prettier --write \"src/**/*.{js,vue,ts,jsx,tsx,json,css,scss,md}\"",
@@ -30,6 +32,7 @@
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.4",
     "eslint-plugin-vue": "^8.0.3",
+    "gh-pages": "^6.1.1",
     "postcss": "^8.5.6",
     "prettier": "^3.6.2",
     "tailwindcss": "3.4.0"

@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router';
+import { createRouter, createWebHashHistory } from 'vue-router';
 import DepthAggregatorTailwind from '../components/DepthAggregatorTailwind.vue';
 // import BaseLayout from '../layouts/BaseLayout.vue';
 import SimpleLayout from '../layouts/SimpleLayout.vue';
@@ -107,7 +107,8 @@ const routes = [
 ];
 
 const router = createRouter({
-  history: createWebHistory(process.env.BASE_URL),
+  // 使用 hash 模式，更适合 GitHub Pages 部署
+  history: createWebHashHistory(),
   routes,
 });
 
