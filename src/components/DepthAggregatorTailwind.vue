@@ -126,12 +126,19 @@
             <div class="border-r border-gray-200 dark:border-gray-600">
               <div
                 v-if="selectedExchangeAsks[index]"
-                class="grid grid-cols-3 px-4 py-2 text-sm font-mono hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors duration-200"
-                :style="{ backgroundColor: `rgba(239, 68, 68, ${0.1 + (index / Math.max(selectedExchangeAsks.length, 1)) * 0.2})` }"
+                class="grid grid-cols-3 px-4 py-2 text-sm font-mono hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors duration-200 relative"
               >
-                <span class="text-danger-600 dark:text-danger-400 font-semibold">{{ formatPrice(selectedExchangeAsks[index].price) }}</span>
-                <span class="text-gray-600 dark:text-gray-300 text-right">{{ formatQuantity(selectedExchangeAsks[index].quantity) }}</span>
-                <span class="text-gray-600 dark:text-gray-300 text-right">{{ formatQuantity(selectedExchangeAsks[index].total) }}</span>
+                <span class="text-danger-600 dark:text-danger-400 font-semibold relative z-10">{{ formatPrice(selectedExchangeAsks[index].price) }}</span>
+                <span class="text-gray-600 dark:text-gray-300 text-right relative z-10">{{ formatQuantity(selectedExchangeAsks[index].quantity) }}</span>
+                <span class="text-gray-600 dark:text-gray-300 text-right relative z-10">{{ formatQuantity(selectedExchangeAsks[index].total) }}</span>
+                <!-- 背景色条 -->
+                <div 
+                  class="absolute inset-0 bg-red-100 dark:bg-red-900/30 transition-all duration-300"
+                  :style="{ 
+                    width: `${getAskBackgroundWidth(selectedExchangeAsks[index].total, selectedExchangeAsks)}%`,
+                    right: 0
+                  }"
+                ></div>
               </div>
               <div v-else class="grid grid-cols-3 px-4 py-2 text-sm font-mono text-gray-400 dark:text-gray-500 italic">
                 <span>--</span>
@@ -142,12 +149,19 @@
             <div>
               <div
                 v-if="toobitAsks[index]"
-                class="grid grid-cols-3 px-4 py-2 text-sm font-mono hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors duration-200"
-                :style="{ backgroundColor: `rgba(239, 68, 68, ${0.1 + (index / Math.max(toobitAsks.length, 1)) * 0.2})` }"
+                class="grid grid-cols-3 px-4 py-2 text-sm font-mono hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors duration-200 relative"
               >
-                <span class="text-danger-600 dark:text-danger-400 font-semibold">{{ formatPrice(toobitAsks[index].price) }}</span>
-                <span class="text-gray-600 dark:text-gray-300 text-right">{{ formatQuantity(toobitAsks[index].quantity) }}</span>
-                <span class="text-gray-600 dark:text-gray-300 text-right">{{ formatQuantity(toobitAsks[index].total) }}</span>
+                <span class="text-danger-600 dark:text-danger-400 font-semibold relative z-10">{{ formatPrice(toobitAsks[index].price) }}</span>
+                <span class="text-gray-600 dark:text-gray-300 text-right relative z-10">{{ formatQuantity(toobitAsks[index].quantity) }}</span>
+                <span class="text-gray-600 dark:text-gray-300 text-right relative z-10">{{ formatQuantity(toobitAsks[index].total) }}</span>
+                <!-- 背景色条 -->
+                <div 
+                  class="absolute inset-0 bg-red-100 dark:bg-red-900/30 transition-all duration-300"
+                  :style="{ 
+                    width: `${getAskBackgroundWidth(toobitAsks[index].total, toobitAsks)}%`,
+                    right: 0
+                  }"
+                ></div>
               </div>
               <div v-else class="grid grid-cols-3 px-4 py-2 text-sm font-mono text-gray-400 dark:text-gray-500 italic">
                 <span>--</span>
@@ -196,12 +210,19 @@
             <div class="border-r border-gray-200 dark:border-gray-600">
               <div
                 v-if="selectedExchangeBids[index]"
-                class="grid grid-cols-3 px-4 py-2 text-sm font-mono hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors duration-200"
-                :style="{ backgroundColor: `rgba(34, 197, 94, ${0.1 + (index / Math.max(selectedExchangeBids.length, 1)) * 0.2})` }"
+                class="grid grid-cols-3 px-4 py-2 text-sm font-mono hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors duration-200 relative"
               >
-                <span class="text-success-600 dark:text-success-400 font-semibold">{{ formatPrice(selectedExchangeBids[index].price) }}</span>
-                <span class="text-gray-600 dark:text-gray-300 text-right">{{ formatQuantity(selectedExchangeBids[index].quantity) }}</span>
-                <span class="text-gray-600 dark:text-gray-300 text-right">{{ formatQuantity(selectedExchangeBids[index].total) }}</span>
+                <span class="text-success-600 dark:text-success-400 font-semibold relative z-10">{{ formatPrice(selectedExchangeBids[index].price) }}</span>
+                <span class="text-gray-600 dark:text-gray-300 text-right relative z-10">{{ formatQuantity(selectedExchangeBids[index].quantity) }}</span>
+                <span class="text-gray-600 dark:text-gray-300 text-right relative z-10">{{ formatQuantity(selectedExchangeBids[index].total) }}</span>
+                <!-- 背景色条 -->
+                <div 
+                  class="absolute inset-0 bg-green-100 dark:bg-green-900/30 transition-all duration-300"
+                  :style="{ 
+                    width: `${getBidBackgroundWidth(selectedExchangeBids[index].total, selectedExchangeBids)}%`,
+                    left: 0
+                  }"
+                ></div>
               </div>
               <div v-else class="grid grid-cols-3 px-4 py-2 text-sm font-mono text-gray-400 dark:text-gray-500 italic">
                 <span>--</span>
@@ -212,12 +233,19 @@
             <div>
               <div
                 v-if="toobitBids[index]"
-                class="grid grid-cols-3 px-4 py-2 text-sm font-mono hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors duration-200"
-                :style="{ backgroundColor: `rgba(34, 197, 94, ${0.1 + (index / Math.max(toobitBids.length, 1)) * 0.2})` }"
+                class="grid grid-cols-3 px-4 py-2 text-sm font-mono hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors duration-200 relative"
               >
-                <span class="text-success-600 dark:text-success-400 font-semibold">{{ formatPrice(toobitBids[index].price) }}</span>
-                <span class="text-gray-600 dark:text-gray-300 text-right">{{ formatQuantity(toobitBids[index].quantity) }}</span>
-                <span class="text-gray-600 dark:text-gray-300 text-right">{{ formatQuantity(toobitBids[index].total) }}</span>
+                <span class="text-success-600 dark:text-success-400 font-semibold relative z-10">{{ formatPrice(toobitBids[index].price) }}</span>
+                <span class="text-gray-600 dark:text-gray-300 text-right relative z-10">{{ formatQuantity(toobitBids[index].quantity) }}</span>
+                <span class="text-gray-600 dark:text-gray-300 text-right relative z-10">{{ formatQuantity(toobitBids[index].total) }}</span>
+                <!-- 背景色条 -->
+                <div 
+                  class="absolute inset-0 bg-green-100 dark:bg-green-900/30 transition-all duration-300"
+                  :style="{ 
+                    width: `${getBidBackgroundWidth(toobitBids[index].total, toobitBids)}%`,
+                    left: 0
+                  }"
+                ></div>
               </div>
               <div v-else class="grid grid-cols-3 px-4 py-2 text-sm font-mono text-gray-400 dark:text-gray-500 italic">
                 <span>--</span>
@@ -627,6 +655,40 @@ const getDepthPercentageLabel = percentage => {
     '10': '极限'
   };
   return labels[percentage] || percentage;
+};
+
+// 新增：计算卖盘背景色宽度
+const getAskBackgroundWidth = (currentTotal, asksArray) => {
+  if (!asksArray || asksArray.length === 0 || !currentTotal) {
+    return 0;
+  }
+  
+  // 获取最后一条的total作为最大占比
+  const maxTotal = asksArray[asksArray.length - 1]?.total || 0;
+  if (maxTotal === 0) {
+    return 0;
+  }
+  
+  // 计算当前total占最大total的百分比
+  const percentage = (currentTotal / maxTotal) * 100;
+  return Math.min(percentage, 100); // 确保不超过100%
+};
+
+// 新增：计算买盘背景色宽度
+const getBidBackgroundWidth = (currentTotal, bidsArray) => {
+  if (!bidsArray || bidsArray.length === 0 || !currentTotal) {
+    return 0;
+  }
+  
+  // 获取最后一条的total作为最大占比
+  const maxTotal = bidsArray[bidsArray.length - 1]?.total || 0;
+  if (maxTotal === 0) {
+    return 0;
+  }
+  
+  // 计算当前total占最大total的百分比
+  const percentage = (currentTotal / maxTotal) * 100;
+  return Math.min(percentage, 100); // 确保不超过100%
 };
 
 // WebSocket连接管理
