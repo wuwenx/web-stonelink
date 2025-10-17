@@ -2,6 +2,7 @@
  * WebSocket服务类
  * 用于管理交易所WebSocket连接，提供统一的数据处理接口
  */
+import axios from 'axios';
 import { binanceFuturesWebSocketUrl, binanceSpotWebSocketUrl, binanceSymbol, okxFuturesWebSocketUrl, okxSymbol, toobitFuturesWebSocketUrl, toobitSymbol } from '../config/const';
 
 export class WebSocketService {
@@ -12,6 +13,129 @@ export class WebSocketService {
     this.reconnectDelay = 3000;
     this.heartbeatInterval = 30000;
     this.heartbeatTimers = new Map();
+    // 本地orderbook管理
+    this.localOrderBooks = new Map();
+    this.lastUpdateIds = new Map();
+  }
+
+  /**
+   * 获取Binance深度快照
+   * @param {string} symbol - 交易对符号
+   * @param {number} limit - 深度档位数，默认1000
+   * @returns {Promise} 深度快照数据
+   */
+  async getBinanceDepthSnapshot(symbol, limit = 1000) {
+    try {
+      const response = await axios.get('https://fapi.binance.com/fapi/v1/depth', {
+        params: {
+          symbol: binanceSymbol(symbol),
+          limit: limit
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('获取Binance深度快照失败:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 初始化本地orderbook
+   * @param {string} symbol - 交易对符号
+   * @param {Object} snapshot - 深度快照数据
+   */
+  initializeLocalOrderBook(symbol, snapshot) {
+    const orderBook = {
+      bids: new Map(),
+      asks: new Map(),
+      lastUpdateId: snapshot.lastUpdateId
+    };
+
+    // 处理买单
+    snapshot.bids.forEach(([price, quantity]) => {
+      const numPrice = parseFloat(price);
+      const numQuantity = parseFloat(quantity);
+      if (numQuantity > 0) {
+        orderBook.bids.set(numPrice, numQuantity);
+      }
+    });
+
+    // 处理卖单
+    snapshot.asks.forEach(([price, quantity]) => {
+      const numPrice = parseFloat(price);
+      const numQuantity = parseFloat(quantity);
+      if (numQuantity > 0) {
+        orderBook.asks.set(numPrice, numQuantity);
+      }
+    });
+
+    this.localOrderBooks.set(symbol, orderBook);
+    this.lastUpdateIds.set(symbol, snapshot.lastUpdateId);
+  }
+
+  /**
+   * 更新本地orderbook
+   * @param {string} symbol - 交易对符号
+   * @param {Object} updateData - 增量更新数据
+   * @returns {Object} 更新后的orderbook数据
+   */
+  updateLocalOrderBook(symbol, updateData) {
+    const orderBook = this.localOrderBooks.get(symbol);
+    if (!orderBook) {
+      return null;
+    }
+
+    // 检查更新ID的连续性
+    if (this.lastUpdateIds.has(symbol)) {
+      const lastU = this.lastUpdateIds.get(symbol);
+      if (updateData.pu !== lastU) {
+        console.warn(`检测到丢包: 期望 pu=${lastU}, 实际 pu=${updateData.pu}`);
+        return null; // 需要重新初始化
+      }
+    }
+
+    // 更新买单
+    updateData.b.forEach(([price, quantity]) => {
+      const numPrice = parseFloat(price);
+      const numQuantity = parseFloat(quantity);
+      
+      if (numQuantity === 0) {
+        orderBook.bids.delete(numPrice);
+      } else {
+        orderBook.bids.set(numPrice, numQuantity);
+      }
+    });
+
+    // 更新卖单
+    updateData.a.forEach(([price, quantity]) => {
+      const numPrice = parseFloat(price);
+      const numQuantity = parseFloat(quantity);
+      
+      if (numQuantity === 0) {
+        orderBook.asks.delete(numPrice);
+      } else {
+        orderBook.asks.set(numPrice, numQuantity);
+      }
+    });
+
+    // 更新lastUpdateId
+    this.lastUpdateIds.set(symbol, updateData.u);
+    orderBook.lastUpdateId = updateData.u;
+
+    // 转换为数组格式返回
+    const bids = Array.from(orderBook.bids.entries())
+      .sort((a, b) => b[0] - a[0]) // 买单按价格降序排列
+      .map(([price, quantity]) => [price, quantity]);
+    
+    const asks = Array.from(orderBook.asks.entries())
+      .sort((a, b) => a[0] - b[0]) // 卖单按价格升序排列
+      .map(([price, quantity]) => [price, quantity]);
+
+    return {
+      bids: bids,
+      asks: asks,
+      lastUpdateId: updateData.u
+    };
   }
 
   /**
@@ -76,7 +200,7 @@ export class WebSocketService {
    * @param {Function} onStatusChange - 状态变更回调
    * @param {number} depthLevels - 深度档位数，默认20
    */
-  connectBinanceFuturesWithMarkPrice(symbol, onDepthMessage, onMarkPriceMessage, onStatusChange, depthLevels = 20) {
+  async connectBinanceFuturesWithMarkPrice(symbol, onDepthMessage, onMarkPriceMessage, onStatusChange, depthLevels = 20) {
     const connectionId = `binance_futures_combined_${symbol}`;
 
     // 如果已存在连接，先关闭
@@ -85,14 +209,33 @@ export class WebSocketService {
     }
 
     try {
+      // 步骤1: 获取深度快照
+      onStatusChange('connecting');
+      console.log('正在获取Binance深度快照...');
+      
+      const snapshot = await this.getBinanceDepthSnapshot(symbol, 1000);
+      console.log('深度快照获取成功，lastUpdateId:', snapshot.lastUpdateId);
+      
+      // 步骤2: 初始化本地orderbook
+      this.initializeLocalOrderBook(symbol, snapshot);
+      
+      // 步骤2.5: 发送初始快照数据
+      const initialData = {
+        e: 'depthUpdate',
+        a: snapshot.asks,
+        b: snapshot.bids,
+        lastUpdateId: snapshot.lastUpdateId
+      };
+      onDepthMessage(initialData);
+      
+      // 步骤3: 建立WebSocket连接
       const wsUrl = binanceFuturesWebSocketUrl;
-
       const ws = new WebSocket(wsUrl);
       this.connections.set(connectionId, ws);
       this.reconnectAttempts.set(connectionId, 0);
 
       ws.onopen = () => {
-        onStatusChange('connected');
+        console.log('WebSocket连接已建立');
         this.reconnectAttempts.set(connectionId, 0);
         this.startHeartbeat(connectionId);
 
@@ -100,7 +243,7 @@ export class WebSocketService {
         const subscribeMessage = {
           method: 'SUBSCRIBE',
           params: [
-            `${binanceSymbol(symbol).toLowerCase()}@depth${depthLevels}@500ms`,
+            `${binanceSymbol(symbol).toLowerCase()}@depth@500ms`,
             `${binanceSymbol(symbol).toLowerCase()}@markPrice@1s`
           ],
           id: Date.now(),
@@ -120,22 +263,41 @@ export class WebSocketService {
 
           // 处理深度数据流
           if (data.stream && data.stream.includes('depth')) {
-            onDepthMessage(data.data);
+            const updateData = data.data;
+            
+            // 检查是否需要重新初始化
+            if (updateData.U <= snapshot.lastUpdateId && updateData.u >= snapshot.lastUpdateId) {
+              // 丢弃快照之前的数据
+              return;
+            }
+            
+            // 更新本地orderbook
+            const updatedOrderBook = this.updateLocalOrderBook(symbol, updateData);
+            
+            if (updatedOrderBook) {
+              // 转换为标准格式
+              const formattedData = {
+                e: 'depthUpdate',
+                a: updatedOrderBook.asks,
+                b: updatedOrderBook.bids,
+                lastUpdateId: updatedOrderBook.lastUpdateId
+              };
+              onDepthMessage(formattedData);
+            } else {
+              console.warn('检测到丢包，需要重新初始化');
+              // 重新初始化
+              this.reconnectBinanceFutures(symbol, onDepthMessage, onMarkPriceMessage, onStatusChange, depthLevels);
+            }
           } else if (data.stream && data.stream.includes('markPrice')) {
             // 处理标记价格流
             onMarkPriceMessage(data.data);
-          } else if (data.e === 'depthUpdate') {
-            // 处理直接深度数据（U本位合约格式）
-            onDepthMessage(data);
-          } else if (data.p && data.i) {
-            // 处理直接标记价格数据
-            onMarkPriceMessage(data);
           } else if (data.result === null && data.id) {
             // 处理订阅确认
-            // 订阅成功确认
+            console.log('订阅确认成功');
+            onStatusChange('connected');
           }
         } catch (error) {
-          // 静默处理错误
+          console.error('处理WebSocket消息时出错:', error);
         }
       };
 
@@ -143,7 +305,7 @@ export class WebSocketService {
         onStatusChange('disconnected');
         this.stopHeartbeat(connectionId);
         this.scheduleReconnect(connectionId, () => {
-          this.connectBinanceFuturesWithMarkPrice(symbol, onDepthMessage, onMarkPriceMessage, onStatusChange);
+          this.connectBinanceFuturesWithMarkPrice(symbol, onDepthMessage, onMarkPriceMessage, onStatusChange, depthLevels);
         });
       };
 
@@ -151,10 +313,25 @@ export class WebSocketService {
         onStatusChange('error');
       };
 
-      onStatusChange('connecting');
     } catch (error) {
+      console.error('连接Binance期货失败:', error);
       onStatusChange('error');
     }
+  }
+
+  /**
+   * 重新连接Binance期货（用于丢包重连）
+   */
+  async reconnectBinanceFutures(symbol, onDepthMessage, onMarkPriceMessage, onStatusChange, depthLevels) {
+    console.log('重新初始化Binance连接...');
+    // 清理旧的连接和数据
+    const connectionId = `binance_futures_combined_${symbol}`;
+    this.disconnect(connectionId);
+    this.localOrderBooks.delete(symbol);
+    this.lastUpdateIds.delete(symbol);
+    
+    // 重新连接
+    await this.connectBinanceFuturesWithMarkPrice(symbol, onDepthMessage, onMarkPriceMessage, onStatusChange, depthLevels);
   }
 
   /**
@@ -347,6 +524,8 @@ export class WebSocketService {
     // 确保所有资源都被清理
     this.connections.clear();
     this.reconnectAttempts.clear();
+    this.localOrderBooks.clear();
+    this.lastUpdateIds.clear();
 
     // 停止所有心跳定时器
     for (const [connectionId] of this.heartbeatTimers) {
@@ -461,36 +640,29 @@ export class DepthDataProcessor {
       .slice(0, maxLevels); // 限制档位数
 
     // 排序：asks降序，bids升序
-    // if (type === 'bids') {
-    //   processed.sort((a, b) => b.price - a.price); // 卖盘降序
-    // } else {
-    //   processed.sort((a, b) => b.price - a.price); // 买盘升序
-    // }
     if (type === 'asks') {
-      processed.reverse(); // 卖盘降序
+      processed.sort((a, b) => parseFloat(b.price) - parseFloat(a.price)); // 卖盘按价格降序排列
+    } else {
+      processed.sort((a, b) => parseFloat(a.price) - parseFloat(b.price)); // 买盘按价格升序排列
+      console.log('买盘排序后:', processed);
     } 
-    // let total = 0;
-    // processed.forEach(item => {
-    //   total += item.quantity;
-    //   item.total = total;
-    // });
-    // // 计算累计数量（在排序后进行）
+
+    // 计算累计数量（在排序后进行）
     if (type === 'asks') {
-      // 卖盘：从最后一条（最接近市价）开始向上累计
+      // 卖盘：从最后一条的价格开始向下累计
       let total = 0;
       for (let i = processed.length - 1; i >= 0; i--) {
         total += processed[i].quantity;
         processed[i].total = total;
       }
     } else {
-      // 买盘：从第一条（最接近市价）开始向下累计
+      // 买盘：从第一条的价格开始向上累计
       let total = 0;
-      processed.forEach(item => {
-        total += item.quantity;
-        item.total = total;
-      });
+      for (let i = 0; i < processed.length; i++) {
+        total += processed[i].quantity;
+        processed[i].total = total;
+      }
     }
-
     return processed;
   }
 

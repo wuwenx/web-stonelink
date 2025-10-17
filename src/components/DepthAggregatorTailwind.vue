@@ -69,6 +69,7 @@
           <el-option label="5档" :value="5" />
           <el-option label="10档" :value="10" />
           <el-option label="20档" :value="20" />
+          <el-option label="1000档" :value="1000" />
         </el-select>
       </div>
 
@@ -98,7 +99,7 @@
             {{ getExchangeDisplayName(selectedExchange) }}: {{ selectedExchangeLastUpdate }} | Toobit: {{ toobitLastUpdate }}
           </div>
         </div>
-        <div class=" min-h-[150px] max-h-96 overflow-y-auto relative " v-loading="isLoadingData" element-loading-text="正在获取卖盘数据..." element-loading-background="rgba(255, 255, 255, 0.8)" element-loading-spinner="el-icon-loading" element-loading-svg-view-box="-10, -10, 50, 50">
+        <div v-loading="isLoadingData" class=" min-h-[150px] max-h-96 overflow-y-auto relative " element-loading-text="正在获取卖盘数据..." element-loading-background="rgba(255, 255, 255, 0.8)" element-loading-spinner="el-icon-loading" element-loading-svg-view-box="-10, -10, 50, 50">
           <div class="grid grid-cols-2 border-b border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 transition-colors duration-300">
             <div class="border-r border-gray-200 dark:border-gray-600 flex flex-col">
               <div class="px-4 py-2 text-sm font-semibold bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-200 text-center transition-colors duration-300">
@@ -168,7 +169,7 @@
             {{ getExchangeDisplayName(selectedExchange) }}: {{ selectedExchangeLastUpdate }} | Toobit: {{ toobitLastUpdate }}
           </div>
         </div>
-        <div class=" min-h-[150px] max-h-96 overflow-y-auto relative" v-loading="isLoadingData" element-loading-text="正在获取买盘数据..." element-loading-background="rgba(255, 255, 255, 0.8)" element-loading-spinner="el-icon-loading" element-loading-svg-view-box="-10, -10, 50, 50">
+        <div v-loading="isLoadingData" class=" min-h-[150px] max-h-96 overflow-y-auto relative" element-loading-text="正在获取买盘数据..." element-loading-background="rgba(255, 255, 255, 0.8)" element-loading-spinner="el-icon-loading" element-loading-svg-view-box="-10, -10, 50, 50">
           <div class="grid grid-cols-2 border-b border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 transition-colors duration-300">
             <div class="border-r border-gray-200 dark:border-gray-600 flex flex-col">
               <div class="px-4 py-2 text-sm font-semibold bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-200 text-center transition-colors duration-300">
@@ -267,15 +268,31 @@
         </h3>
         <div class="flex items-center gap-4">
           <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">深度档位：</span>
-          <el-radio-group v-model="depthPercentage" @change="onDepthPercentageChange" size="small">
-            <el-radio label="0.01" class="text-xs">万1</el-radio>
-            <el-radio label="0.05" class="text-xs">万5</el-radio>
-            <el-radio label="0.1" class="text-xs">微观</el-radio>
-            <el-radio label="0.5" class="text-xs">紧密</el-radio>
-            <el-radio label="1" class="text-xs">核心</el-radio>
-            <el-radio label="2" class="text-xs">巨额</el-radio>
-            <el-radio label="5" class="text-xs">大额</el-radio>
-            <el-radio label="10" class="text-xs">极限</el-radio>
+          <el-radio-group v-model="depthPercentage" size="small" @change="onDepthPercentageChange">
+            <el-radio label="0.01" class="text-xs">
+              万1
+            </el-radio>
+            <el-radio label="0.05" class="text-xs">
+              万5
+            </el-radio>
+            <el-radio label="0.1" class="text-xs">
+              微观
+            </el-radio>
+            <el-radio label="0.5" class="text-xs">
+              紧密
+            </el-radio>
+            <el-radio label="1" class="text-xs">
+              核心
+            </el-radio>
+            <el-radio label="2" class="text-xs">
+              巨额
+            </el-radio>
+            <el-radio label="5" class="text-xs">
+              大额
+            </el-radio>
+            <el-radio label="10" class="text-xs">
+              极限
+            </el-radio>
           </el-radio-group>
           <div class="text-sm text-blue-600 dark:text-blue-400">
             ({{ depthPercentage }}%)
@@ -338,7 +355,7 @@
       <!-- 计算范围说明 -->
       <div class="mt-4 p-5 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
         <div class="flex items-center gap-2 mb-4">
-          <div class="w-2 h-2 bg-blue-500 rounded-full"></div>
+          <div class="w-2 h-2 bg-blue-500 rounded-full" />
           <h4 class="text-base font-semibold text-blue-800 dark:text-blue-200">
             计算范围说明
           </h4>
@@ -350,7 +367,7 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div class="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm">
             <div class="flex items-center gap-2 mb-3">
-              <div class="w-3 h-3 bg-green-500 rounded-full"></div>
+              <div class="w-3 h-3 bg-green-500 rounded-full" />
               <span class="font-semibold text-gray-700 dark:text-gray-200">{{ getExchangeDisplayName(selectedExchange) }}</span>
             </div>
             <div class="space-y-2">
@@ -379,7 +396,7 @@
           
           <div class="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm">
             <div class="flex items-center gap-2 mb-3">
-              <div class="w-3 h-3 bg-orange-500 rounded-full"></div>
+              <div class="w-3 h-3 bg-orange-500 rounded-full" />
               <span class="font-semibold text-gray-700 dark:text-gray-200">Toobit</span>
             </div>
             <div class="space-y-2">
@@ -455,7 +472,7 @@ import { DepthDataProcessor, WebSocketService } from '../services/WebSocketServi
 const selectedSymbol = ref('BTCUSDT');
 const selectedExchange = ref('binance'); // 新增：选择的交易所
 const exchangeType = ref('futures');
-const depthLevels = ref(5);
+const depthLevels = ref(1000);
 const depthPercentage = ref('0.01'); // 新增：深度百分比
 const selectedExchangeStatus = ref('disconnected'); // 新增：选择的交易所状态
 const toobitStatus = ref('disconnected');
@@ -628,25 +645,25 @@ const getDepthPercentageLabel = percentage => {
 };
 
 // WebSocket连接管理
-const initializeWebSockets = () => {
+const initializeWebSockets = async() => {
   wsService = new WebSocketService();
-  connectSelectedExchange();
+  await connectSelectedExchange();
   connectToobit();
 };
 
 // 新增：连接选择的交易所
-const connectSelectedExchange = () => {
+const connectSelectedExchange = async() => {
   if (selectedExchange.value === 'binance') {
-    connectBinance();
+    await connectBinance();
   } else if (selectedExchange.value === 'okx') {
     connectOKX();
   }
 };
 
-const connectBinance = () => {
+const connectBinance = async() => {
   if (exchangeType.value === 'futures') {
     // 使用合并连接，同时获取深度数据和标记价格
-    wsService.connectBinanceFuturesWithMarkPrice(
+    await wsService.connectBinanceFuturesWithMarkPrice(
       selectedSymbol.value, 
       handleSelectedExchangeData, 
       handleSelectedExchangeMarkPriceData, 
@@ -778,7 +795,7 @@ const onDepthPercentageChange = () => {
 };
 
 // 统一的连接变更处理
-const handleConnectionChange = () => {
+const handleConnectionChange = async() => {
   // 显示 loading 状态
   isLoadingData.value = true;
   
@@ -792,8 +809,8 @@ const handleConnectionChange = () => {
   closeWebSockets();
 
   // 延迟重新连接，确保旧连接完全关闭
-  reconnectTimer = setTimeout(() => {
-    initializeWebSockets();
+  reconnectTimer = setTimeout(async() => {
+    await initializeWebSockets();
     reconnectTimer = null;
   }, 1500);
 };
@@ -832,9 +849,9 @@ watch([selectedSymbol, selectedExchange, exchangeType], () => {
 });
 
 // 生命周期
-onMounted(() => {
+onMounted(async() => {
   console.log('组件挂载，初始化WebSocket');
-  initializeWebSockets();
+  await initializeWebSockets();
 });
 
 onUnmounted(() => {
