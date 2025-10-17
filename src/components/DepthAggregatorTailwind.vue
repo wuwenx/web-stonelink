@@ -286,9 +286,6 @@
       <el-table 
         :data="depthComparisonData" 
         style="width: 100%" 
-        :header-cell-style="{ backgroundColor: '#f8fafc', color: '#374151' }"
-        :row-style="{ backgroundColor: 'transparent' }"
-        class="dark:bg-gray-800"
         stripe
         border
       >
@@ -337,6 +334,91 @@
           </template>
         </el-table-column>
       </el-table>
+      
+      <!-- 计算范围说明 -->
+      <div class="mt-4 p-5 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+        <div class="flex items-center gap-2 mb-4">
+          <div class="w-2 h-2 bg-blue-500 rounded-full"></div>
+          <h4 class="text-base font-semibold text-blue-800 dark:text-blue-200">
+            计算范围说明
+          </h4>
+          <el-tag size="small" type="primary" class="ml-2">
+            {{ getDepthPercentageLabel(depthPercentage) }} ({{ depthPercentage }}%)
+          </el-tag>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div class="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm">
+            <div class="flex items-center gap-2 mb-3">
+              <div class="w-3 h-3 bg-green-500 rounded-full"></div>
+              <span class="font-semibold text-gray-700 dark:text-gray-200">{{ getExchangeDisplayName(selectedExchange) }}</span>
+            </div>
+            <div class="space-y-2">
+              <div class="flex justify-between items-center text-sm">
+                <span class="text-gray-500 dark:text-gray-400">起始价格:</span>
+                <span class="font-mono font-semibold text-green-600 dark:text-green-400">
+                  {{ formatPrice(selectedExchangeBestBid) }}
+                </span>
+              </div>
+              <div class="flex justify-between items-center text-sm">
+                <span class="text-gray-500 dark:text-gray-400">结束价格:</span>
+                <span class="font-mono font-semibold text-green-600 dark:text-green-400">
+                  {{ formatPrice(selectedExchangeBestBid * (1 + parseFloat(depthPercentage) / 100)) }}
+                </span>
+              </div>
+              <div class="pt-2 border-t border-gray-200 dark:border-gray-600">
+                <div class="flex justify-between items-center text-sm">
+                  <span class="text-gray-500 dark:text-gray-400">价格区间:</span>
+                  <span class="font-mono text-xs text-gray-600 dark:text-gray-300">
+                    +{{ depthPercentage }}%
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm">
+            <div class="flex items-center gap-2 mb-3">
+              <div class="w-3 h-3 bg-orange-500 rounded-full"></div>
+              <span class="font-semibold text-gray-700 dark:text-gray-200">Toobit</span>
+            </div>
+            <div class="space-y-2">
+              <div class="flex justify-between items-center text-sm">
+                <span class="text-gray-500 dark:text-gray-400">起始价格:</span>
+                <span class="font-mono font-semibold text-orange-600 dark:text-orange-400">
+                  {{ formatPrice(toobitBestBid) }}
+                </span>
+              </div>
+              <div class="flex justify-between items-center text-sm">
+                <span class="text-gray-500 dark:text-gray-400">结束价格:</span>
+                <span class="font-mono font-semibold text-orange-600 dark:text-orange-400">
+                  {{ formatPrice(toobitBestBid * (1 + parseFloat(depthPercentage) / 100)) }}
+                </span>
+              </div>
+              <div class="pt-2 border-t border-gray-200 dark:border-gray-600">
+                <div class="flex justify-between items-center text-sm">
+                  <span class="text-gray-500 dark:text-gray-400">价格区间:</span>
+                  <span class="font-mono text-xs text-gray-600 dark:text-gray-300">
+                    +{{ depthPercentage }}%
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="mt-4 p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg border-l-4 border-blue-500">
+          <div class="flex items-start gap-2">
+            <div class="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center mt-0.5">
+              <span class="text-white text-xs">ℹ</span>
+            </div>
+            <div class="text-sm text-blue-800 dark:text-blue-200">
+              <span class="font-semibold">算法说明：</span>
+              计算从最优买价到最优买价×(1+{{ depthPercentage }}%)之间的所有买单数量，用于评估市场深度和流动性。
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- 统计信息 -->
@@ -470,15 +552,16 @@ const calculateDepthValue = (bids, bestBid, percentage) => {
   if (!bids || bids.length === 0 || !bestBid || bestBid === 0) {
     return 0;
   }
-  
-  const targetPrice = bestBid * (1 - percentage);
+ 
+  // 计算目标价格：最优买价 + 最优买价 * 百分比
+  // 例如：万1 = 最优买价 * (1 + 0.01%)
+  const targetPrice = bestBid * (1 + percentage);
   let totalQuantity = 0;
   
+  // 累计从最优买价到目标价格之间的所有买单数量
   for (const bid of bids) {
-    if (bid.price >= targetPrice) {
+    if (bid.price <= targetPrice && bid.price >= bestBid) {
       totalQuantity += bid.quantity;
-    } else {
-      break;
     }
   }
   
@@ -642,9 +725,8 @@ const handleToobitData = data => {
     return;
   }
 
-  const processedAsks = DepthDataProcessor.processDepthData(data.a, 'asks', depthLevels.value);
-  const processedBids = DepthDataProcessor.processDepthData(data.b, 'bids', depthLevels.value);
-
+  const processedAsks = DepthDataProcessor.processDepthData(data.a, 'asks', depthLevels.value,'0.001');
+  const processedBids = DepthDataProcessor.processDepthData(data.b, 'bids', depthLevels.value,'0.001');
   toobitAsks.value = processedAsks;
   toobitBids.value = processedBids;
 
