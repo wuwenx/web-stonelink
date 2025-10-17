@@ -71,6 +71,8 @@ export class WebSocketService {
 
     this.localOrderBooks.set(symbol, orderBook);
     this.lastUpdateIds.set(symbol, snapshot.lastUpdateId);
+    
+    console.log(`本地orderbook初始化: ${symbol}, bids=${orderBook.bids.size}, asks=${orderBook.asks.size}, lastUpdateId=${snapshot.lastUpdateId}`);
   }
 
   /**
@@ -82,6 +84,7 @@ export class WebSocketService {
   updateLocalOrderBook(symbol, updateData) {
     const orderBook = this.localOrderBooks.get(symbol);
     if (!orderBook) {
+      console.warn(`本地orderbook不存在: ${symbol}`);
       return null;
     }
 
@@ -93,6 +96,8 @@ export class WebSocketService {
         return null; // 需要重新初始化
       }
     }
+    
+    console.log(`更新orderbook: bids=${updateData.b.length}, asks=${updateData.a.length}`);
 
     // 更新买单
     updateData.b.forEach(([price, quantity]) => {
@@ -122,14 +127,14 @@ export class WebSocketService {
     this.lastUpdateIds.set(symbol, updateData.u);
     orderBook.lastUpdateId = updateData.u;
 
-    // 转换为数组格式返回
-    const bids = Array.from(orderBook.bids.entries())
-      .sort((a, b) => b[0] - a[0]) // 买单按价格降序排列
-      .map(([price, quantity]) => [price, quantity]);
+    // // 转换为数组格式返回
+    // const bids = Array.from(orderBook.bids.entries())
+    //   .sort((a, b) => a[0] - b[0]) // 买单按价格升序排列
+    //   .map(([price, quantity]) => [price, quantity]);
     
-    const asks = Array.from(orderBook.asks.entries())
-      .sort((a, b) => a[0] - b[0]) // 卖单按价格升序排列
-      .map(([price, quantity]) => [price, quantity]);
+    // const asks = Array.from(orderBook.asks.entries())
+    //   .sort((a, b) => b[0] - a[0]) // 卖单按价格降序排列
+    //   .map(([price, quantity]) => [price, quantity]);
 
     return {
       bids: bids,
@@ -218,6 +223,7 @@ export class WebSocketService {
       
       // 步骤2: 初始化本地orderbook
       this.initializeLocalOrderBook(symbol, snapshot);
+      console.log(`初始化本地orderbook完成: ${symbol}, lastUpdateId: ${snapshot.lastUpdateId}`);
       
       // 步骤2.5: 发送初始快照数据
       const initialData = {
@@ -226,6 +232,7 @@ export class WebSocketService {
         b: snapshot.bids,
         lastUpdateId: snapshot.lastUpdateId
       };
+      console.log(`发送初始快照数据: bids=${snapshot.bids.length}, asks=${snapshot.asks.length}`);
       onDepthMessage(initialData);
       
       // 步骤3: 建立WebSocket连接
@@ -243,7 +250,7 @@ export class WebSocketService {
         const subscribeMessage = {
           method: 'SUBSCRIBE',
           params: [
-            `${binanceSymbol(symbol).toLowerCase()}@depth@500ms`,
+            `${binanceSymbol(symbol).toLowerCase()}@depth`,
             `${binanceSymbol(symbol).toLowerCase()}@markPrice@1s`
           ],
           id: Date.now(),
@@ -262,16 +269,19 @@ export class WebSocketService {
           }
 
           // 处理深度数据流
-          if (data.stream && data.stream.includes('depth')) {
-            const updateData = data.data;
+          if (data.e && data.e === 'depthUpdate') {
+            console.log('处理深度----数据流:', data);
+            const updateData = data; // 直接使用data，因为币安@depth格式是直接的消息对象
             
-            // 检查是否需要重新初始化
-            if (updateData.U <= snapshot.lastUpdateId && updateData.u >= snapshot.lastUpdateId) {
+            // 检查数据有效性：只处理快照之后的新数据
+            if (updateData.U <= snapshot.lastUpdateId) {
               // 丢弃快照之前的数据
+              console.log(`丢弃旧数据: U=${updateData.U}, snapshot.lastUpdateId=${snapshot.lastUpdateId}`);
               return;
             }
             
             // 更新本地orderbook
+            console.log(`处理WebSocket更新: U=${updateData.U}, u=${updateData.u}, pu=${updateData.pu}`);
             const updatedOrderBook = this.updateLocalOrderBook(symbol, updateData);
             
             if (updatedOrderBook) {
@@ -282,6 +292,7 @@ export class WebSocketService {
                 b: updatedOrderBook.bids,
                 lastUpdateId: updatedOrderBook.lastUpdateId
               };
+              console.log(`成功更新orderbook: bids=${updatedOrderBook.bids.length}, asks=${updatedOrderBook.asks.length}`);
               onDepthMessage(formattedData);
             } else {
               console.warn('检测到丢包，需要重新初始化');
@@ -643,8 +654,7 @@ export class DepthDataProcessor {
     if (type === 'asks') {
       processed.sort((a, b) => parseFloat(b.price) - parseFloat(a.price)); // 卖盘按价格降序排列
     } else {
-      processed.sort((a, b) => parseFloat(a.price) - parseFloat(b.price)); // 买盘按价格升序排列
-      console.log('买盘排序后:', processed);
+      // processed.sort((a, b) => parseFloat(a.price) - parseFloat(b.price)); // 买盘按价格升序排列
     } 
 
     // 计算累计数量（在排序后进行）
