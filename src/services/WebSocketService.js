@@ -853,11 +853,11 @@ export class DepthDataProcessor {
       }))
       .slice(0, maxLevels); // 限制档位数
 
-    // 排序：asks升序（最低价在前），bids降序（最高价在前）
+    // 排序：asks降序（最高价在前），bids降序（最高价在前）
     if (type === 'asks') {
-      processed.sort((a, b) => parseFloat(a.price) - parseFloat(b.price)); // 卖盘按价格升序排列（最低价在前）
+      processed.sort((a, b) => parseFloat(b.price) - parseFloat(a.price));  
     } else {
-      processed.sort((a, b) => parseFloat(b.price) - parseFloat(a.price)); // 买盘按价格降序排列（最高价在前）
+      processed.sort((a, b) => parseFloat(b.price) - parseFloat(a.price));
     } 
 
     // 计算累计数量（在排序后进行）

@@ -598,22 +598,6 @@ const formatDepthValue = value => {
   }
 };
 
-// 新增：获取深度值样式类
-const getDepthValueClass = value => {
-  if (!value || value === 0) return 'bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-400';
-  
-  // 根据数值大小决定颜色
-  if (value >= 2.0) {
-    return 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200';
-  } else if (value >= 1.0) {
-    return 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200';
-  } else if (value >= 0.5) {
-    return 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200';
-  } else {
-    return 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200';
-  }
-};
-
 // 新增：获取深度值Tag类型
 const getDepthValueTagType = value => {
   if (!value || value === 0) return 'info';
