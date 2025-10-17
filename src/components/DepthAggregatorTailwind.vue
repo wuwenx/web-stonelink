@@ -497,6 +497,7 @@ const selectedExchangeNextFundingTime = ref(0); // 新增：选择的交易所�
 // WebSocket服务实例
 let wsService = null;
 let reconnectTimer = null;
+let currentConnectionConfig = null; // 跟踪当前连接配置
 
 // 计算属性
 const priceDifference = computed(() => {
@@ -805,14 +806,48 @@ const handleConnectionChange = async() => {
     reconnectTimer = null;
   }
 
-  // 立即清空数据和重置状态
-  closeWebSockets();
+  // 检查是否需要重新连接
+  const needsReconnect = checkIfReconnectNeeded();
+  
+  if (needsReconnect) {
+    console.log('检测到配置变更，需要重新连接');
+    // 立即清空数据和重置状态
+    closeWebSockets();
 
-  // 延迟重新连接，确保旧连接完全关闭
-  reconnectTimer = setTimeout(async() => {
-    await initializeWebSockets();
-    reconnectTimer = null;
-  }, 1500);
+    // 延迟重新连接，确保旧连接完全关闭
+    reconnectTimer = setTimeout(async() => {
+      await initializeWebSockets();
+      reconnectTimer = null;
+    }, 1500);
+  } else {
+    console.log('配置未变更，无需重新连接');
+    isLoadingData.value = false;
+  }
+};
+
+// 检查是否需要重新连接
+const checkIfReconnectNeeded = () => {
+  const newConfig = {
+    symbol: selectedSymbol.value,
+    exchange: selectedExchange.value,
+    exchangeType: exchangeType.value,
+    depthLevels: depthLevels.value
+  };
+  
+  // 如果是第一次连接或者配置发生了变化，需要重新连接
+  if (!currentConnectionConfig) {
+    currentConnectionConfig = newConfig;
+    return true;
+  }
+  
+  const configChanged = JSON.stringify(currentConnectionConfig) !== JSON.stringify(newConfig);
+  if (configChanged) {
+    currentConnectionConfig = newConfig;
+    console.log('连接配置发生变化:', newConfig);
+    return true;
+  }
+  
+  return false;
 };
 
 const closeWebSockets = () => {

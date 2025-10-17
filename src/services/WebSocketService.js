@@ -127,14 +127,14 @@ export class WebSocketService {
     this.lastUpdateIds.set(symbol, updateData.u);
     orderBook.lastUpdateId = updateData.u;
 
-    // // 转换为数组格式返回
-    // const bids = Array.from(orderBook.bids.entries())
-    //   .sort((a, b) => a[0] - b[0]) // 买单按价格升序排列
-    //   .map(([price, quantity]) => [price, quantity]);
+    // 转换为数组格式返回
+    const bids = Array.from(orderBook.bids.entries())
+      .sort((a, b) => b[0] - a[0]) // 买单按价格降序排列（最高价在前）
+      .map(([price, quantity]) => [price, quantity]);
     
-    // const asks = Array.from(orderBook.asks.entries())
-    //   .sort((a, b) => b[0] - a[0]) // 卖单按价格降序排列
-    //   .map(([price, quantity]) => [price, quantity]);
+    const asks = Array.from(orderBook.asks.entries())
+      .sort((a, b) => a[0] - b[0]) // 卖单按价格升序排列（最低价在前）
+      .map(([price, quantity]) => [price, quantity]);
 
     return {
       bids: bids,
@@ -152,9 +152,18 @@ export class WebSocketService {
   connectBinance(symbol, onMessage, onStatusChange) {
     const connectionId = `binance_spot_${symbol}`;
 
-    // 如果已存在连接，先关闭
+    // 如果已存在连接且状态正常，直接返回
     if (this.connections.has(connectionId)) {
-      this.disconnect(connectionId);
+      const existingWs = this.connections.get(connectionId);
+      if (existingWs && existingWs.readyState === WebSocket.OPEN) {
+        console.log(`连接 ${connectionId} 已存在且状态正常，复用现有连接`);
+        onStatusChange('connected');
+        return;
+      } else {
+        // 连接存在但状态异常，先关闭
+        console.log(`连接 ${connectionId} 存在但状态异常，关闭后重新创建`);
+        this.disconnect(connectionId);
+      }
     }
 
     try {
@@ -208,32 +217,51 @@ export class WebSocketService {
   async connectBinanceFuturesWithMarkPrice(symbol, onDepthMessage, onMarkPriceMessage, onStatusChange, depthLevels = 20) {
     const connectionId = `binance_futures_combined_${symbol}`;
 
-    // 如果已存在连接，先关闭
+    // 如果已存在连接且状态正常，直接返回
     if (this.connections.has(connectionId)) {
-      this.disconnect(connectionId);
+      const existingWs = this.connections.get(connectionId);
+      if (existingWs && existingWs.readyState === WebSocket.OPEN) {
+        console.log(`连接 ${connectionId} 已存在且状态正常，复用现有连接`);
+        onStatusChange('connected');
+        return;
+      } else {
+        // 连接存在但状态异常，先关闭
+        console.log(`连接 ${connectionId} 存在但状态异常，关闭后重新创建`);
+        this.disconnect(connectionId);
+      }
     }
 
     try {
-      // 步骤1: 获取深度快照
+      // 步骤1: 尝试获取深度快照
       onStatusChange('connecting');
       console.log('正在获取Binance深度快照...');
       
-      const snapshot = await this.getBinanceDepthSnapshot(symbol, 1000);
-      console.log('深度快照获取成功，lastUpdateId:', snapshot.lastUpdateId);
+      let snapshot = null;
+      let hasSnapshot = false;
       
-      // 步骤2: 初始化本地orderbook
-      this.initializeLocalOrderBook(symbol, snapshot);
-      console.log(`初始化本地orderbook完成: ${symbol}, lastUpdateId: ${snapshot.lastUpdateId}`);
-      
-      // 步骤2.5: 发送初始快照数据
-      const initialData = {
-        e: 'depthUpdate',
-        a: snapshot.asks,
-        b: snapshot.bids,
-        lastUpdateId: snapshot.lastUpdateId
-      };
-      console.log(`发送初始快照数据: bids=${snapshot.bids.length}, asks=${snapshot.asks.length}`);
-      onDepthMessage(initialData);
+      try {
+        snapshot = await this.getBinanceDepthSnapshot(symbol, 1000);
+        console.log('深度快照获取成功，lastUpdateId:', snapshot.lastUpdateId);
+        hasSnapshot = true;
+        
+        // 步骤2: 初始化本地orderbook
+        this.initializeLocalOrderBook(symbol, snapshot);
+        console.log(`初始化本地orderbook完成: ${symbol}, lastUpdateId: ${snapshot.lastUpdateId}`);
+        
+        // 步骤2.5: 发送初始快照数据
+        const initialData = {
+          e: 'depthUpdate',
+          a: snapshot.asks,
+          b: snapshot.bids,
+          lastUpdateId: snapshot.lastUpdateId
+        };
+        console.log(`发送初始快照数据: bids=${snapshot.bids.length}, asks=${snapshot.asks.length}`);
+        onDepthMessage(initialData);
+      } catch (snapshotError) {
+        console.warn('深度快照获取失败，将直接使用WebSocket连接:', snapshotError.message);
+        hasSnapshot = false;
+        // 不中断流程，继续建立WebSocket连接
+      }
       
       // 步骤3: 建立WebSocket连接
       const wsUrl = binanceFuturesWebSocketUrl;
@@ -246,11 +274,11 @@ export class WebSocketService {
         this.reconnectAttempts.set(connectionId, 0);
         this.startHeartbeat(connectionId);
 
-        // 订阅深度数据流和标记价格流
+        // 订阅深度数据流和标记价格流 https://developers.binance.com/docs/zh-CN/derivatives/usds-margined-futures/websocket-market-streams/Partial-Book-Depth-Streams
         const subscribeMessage = {
           method: 'SUBSCRIBE',
           params: [
-            `${binanceSymbol(symbol).toLowerCase()}@depth`,
+            hasSnapshot ? `${binanceSymbol(symbol).toLowerCase()}@depth` : `${binanceSymbol(symbol).toLowerCase()}@depth20@500ms`,
             `${binanceSymbol(symbol).toLowerCase()}@markPrice@1s`
           ],
           id: Date.now(),
@@ -273,35 +301,49 @@ export class WebSocketService {
             console.log('处理深度----数据流:', data);
             const updateData = data; // 直接使用data，因为币安@depth格式是直接的消息对象
             
-            // 检查数据有效性：只处理快照之后的新数据
-            if (updateData.U <= snapshot.lastUpdateId) {
-              // 丢弃快照之前的数据
-              console.log(`丢弃旧数据: U=${updateData.U}, snapshot.lastUpdateId=${snapshot.lastUpdateId}`);
-              return;
-            }
-            
-            // 更新本地orderbook
-            console.log(`处理WebSocket更新: U=${updateData.U}, u=${updateData.u}, pu=${updateData.pu}`);
-            const updatedOrderBook = this.updateLocalOrderBook(symbol, updateData);
-            
-            if (updatedOrderBook) {
-              // 转换为标准格式
+            // 如果有快照数据，检查数据有效性
+            if (hasSnapshot && snapshot) {
+              if (updateData.U <= snapshot.lastUpdateId) {
+                // 丢弃快照之前的数据
+                console.log(`丢弃旧数据: U=${updateData.U}, snapshot.lastUpdateId=${snapshot.lastUpdateId}`);
+                return;
+              }
+              
+              // 更新本地orderbook
+              console.log(`处理WebSocket更新: U=${updateData.U}, u=${updateData.u}, pu=${updateData.pu}`);
+              const updatedOrderBook = this.updateLocalOrderBook(symbol, updateData);
+              
+              if (updatedOrderBook) {
+                // 转换为标准格式
+                const formattedData = {
+                  e: 'depthUpdate',
+                  a: updatedOrderBook.asks,
+                  b: updatedOrderBook.bids,
+                  lastUpdateId: updatedOrderBook.lastUpdateId
+                };
+                console.log(`成功更新orderbook: bids=${updatedOrderBook.bids.length}, asks=${updatedOrderBook.asks.length}`);
+                onDepthMessage(formattedData);
+              } else {
+                console.warn('检测到丢包，需要重新初始化');
+                // 延迟重新初始化，避免频繁重连
+                setTimeout(() => {
+                  this.reconnectBinanceFutures(symbol, onDepthMessage, onMarkPriceMessage, onStatusChange, depthLevels);
+                }, 1000);
+              }
+            } else {
+              // 没有快照数据，直接使用WebSocket数据
+              console.log('没有快照数据，直接使用WebSocket数据');
               const formattedData = {
                 e: 'depthUpdate',
-                a: updatedOrderBook.asks,
-                b: updatedOrderBook.bids,
-                lastUpdateId: updatedOrderBook.lastUpdateId
+                a: updateData.a || [],
+                b: updateData.b || [],
+                lastUpdateId: updateData.u || 0
               };
-              console.log(`成功更新orderbook: bids=${updatedOrderBook.bids.length}, asks=${updatedOrderBook.asks.length}`);
               onDepthMessage(formattedData);
-            } else {
-              console.warn('检测到丢包，需要重新初始化');
-              // 重新初始化
-              this.reconnectBinanceFutures(symbol, onDepthMessage, onMarkPriceMessage, onStatusChange, depthLevels);
             }
-          } else if (data.stream && data.stream.includes('markPrice')) {
+          } else if (data.e && data.e === 'markPriceUpdate') {
             // 处理标记价格流
-            onMarkPriceMessage(data.data);
+            onMarkPriceMessage(data);
           } else if (data.result === null && data.id) {
             // 处理订阅确认
             console.log('订阅确认成功');
@@ -334,9 +376,16 @@ export class WebSocketService {
    * 重新连接Binance期货（用于丢包重连）
    */
   async reconnectBinanceFutures(symbol, onDepthMessage, onMarkPriceMessage, onStatusChange, depthLevels) {
+    const connectionId = `binance_futures_combined_${symbol}`;
+    
+    // 检查是否已经在重连中，避免重复重连
+    if (this.reconnectAttempts.has(connectionId) && this.reconnectAttempts.get(connectionId) > 0) {
+      console.log(`连接 ${connectionId} 正在重连中，跳过重复重连`);
+      return;
+    }
+    
     console.log('重新初始化Binance连接...');
     // 清理旧的连接和数据
-    const connectionId = `binance_futures_combined_${symbol}`;
     this.disconnect(connectionId);
     this.localOrderBooks.delete(symbol);
     this.lastUpdateIds.delete(symbol);
@@ -354,9 +403,18 @@ export class WebSocketService {
   connectOKX(symbol, onMessage, onStatusChange) {
     const connectionId = `okx_${symbol}`;
 
-    // 如果已存在连接，先关闭
+    // 如果已存在连接且状态正常，直接返回
     if (this.connections.has(connectionId)) {
-      this.disconnect(connectionId);
+      const existingWs = this.connections.get(connectionId);
+      if (existingWs && existingWs.readyState === WebSocket.OPEN) {
+        console.log(`连接 ${connectionId} 已存在且状态正常，复用现有连接`);
+        onStatusChange('connected');
+        return;
+      } else {
+        // 连接存在但状态异常，先关闭
+        console.log(`连接 ${connectionId} 存在但状态异常，关闭后重新创建`);
+        this.disconnect(connectionId);
+      }
     }
 
     try {
@@ -432,9 +490,18 @@ export class WebSocketService {
   connectToobit(symbol, onMessage, onStatusChange) {
     const connectionId = `toobit_${symbol}`;
 
-    // 如果已存在连接，先关闭
+    // 如果已存在连接且状态正常，直接返回
     if (this.connections.has(connectionId)) {
-      this.disconnect(connectionId);
+      const existingWs = this.connections.get(connectionId);
+      if (existingWs && existingWs.readyState === WebSocket.OPEN) {
+        console.log(`连接 ${connectionId} 已存在且状态正常，复用现有连接`);
+        onStatusChange('connected');
+        return;
+      } else {
+        // 连接存在但状态异常，先关闭
+        console.log(`连接 ${connectionId} 存在但状态异常，关闭后重新创建`);
+        this.disconnect(connectionId);
+      }
     }
 
     try {
@@ -650,11 +717,11 @@ export class DepthDataProcessor {
       }))
       .slice(0, maxLevels); // 限制档位数
 
-    // 排序：asks降序，bids升序
+    // 排序：asks升序（最低价在前），bids降序（最高价在前）
     if (type === 'asks') {
-      processed.sort((a, b) => parseFloat(b.price) - parseFloat(a.price)); // 卖盘按价格降序排列
+      processed.sort((a, b) => parseFloat(a.price) - parseFloat(b.price)); // 卖盘按价格升序排列（最低价在前）
     } else {
-      // processed.sort((a, b) => parseFloat(a.price) - parseFloat(b.price)); // 买盘按价格升序排列
+      processed.sort((a, b) => parseFloat(b.price) - parseFloat(a.price)); // 买盘按价格降序排列（最高价在前）
     } 
 
     // 计算累计数量（在排序后进行）
