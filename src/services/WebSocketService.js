@@ -482,6 +482,111 @@ export class WebSocketService {
   }
 
   /**
+   * 初始化Toobit本地orderbook
+   * @param {string} symbol - 交易对符号
+   * @param {Object} snapshot - 深度快照数据
+   */
+  initializeToobitOrderBook(symbol, snapshot) {
+    const orderBook = {
+      bids: new Map(),
+      asks: new Map(),
+      lastUpdateTime: snapshot.t || Date.now()
+    };
+
+    // 处理买单
+    if (snapshot.b && Array.isArray(snapshot.b)) {
+      snapshot.b.forEach(([price, quantity]) => {
+        const numPrice = parseFloat(price);
+        const numQuantity = parseFloat(quantity);
+        if (numQuantity > 0) {
+          orderBook.bids.set(numPrice, numQuantity);
+        }
+      });
+    }
+
+    // 处理卖单
+    if (snapshot.a && Array.isArray(snapshot.a)) {
+      snapshot.a.forEach(([price, quantity]) => {
+        const numPrice = parseFloat(price);
+        const numQuantity = parseFloat(quantity);
+        if (numQuantity > 0) {
+          orderBook.asks.set(numPrice, numQuantity);
+        }
+      });
+    }
+
+    this.localOrderBooks.set(`toobit_${symbol}`, orderBook);
+    
+    console.log(`Toobit本地orderbook初始化: ${symbol}, bids=${orderBook.bids.size}, asks=${orderBook.asks.size}`);
+  }
+
+  /**
+   * 更新Toobit本地orderbook
+   * @param {string} symbol - 交易对符号
+   * @param {Object} updateData - 增量更新数据
+   * @returns {Object} 更新后的orderbook数据
+   */
+  updateToobitOrderBook(symbol, updateData) {
+    const orderBook = this.localOrderBooks.get(`toobit_${symbol}`);
+    if (!orderBook) {
+      console.warn(`Toobit本地orderbook不存在: ${symbol}`);
+      return null;
+    }
+
+    console.log(`更新Toobit orderbook: bids=${updateData.b?.length || 0}, asks=${updateData.a?.length || 0}`);
+
+    // 更新买单
+    if (updateData.b && Array.isArray(updateData.b)) {
+      updateData.b.forEach(([price, quantity]) => {
+        const numPrice = parseFloat(price);
+        const numQuantity = parseFloat(quantity);
+        
+        if (numQuantity === 0) {
+          // 数量为0表示删除该价格档位
+          orderBook.bids.delete(numPrice);
+        } else {
+          // 更新或添加该价格档位
+          orderBook.bids.set(numPrice, numQuantity);
+        }
+      });
+    }
+
+    // 更新卖单
+    if (updateData.a && Array.isArray(updateData.a)) {
+      updateData.a.forEach(([price, quantity]) => {
+        const numPrice = parseFloat(price);
+        const numQuantity = parseFloat(quantity);
+        
+        if (numQuantity === 0) {
+          // 数量为0表示删除该价格档位
+          orderBook.asks.delete(numPrice);
+        } else {
+          // 更新或添加该价格档位
+          orderBook.asks.set(numPrice, numQuantity);
+        }
+      });
+    }
+
+    // 更新最后更新时间
+    orderBook.lastUpdateTime = updateData.t || Date.now();
+
+    // 转换为数组格式返回
+    const bids = Array.from(orderBook.bids.entries())
+      .sort((a, b) => b[0] - a[0]) // 买单按价格降序排列（最高价在前）
+      .map(([price, quantity]) => [price, quantity]);
+    
+    const asks = Array.from(orderBook.asks.entries())
+      .sort((a, b) => a[0] - b[0]) // 卖单按价格升序排列（最低价在前）
+      .map(([price, quantity]) => [price, quantity]);
+
+    return {
+      bids: bids,
+      asks: asks,
+      lastUpdateTime: orderBook.lastUpdateTime
+    };
+  }
+
+  /**
    * 连接Toobit WebSocket
    * @param {string} symbol - 交易对符号
    * @param {Function} onMessage - 消息处理回调
@@ -519,7 +624,7 @@ export class WebSocketService {
         // 订阅深度数据
         const subscribeMessage = {
           symbol: toobitSymbol(symbol),
-          topic: 'depth',
+          topic: 'diffDepth',
           event: 'sub',
         };
         ws.send(JSON.stringify(subscribeMessage));
@@ -530,14 +635,45 @@ export class WebSocketService {
           const data = JSON.parse(event.data);
 
           // 处理深度数据
-          if (data.topic && data.topic === 'depth' && data.data && Array.isArray(data.data)) {
+          if (data.topic && data.topic === 'diffDepth' && data.data && Array.isArray(data.data)) {
             // Toobit返回的是数组格式，取第一个元素
             const depthData = data.data[0];
             if (depthData && (depthData.b || depthData.a)) {
-              onMessage(depthData);
+              
+              // 检查是否为全量数据 (f=true)
+              if (data.f === true) {
+                console.log('收到Toobit全量深度数据，初始化本地orderbook');
+                // 全量数据，初始化本地orderbook
+                this.initializeToobitOrderBook(symbol, depthData);
+                
+                // 发送初始数据
+                const initialData = {
+                  e: 'depthUpdate',
+                  a: depthData.a || [],
+                  b: depthData.b || [],
+                  lastUpdateTime: depthData.t || Date.now()
+                };
+                onMessage(initialData);
+              } else {
+                console.log('收到Toobit增量深度数据');
+                // 增量数据，更新本地orderbook
+                const updatedOrderBook = this.updateToobitOrderBook(symbol, depthData);
+                
+                if (updatedOrderBook) {
+                  // 转换为标准格式
+                  const formattedData = {
+                    e: 'depthUpdate',
+                    a: updatedOrderBook.asks,
+                    b: updatedOrderBook.bids,
+                    lastUpdateTime: updatedOrderBook.lastUpdateTime
+                  };
+                  onMessage(formattedData);
+                }
+              }
             }
           }
         } catch (error) {
+          console.error('处理Toobit WebSocket消息时出错:', error);
         }
       };
 
