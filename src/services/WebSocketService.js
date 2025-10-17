@@ -855,26 +855,31 @@ export class DepthDataProcessor {
 
     // 排序：asks降序（最高价在前），bids降序（最高价在前）
     if (type === 'asks') {
-      processed.sort((a, b) => parseFloat(b.price) - parseFloat(a.price));  
+      processed.sort((a, b) => parseFloat(a.price) - parseFloat(b.price));  
     } else {
       processed.sort((a, b) => parseFloat(b.price) - parseFloat(a.price));
     } 
 
     // 计算累计数量（在排序后进行）
-    if (type === 'asks') {
-      // 卖盘：从最后一条的价格开始向下累计
-      let total = 0;
-      for (let i = processed.length - 1; i >= 0; i--) {
-        total += processed[i].quantity;
-        processed[i].total = total;
-      }
-    } else {
-      // 买盘：从第一条的价格开始向上累计
-      let total = 0;
-      for (let i = 0; i < processed.length; i++) {
-        total += processed[i].quantity;
-        processed[i].total = total;
-      }
+    // if (type === 'asks') {
+    //   // 卖盘：从最后一条的价格开始向下累计
+    //   let total = 0;
+    //   for (let i = processed.length - 1; i >= 0; i--) {
+    //     total += processed[i].quantity;
+    //     processed[i].total = total;
+    //   }
+    // } else {
+    //   // 买盘：从第一条的价格开始向上累计
+    //   let total = 0;
+    //   for (let i = 0; i < processed.length; i++) {
+    //     total += processed[i].quantity;
+    //     processed[i].total = total;
+    //   }
+    // }
+    let total = 0;
+    for (let i = 0; i < processed.length; i++) {
+      total += processed[i].quantity;
+      processed[i].total = total;
     }
     return processed;
   }

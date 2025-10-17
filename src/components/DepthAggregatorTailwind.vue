@@ -66,10 +66,10 @@
           class="min-w-24"
           @change="onDepthLevelsChange"
         >
-          <el-option label="5档" :value="5" />
-          <el-option label="10档" :value="10" />
-          <el-option label="20档" :value="20" />
-          <el-option label="1000档" :value="1000" />
+          <el-option label="5档" :value="50" />
+          <el-option label="100档" :value="100" />
+          <el-option label="200档" :value="200" />
+          <el-option label="250档" :value="250" />
         </el-select>
       </div>
 
@@ -88,9 +88,9 @@
     </div>
 
     <!-- 深度数据展示区域 -->
-    <div class="flex flex-col gap-5 mb-5">
+    <div class="flex gap-5 mb-5">
       <!-- 卖盘对比区域 -->
-      <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden transition-colors duration-300 relative">
+      <div class="flex-1 bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden transition-colors duration-300 relative">
         <div class="bg-gradient-to-r from-danger-500 to-red-600 text-white p-4 flex justify-between items-center">
           <h2 class="text-2xl font-light">
             卖盘对比 (Asks)
@@ -99,7 +99,7 @@
             {{ getExchangeDisplayName(selectedExchange) }}: {{ selectedExchangeLastUpdate }} | Toobit: {{ toobitLastUpdate }}
           </div>
         </div>
-        <div v-loading="isLoadingData" class=" min-h-[150px] max-h-96 overflow-y-auto relative " element-loading-text="正在获取卖盘数据..." element-loading-background="rgba(255, 255, 255, 0.8)" element-loading-spinner="el-icon-loading" element-loading-svg-view-box="-10, -10, 50, 50">
+        <div v-loading="isLoadingData" class="min-h-[400px] max-h-[600px] overflow-y-auto relative" element-loading-text="正在获取卖盘数据..." element-loading-background="rgba(255, 255, 255, 0.8)" element-loading-spinner="el-icon-loading" element-loading-svg-view-box="-10, -10, 50, 50">
           <div class="grid grid-cols-2 border-b border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 transition-colors duration-300">
             <div class="border-r border-gray-200 dark:border-gray-600 flex flex-col">
               <div class="px-4 py-2 text-sm font-semibold bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-200 text-center transition-colors duration-300">
@@ -160,7 +160,7 @@
       </div>
 
       <!-- 买盘对比区域 -->
-      <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden transition-colors duration-300 relative">
+      <div class="flex-1 bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden transition-colors duration-300 relative">
         <div class="bg-gradient-to-r from-success-500 to-green-600 text-white p-4 flex justify-between items-center">
           <h2 class="text-2xl font-light">
             买盘对比 (Bids)
@@ -169,7 +169,7 @@
             {{ getExchangeDisplayName(selectedExchange) }}: {{ selectedExchangeLastUpdate }} | Toobit: {{ toobitLastUpdate }}
           </div>
         </div>
-        <div v-loading="isLoadingData" class=" min-h-[150px] max-h-96 overflow-y-auto relative" element-loading-text="正在获取买盘数据..." element-loading-background="rgba(255, 255, 255, 0.8)" element-loading-spinner="el-icon-loading" element-loading-svg-view-box="-10, -10, 50, 50">
+        <div v-loading="isLoadingData" class="min-h-[400px] max-h-[600px] overflow-y-auto relative" element-loading-text="正在获取买盘数据..." element-loading-background="rgba(255, 255, 255, 0.8)" element-loading-spinner="el-icon-loading" element-loading-svg-view-box="-10, -10, 50, 50">
           <div class="grid grid-cols-2 border-b border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 transition-colors duration-300">
             <div class="border-r border-gray-200 dark:border-gray-600 flex flex-col">
               <div class="px-4 py-2 text-sm font-semibold bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-200 text-center transition-colors duration-300">
@@ -472,7 +472,7 @@ import { DepthDataProcessor, WebSocketService } from '../services/WebSocketServi
 const selectedSymbol = ref('BTCUSDT');
 const selectedExchange = ref('binance'); // 新增：选择的交易所
 const exchangeType = ref('futures');
-const depthLevels = ref(1000);
+const depthLevels = ref(250);
 const depthPercentage = ref('0.01'); // 新增：深度百分比
 const selectedExchangeStatus = ref('disconnected'); // 新增：选择的交易所状态
 const toobitStatus = ref('disconnected');
