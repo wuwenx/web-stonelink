@@ -259,6 +259,86 @@
       </div>
     </div>
 
+    <!-- 深度详情对比表格 -->
+    <div class="bg-white dark:bg-gray-800 p-5 rounded-lg shadow-md mb-5 transition-colors duration-300">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-xl font-semibold text-gray-800 dark:text-gray-200">
+          深度详情对比 (Depth Detail Comparison)
+        </h3>
+        <div class="flex items-center gap-4">
+          <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">深度档位：</span>
+          <el-radio-group v-model="depthPercentage" @change="onDepthPercentageChange" size="small">
+            <el-radio label="0.01" class="text-xs">万1</el-radio>
+            <el-radio label="0.05" class="text-xs">万5</el-radio>
+            <el-radio label="0.1" class="text-xs">微观</el-radio>
+            <el-radio label="0.5" class="text-xs">紧密</el-radio>
+            <el-radio label="1" class="text-xs">核心</el-radio>
+            <el-radio label="2" class="text-xs">巨额</el-radio>
+            <el-radio label="5" class="text-xs">大额</el-radio>
+            <el-radio label="10" class="text-xs">极限</el-radio>
+          </el-radio-group>
+          <div class="text-sm text-blue-600 dark:text-blue-400">
+            ({{ depthPercentage }}%)
+          </div>
+        </div>
+      </div>
+      
+      <el-table 
+        :data="depthComparisonData" 
+        style="width: 100%" 
+        :header-cell-style="{ backgroundColor: '#f8fafc', color: '#374151' }"
+        :row-style="{ backgroundColor: 'transparent' }"
+        class="dark:bg-gray-800"
+        stripe
+        border
+      >
+        <el-table-column 
+          prop="symbol" 
+          label="资产 (ASSET)" 
+          width="200"
+          class-name="font-semibold"
+        >
+          <template #default="scope">
+            <span class="font-semibold text-gray-800 dark:text-gray-200">
+              {{ scope.row.symbol }} 
+            </span>
+          </template>
+        </el-table-column>
+        
+        <el-table-column 
+          :label="getExchangeDisplayName(selectedExchange)" 
+          align="center"
+          width="200"
+        >
+          <template #default="scope">
+            <el-tag 
+              :type="getDepthValueTagType(scope.row.selectedExchangeValue)"
+              size="large"
+              class="font-mono font-semibold"
+            >
+              {{ formatDepthValue(scope.row.selectedExchangeValue) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        
+        <el-table-column 
+          label="Toobit" 
+          align="center"
+          width="200"
+        >
+          <template #default="scope">
+            <el-tag 
+              :type="getDepthValueTagType(scope.row.toobitValue)"
+              size="large"
+              class="font-mono font-semibold"
+            >
+              {{ formatDepthValue(scope.row.toobitValue) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
+
     <!-- 统计信息 -->
     <div class="bg-white dark:bg-gray-800 p-5 rounded-lg shadow-md grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 transition-colors duration-300">
       <div class="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-md border-l-4 border-primary-500 transition-colors duration-300">
@@ -294,6 +374,7 @@ const selectedSymbol = ref('BTCUSDT');
 const selectedExchange = ref('binance'); // 新增：选择的交易所
 const exchangeType = ref('futures');
 const depthLevels = ref(5);
+const depthPercentage = ref('0.01'); // 新增：深度百分比
 const selectedExchangeStatus = ref('disconnected'); // 新增：选择的交易所状态
 const toobitStatus = ref('disconnected');
 const selectedExchangeMarkPriceStatus = ref('disconnected'); // 新增：选择的交易所标记价格状态
@@ -321,6 +402,16 @@ let reconnectTimer = null;
 // 计算属性
 const priceDifference = computed(() => {
   return selectedExchangeBestBid.value - toobitBestBid.value;
+});
+
+// 深度对比数据计算
+const depthComparisonData = computed(() => {  
+  const percentage = parseFloat(depthPercentage.value) / 100;
+  return [{
+    symbol: selectedSymbol.value,
+    selectedExchangeValue: calculateDepthValue(selectedExchangeBids.value, selectedExchangeBestBid.value, percentage),
+    toobitValue: calculateDepthValue(toobitBids.value, toobitBestBid.value, percentage)
+  }];
 });
 
 // 方法
@@ -372,6 +463,85 @@ const getExchangeDisplayName = exchange => {
     toobit: 'Toobit'
   };
   return exchangeNames[exchange] || exchange;
+};
+
+// 新增：计算深度值
+const calculateDepthValue = (bids, bestBid, percentage) => {
+  if (!bids || bids.length === 0 || !bestBid || bestBid === 0) {
+    return 0;
+  }
+  
+  const targetPrice = bestBid * (1 - percentage);
+  let totalQuantity = 0;
+  
+  for (const bid of bids) {
+    if (bid.price >= targetPrice) {
+      totalQuantity += bid.quantity;
+    } else {
+      break;
+    }
+  }
+  
+  return totalQuantity;
+};
+
+// 新增：格式化深度值
+const formatDepthValue = value => {
+  if (!value || value === 0) return '0.0 K';
+  if (value >= 1000000) {
+    return `${(value / 1000000).toFixed(1)} M`;
+  } else if (value >= 1000) {
+    return `${(value / 1000).toFixed(1)} K`;
+  } else {
+    return `${value.toFixed(2)}`;
+  }
+};
+
+// 新增：获取深度值样式类
+const getDepthValueClass = value => {
+  if (!value || value === 0) return 'bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-400';
+  
+  // 根据数值大小决定颜色
+  if (value >= 2.0) {
+    return 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200';
+  } else if (value >= 1.0) {
+    return 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200';
+  } else if (value >= 0.5) {
+    return 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200';
+  } else {
+    return 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200';
+  }
+};
+
+// 新增：获取深度值Tag类型
+const getDepthValueTagType = value => {
+  if (!value || value === 0) return 'info';
+  
+  // 根据数值大小决定Tag类型
+  if (value >= 2.0) {
+    return 'success';
+  } else if (value >= 1.0) {
+    return 'primary';
+  } else if (value >= 0.5) {
+    return 'warning';
+  } else {
+    return 'danger';
+  }
+};
+
+// 新增：获取深度百分比标签
+const getDepthPercentageLabel = percentage => {
+  const labels = {
+    '0.01': '万1',
+    '0.05': '万5',
+    '0.1': '微观',
+    '0.5': '紧密',
+    '1': '核心',
+    '2': '巨额',
+    '5': '大额',
+    '10': '极限'
+  };
+  return labels[percentage] || percentage;
 };
 
 // WebSocket连接管理
@@ -518,6 +688,11 @@ const onDepthLevelsChange = () => {
   // 深度档位变更时需要重新连接以获取新的深度数据
   console.log('深度档位变更:', depthLevels.value);
   handleConnectionChange();
+};
+
+const onDepthPercentageChange = () => {
+  // 深度百分比变更时不需要重新连接，只需要重新计算数据
+  console.log('深度百分比变更:', depthPercentage.value);
 };
 
 // 统一的连接变更处理
