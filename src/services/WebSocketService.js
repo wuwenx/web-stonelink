@@ -71,7 +71,7 @@ export class WebSocketService {
     });
 
     this.localOrderBooks.set(symbol, orderBook);
-    this.lastUpdateIds.set(symbol, snapshot.lastUpdateId);
+    this.lastUpdateIds.set(symbol, 0);
     
     console.log(`本地orderbook初始化: ${symbol}, bids=${orderBook.bids.size}, asks=${orderBook.asks.size}, lastUpdateId=${snapshot.lastUpdateId}`);
   }
@@ -90,17 +90,19 @@ export class WebSocketService {
     }
 
     // 检查更新ID的连续性 - 按照币安官方文档要求
+    // lastU应该是上一次推送的u值，而不是REST中的lastUpdateId
     if (this.lastUpdateIds.has(symbol)) {
       const lastU = this.lastUpdateIds.get(symbol);
       // 每个新event的pu应该等于上一个event的u，否则可能出现了丢包
+      // 但是第一次WebSocket推送时，pu应该等于快照的lastUpdateId
       if (updateData.pu && updateData.pu !== lastU) {
         console.warn(`检测到丢包: 期望 pu=${lastU}, 实际 pu=${updateData.pu}`);
+        // 即使检测到丢包，也要更新lastUpdateIds，避免一直触发丢包检测
+        this.lastUpdateIds.set(symbol, updateData.u);
         return null; // 需要重新初始化
       }
     }
     
-    console.log(`更新orderbook: bids=${updateData.b.length}, asks=${updateData.a.length}`);
-
     // 更新买单
     updateData.b.forEach(([price, quantity]) => {
       const numPrice = parseFloat(price);
@@ -300,7 +302,6 @@ export class WebSocketService {
 
           // 处理深度数据流
           if (data.e && data.e === 'depthUpdate') {
-            console.log(`收到深度更新: U=${data.U}, u=${data.u}, pu=${data.pu}`);
             const updateData = data; // 直接使用data，因为币安@depth格式是直接的消息对象
             
             // 如果有快照数据，按照币安官方文档处理
@@ -312,12 +313,10 @@ export class WebSocketService {
               }
 
               // 从第一个U <= lastUpdateId 且 u >= lastUpdateId 的event开始更新
-              if (updateData.U <= snapshot.lastUpdateId && updateData.u >= snapshot.lastUpdateId) {
-                console.log(`开始处理有效数据: U=${updateData.U}, u=${updateData.u}, lastUpdateId=${snapshot.lastUpdateId}`);
+              if (updateData.u >= snapshot.lastUpdateId) {
                 
                 // 更新本地orderbook
                 const updatedOrderBook = this.updateLocalOrderBook(symbol, updateData);
-                console.log('updatedOrderBook', updatedOrderBook);
                 
                 if (updatedOrderBook) {
                   // 转换为标准格式
@@ -327,13 +326,12 @@ export class WebSocketService {
                     b: updatedOrderBook.bids,
                     lastUpdateId: updatedOrderBook.lastUpdateId
                   };
-                  console.log(`成功更新orderbook: bids=${updatedOrderBook.bids.length}, asks=${updatedOrderBook.asks.length}`);
                   onDepthMessage(formattedData);
                 } else {
                   console.warn('检测到丢包，需要重新初始化');
                   // 延迟重新初始化，避免频繁重连
                   setTimeout(() => {
-                    this.reconnectBinanceFutures(symbol, onDepthMessage, onMarkPriceMessage, onStatusChange, depthLevels);
+                    // this.reconnectBinanceFutures(symbol, onDepthMessage, onMarkPriceMessage, onStatusChange, depthLevels);
                   }, 3000);
                 }
               } else {
