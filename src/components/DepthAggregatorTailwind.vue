@@ -99,30 +99,33 @@
             {{ getExchangeDisplayName(selectedExchange) }}: {{ selectedExchangeLastUpdate }} | Toobit: {{ toobitLastUpdate }}
           </div>
         </div>
-        <div v-loading="isLoadingData" class="min-h-[400px] max-h-[600px] overflow-y-auto relative" element-loading-text="正在获取卖盘数据..." element-loading-background="rgba(255, 255, 255, 0.8)" element-loading-spinner="el-icon-loading" element-loading-svg-view-box="-10, -10, 50, 50">
-          <div class="grid grid-cols-2 border-b border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 transition-colors duration-300">
-            <div class="border-r border-gray-200 dark:border-gray-600 flex flex-col">
-              <div class="px-4 py-2 text-sm font-semibold bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-200 text-center transition-colors duration-300">
-                {{ getExchangeDisplayName(selectedExchange) }}
-              </div>
-              <div class="grid grid-cols-3 px-4 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 transition-colors duration-300">
-                <span>价格</span>
-                <span>数量</span>
-                <span>总计</span>
-              </div>
+        <!-- 表头部分 - 固定不滚动 -->
+        <div class="grid grid-cols-2 border-b border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 transition-colors duration-300">
+          <div class="border-r border-gray-200 dark:border-gray-600 flex flex-col">
+            <div class="px-4 py-2 text-sm font-semibold bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-200 text-center transition-colors duration-300">
+              {{ getExchangeDisplayName(selectedExchange) }}
             </div>
-            <div class="flex flex-col">
-              <div class="px-4 py-2 text-sm font-semibold bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-200 text-center transition-colors duration-300">
-                Toobit
-              </div>
-              <div class="grid grid-cols-3 px-4 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 transition-colors duration-300">
-                <span>价格</span>
-                <span>数量</span>
-                <span>总计</span> 
-              </div>
+            <div class="grid grid-cols-3 px-4 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 transition-colors duration-300">
+              <span>价格</span>
+              <span>数量</span>
+              <span>总计</span>
             </div>
           </div>
-          <div v-for="(item, index) in Math.max(selectedExchangeAsks.length, toobitAsks.length)" :key="`ask-${index}`" class="grid grid-cols-2 border-b border-gray-100 dark:border-gray-600">
+          <div class="flex flex-col">
+            <div class="px-4 py-2 text-sm font-semibold bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-200 text-center transition-colors duration-300">
+              Toobit
+            </div>
+            <div class="grid grid-cols-3 px-4 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 transition-colors duration-300">
+              <span>价格</span>
+              <span>数量</span>
+              <span>总计</span> 
+            </div>
+          </div>
+        </div>
+        
+        <!-- 数据部分 - 可滚动 -->
+        <div v-loading="isLoadingData" class="min-h-[400px] max-h-[600px] overflow-y-auto relative" element-loading-text="正在获取卖盘数据..." element-loading-background="rgba(255, 255, 255, 0.8)" element-loading-spinner="el-icon-loading" element-loading-svg-view-box="-10, -10, 50, 50">
+          <div v-for="(item, index) in Math.max(selectedExchangeAsks.length, toobitAsks.length)" :key="`ask-${index}`" class="grid  grid-cols-2 border-b border-gray-100 dark:border-gray-600">
             <div class="border-r border-gray-200 dark:border-gray-600">
               <div
                 v-if="selectedExchangeAsks[index]"
@@ -133,7 +136,7 @@
                 <span class="text-gray-600 dark:text-gray-300 text-right relative z-10">{{ formatQuantity(selectedExchangeAsks[index].total) }}</span>
                 <!-- 背景色条 -->
                 <div 
-                  class="absolute inset-0 bg-red-100 dark:bg-red-900/30 transition-all duration-300"
+                  class="absolute inset-0 bg-red-100 dark:bg-red-900/30 transition-all duration-300 opacity-60"
                   :style="{ 
                     width: `${getAskBackgroundWidth(selectedExchangeAsks[index].total, selectedExchangeAsks)}%`,
                     right: 0
@@ -156,7 +159,7 @@
                 <span class="text-gray-600 dark:text-gray-300 text-right relative z-10">{{ formatQuantity(toobitAsks[index].total) }}</span>
                 <!-- 背景色条 -->
                 <div 
-                  class="absolute inset-0 bg-red-100 dark:bg-red-900/30 transition-all duration-300"
+                  class="absolute inset-0 bg-red-100 dark:bg-red-900/30 transition-all duration-300 opacity-60"
                   :style="{ 
                     width: `${getAskBackgroundWidth(toobitAsks[index].total, toobitAsks)}%`,
                     right: 0
@@ -183,29 +186,32 @@
             {{ getExchangeDisplayName(selectedExchange) }}: {{ selectedExchangeLastUpdate }} | Toobit: {{ toobitLastUpdate }}
           </div>
         </div>
-        <div v-loading="isLoadingData" class="min-h-[400px] max-h-[600px] overflow-y-auto relative" element-loading-text="正在获取买盘数据..." element-loading-background="rgba(255, 255, 255, 0.8)" element-loading-spinner="el-icon-loading" element-loading-svg-view-box="-10, -10, 50, 50">
-          <div class="grid grid-cols-2 border-b border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 transition-colors duration-300">
-            <div class="border-r border-gray-200 dark:border-gray-600 flex flex-col">
-              <div class="px-4 py-2 text-sm font-semibold bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-200 text-center transition-colors duration-300">
-                {{ getExchangeDisplayName(selectedExchange) }}
-              </div>
-              <div class="grid grid-cols-3 px-4 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 transition-colors duration-300">
-                <span>价格</span>
-                <span>数量</span>
-                <span>总计</span>
-              </div>
+        <!-- 表头部分 - 固定不滚动 -->
+        <div class="grid grid-cols-2 border-b border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 transition-colors duration-300">
+          <div class="border-r border-gray-200 dark:border-gray-600 flex flex-col">
+            <div class="px-4 py-2 text-sm font-semibold bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-200 text-center transition-colors duration-300">
+              {{ getExchangeDisplayName(selectedExchange) }}
             </div>
-            <div class="flex flex-col">
-              <div class="px-4 py-2 text-sm font-semibold bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-200 text-center transition-colors duration-300">
-                Toobit
-              </div>
-              <div class="grid grid-cols-3 px-4 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 transition-colors duration-300">
-                <span>价格</span>
-                <span>数量</span>
-                <span>总计</span>
-              </div>
+            <div class="grid grid-cols-3 px-4 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 transition-colors duration-300">
+              <span>价格</span>
+              <span>数量</span>
+              <span>总计</span>
             </div>
           </div>
+          <div class="flex flex-col">
+            <div class="px-4 py-2 text-sm font-semibold bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-200 text-center transition-colors duration-300">
+              Toobit
+            </div>
+            <div class="grid grid-cols-3 px-4 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 transition-colors duration-300">
+              <span>价格</span>
+              <span>数量</span>
+              <span>总计</span>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 数据部分 - 可滚动 -->
+        <div v-loading="isLoadingData" class="min-h-[400px] max-h-[600px] overflow-y-auto relative" element-loading-text="正在获取买盘数据..." element-loading-background="rgba(255, 255, 255, 0.8)" element-loading-spinner="el-icon-loading" element-loading-svg-view-box="-10, -10, 50, 50">
           <div v-for="(item, index) in Math.max(selectedExchangeBids.length, toobitBids.length)" :key="`bid-${index}`" class="grid grid-cols-2 border-b border-gray-100 dark:border-gray-600">
             <div class="border-r border-gray-200 dark:border-gray-600">
               <div
@@ -217,7 +223,7 @@
                 <span class="text-gray-600 dark:text-gray-300 text-right relative z-10">{{ formatQuantity(selectedExchangeBids[index].total) }}</span>
                 <!-- 背景色条 -->
                 <div 
-                  class="absolute inset-0 bg-green-100 dark:bg-green-900/30 transition-all duration-300"
+                  class="absolute inset-0 bg-green-100 dark:bg-green-900/30 transition-all duration-300 opacity-60"
                   :style="{ 
                     width: `${getBidBackgroundWidth(selectedExchangeBids[index].total, selectedExchangeBids)}%`,
                     left: 0
@@ -240,7 +246,7 @@
                 <span class="text-gray-600 dark:text-gray-300 text-right relative z-10">{{ formatQuantity(toobitBids[index].total) }}</span>
                 <!-- 背景色条 -->
                 <div 
-                  class="absolute inset-0 bg-green-100 dark:bg-green-900/30 transition-all duration-300"
+                  class="absolute inset-0 bg-green-100 dark:bg-green-900/30 transition-all duration-300 opacity-60"
                   :style="{ 
                     width: `${getBidBackgroundWidth(toobitBids[index].total, toobitBids)}%`,
                     left: 0
@@ -663,8 +669,8 @@ const getAskBackgroundWidth = (currentTotal, asksArray) => {
     return 0;
   }
   
-  // 获取最后一条的total作为最大占比
-  const maxTotal = asksArray[asksArray.length - 1]?.total || 0;
+  // 获取所有卖盘数据中的最大total值
+  const maxTotal = Math.max(...asksArray.map(item => item.total));
   if (maxTotal === 0) {
     return 0;
   }
@@ -680,8 +686,8 @@ const getBidBackgroundWidth = (currentTotal, bidsArray) => {
     return 0;
   }
   
-  // 获取最后一条的total作为最大占比
-  const maxTotal = bidsArray[bidsArray.length - 1]?.total || 0;
+  // 获取所有买盘数据中的最大total值
+  const maxTotal = Math.max(...bidsArray.map(item => item.total));
   if (maxTotal === 0) {
     return 0;
   }
