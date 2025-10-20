@@ -12,6 +12,7 @@ export class WebSocketService {
     this.maxReconnectAttempts = 5;
     this.reconnectDelay = 3000;
     this.heartbeatInterval = 30000;
+    this.reconnecting = new Set(); // 跟踪正在重连的连接
     this.heartbeatTimers = new Map();
     // 本地orderbook管理
     this.localOrderBooks = new Map();
@@ -88,10 +89,11 @@ export class WebSocketService {
       return null;
     }
 
-    // 检查更新ID的连续性
+    // 检查更新ID的连续性 - 按照币安官方文档要求
     if (this.lastUpdateIds.has(symbol)) {
       const lastU = this.lastUpdateIds.get(symbol);
-      if (updateData.pu !== lastU) {
+      // 每个新event的pu应该等于上一个event的u，否则可能出现了丢包
+      if (updateData.pu && updateData.pu !== lastU) {
         console.warn(`检测到丢包: 期望 pu=${lastU}, 实际 pu=${updateData.pu}`);
         return null; // 需要重新初始化
       }
@@ -298,37 +300,44 @@ export class WebSocketService {
 
           // 处理深度数据流
           if (data.e && data.e === 'depthUpdate') {
-            console.log('处理深度----数据流:', data);
+            console.log(`收到深度更新: U=${data.U}, u=${data.u}, pu=${data.pu}`);
             const updateData = data; // 直接使用data，因为币安@depth格式是直接的消息对象
             
-            // 如果有快照数据，检查数据有效性
+            // 如果有快照数据，按照币安官方文档处理
             if (hasSnapshot && snapshot) {
-              if (updateData.U <= snapshot.lastUpdateId) {
-                // 丢弃快照之前的数据
-                console.log(`丢弃旧数据: U=${updateData.U}, snapshot.lastUpdateId=${snapshot.lastUpdateId}`);
+              // 丢弃u < lastUpdateId的数据（过期数据）
+              if (updateData.u < snapshot.lastUpdateId) {
+                console.log(`丢弃过期数据: u=${updateData.u}, snapshot.lastUpdateId=${snapshot.lastUpdateId}`);
                 return;
               }
-              
-              // 更新本地orderbook
-              console.log(`处理WebSocket更新: U=${updateData.U}, u=${updateData.u}, pu=${updateData.pu}`);
-              const updatedOrderBook = this.updateLocalOrderBook(symbol, updateData);
-              
-              if (updatedOrderBook) {
-                // 转换为标准格式
-                const formattedData = {
-                  e: 'depthUpdate',
-                  a: updatedOrderBook.asks,
-                  b: updatedOrderBook.bids,
-                  lastUpdateId: updatedOrderBook.lastUpdateId
-                };
-                console.log(`成功更新orderbook: bids=${updatedOrderBook.bids.length}, asks=${updatedOrderBook.asks.length}`);
-                onDepthMessage(formattedData);
+
+              // 从第一个U <= lastUpdateId 且 u >= lastUpdateId 的event开始更新
+              if (updateData.U <= snapshot.lastUpdateId && updateData.u >= snapshot.lastUpdateId) {
+                console.log(`开始处理有效数据: U=${updateData.U}, u=${updateData.u}, lastUpdateId=${snapshot.lastUpdateId}`);
+                
+                // 更新本地orderbook
+                const updatedOrderBook = this.updateLocalOrderBook(symbol, updateData);
+                console.log('updatedOrderBook', updatedOrderBook);
+                
+                if (updatedOrderBook) {
+                  // 转换为标准格式
+                  const formattedData = {
+                    e: 'depthUpdate',
+                    a: updatedOrderBook.asks,
+                    b: updatedOrderBook.bids,
+                    lastUpdateId: updatedOrderBook.lastUpdateId
+                  };
+                  console.log(`成功更新orderbook: bids=${updatedOrderBook.bids.length}, asks=${updatedOrderBook.asks.length}`);
+                  onDepthMessage(formattedData);
+                } else {
+                  console.warn('检测到丢包，需要重新初始化');
+                  // 延迟重新初始化，避免频繁重连
+                  setTimeout(() => {
+                    this.reconnectBinanceFutures(symbol, onDepthMessage, onMarkPriceMessage, onStatusChange, depthLevels);
+                  }, 3000);
+                }
               } else {
-                console.warn('检测到丢包，需要重新初始化');
-                // 延迟重新初始化，避免频繁重连
-                setTimeout(() => {
-                  this.reconnectBinanceFutures(symbol, onDepthMessage, onMarkPriceMessage, onStatusChange, depthLevels);
-                }, 1000);
+                console.log(`跳过数据: U=${updateData.U}, u=${updateData.u}, lastUpdateId=${snapshot.lastUpdateId}`);
               }
             } else {
               // 没有快照数据，直接使用WebSocket数据
@@ -379,19 +388,39 @@ export class WebSocketService {
     const connectionId = `binance_futures_combined_${symbol}`;
     
     // 检查是否已经在重连中，避免重复重连
-    if (this.reconnectAttempts.has(connectionId) && this.reconnectAttempts.get(connectionId) > 0) {
+    if (this.reconnecting.has(connectionId)) {
       console.log(`连接 ${connectionId} 正在重连中，跳过重复重连`);
       return;
     }
     
-    console.log('重新初始化Binance连接...');
+    // 检查重连次数限制
+    const attempts = this.reconnectAttempts.get(connectionId) || 0;
+    if (attempts >= 3) {
+      console.error(`连接 ${connectionId} 重连次数已达上限，停止重连`);
+      onStatusChange('error');
+      return;
+    }
+    
+    console.log(`重新初始化Binance连接... (第${attempts + 1}次尝试)`);
+    this.reconnecting.add(connectionId);
+    this.reconnectAttempts.set(connectionId, attempts + 1);
+    
     // 清理旧的连接和数据
     this.disconnect(connectionId);
     this.localOrderBooks.delete(symbol);
     this.lastUpdateIds.delete(symbol);
     
-    // 重新连接
-    await this.connectBinanceFuturesWithMarkPrice(symbol, onDepthMessage, onMarkPriceMessage, onStatusChange, depthLevels);
+    // 延迟重连，避免频繁重连
+    setTimeout(async() => {
+      try {
+        await this.connectBinanceFuturesWithMarkPrice(symbol, onDepthMessage, onMarkPriceMessage, onStatusChange, depthLevels);
+        this.reconnecting.delete(connectionId); // 重连成功后清除标记
+      } catch (error) {
+        console.error('重连失败:', error);
+        this.reconnecting.delete(connectionId); // 重连失败后也清除标记
+        onStatusChange('error');
+      }
+    }, 2000 + attempts * 1000); // 递增延迟：2s, 3s, 4s
   }
 
   /**
@@ -533,8 +562,6 @@ export class WebSocketService {
       return null;
     }
 
-    console.log(`更新Toobit orderbook: bids=${updateData.b?.length || 0}, asks=${updateData.a?.length || 0}`);
-
     // 更新买单
     if (updateData.b && Array.isArray(updateData.b)) {
       updateData.b.forEach(([price, quantity]) => {
@@ -642,7 +669,6 @@ export class WebSocketService {
               
               // 检查是否为全量数据 (f=true)
               if (data.f === true) {
-                console.log('收到Toobit全量深度数据，初始化本地orderbook');
                 // 全量数据，初始化本地orderbook
                 this.initializeToobitOrderBook(symbol, depthData);
                 
@@ -655,7 +681,6 @@ export class WebSocketService {
                 };
                 onMessage(initialData);
               } else {
-                console.log('收到Toobit增量深度数据');
                 // 增量数据，更新本地orderbook
                 const updatedOrderBook = this.updateToobitOrderBook(symbol, depthData);
                 
