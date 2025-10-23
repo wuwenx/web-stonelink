@@ -20,12 +20,6 @@
               <router-link to="/depth" class="text-gray-500 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200">
                 深度对比
               </router-link>
-              <router-link to="/depth-aggregator" class="text-gray-500 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200">
-                深度聚合器
-              </router-link>
-              <router-link to="/multi-symbol" class="text-gray-500 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200">
-                多币对示例
-              </router-link>
             </nav>
 
             <!-- 主题切换按钮 -->

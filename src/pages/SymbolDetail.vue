@@ -14,7 +14,7 @@
               返回
             </el-button>
             <h2 class="page-title">
-              {{ symbol }} 流动性热力图
+              {{ symbol }} 单币对详情
             </h2>
           </div>
           <div class="header-right">
@@ -75,6 +75,87 @@
           </div>
         </el-col>
       </el-row>
+    </el-card>
+
+    <!-- 滑点模拟 -->
+    <el-card class="slippage-card" shadow="hover">
+      <template #header>
+        <div class="card-header">
+          <span class="card-title">滑点模拟</span>
+        </div>
+      </template>
+      
+      <div class="slippage-controls">
+        <div class="input-group">
+          <label class="input-label">模拟交易数量 ({{ symbol.replace('USDT', '') }})</label>
+          <el-input-number
+            v-model="simulationQuantity"
+            :min="0.001"
+            :max="1000"
+            :precision="3"
+            :step="0.1"
+            size="large"
+            @change="calculateSlippage"
+          />
+        </div>
+        <el-button 
+          type="primary" 
+          size="large"
+          @click="calculateSlippage"
+        >
+          计算滑点
+        </el-button>
+      </div>
+      
+      <el-table 
+        :data="slippageData" 
+        stripe 
+        border
+        class="slippage-table"
+        v-loading="isCalculating"
+      >
+        <el-table-column prop="exchange" label="交易所" width="120" align="center">
+          <template #default="{ row }">
+            <el-tag :type="getExchangeTagType(row.exchange)" size="large">
+              {{ row.exchange.toUpperCase() }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        
+        <el-table-column prop="buySlippage" label="买入滑点" width="200" align="center">
+          <template #default="{ row }">
+            <el-tag 
+              :type="getSlippageTagType(row.buySlippage)"
+              size="large"
+            >
+              {{ formatSlippage(row.buySlippage) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        
+        <el-table-column prop="sellSlippage" label="卖出滑点" width="200" align="center">
+          <template #default="{ row }">
+            <el-tag 
+              :type="getSlippageTagType(row.sellSlippage)"
+              size="large"
+            >
+              {{ formatSlippage(row.sellSlippage) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        
+        <el-table-column prop="buyAvgPrice" label="买入均价" width="150" align="center">
+          <template #default="{ row }">
+            <span class="price-text">{{ formatPrice(row.buyAvgPrice) }}</span>
+          </template>
+        </el-table-column>
+        
+        <el-table-column prop="sellAvgPrice" label="卖出均价" width="150" align="center">
+          <template #default="{ row }">
+            <span class="price-text">{{ formatPrice(row.sellAvgPrice) }}</span>
+          </template>
+        </el-table-column>
+      </el-table>
     </el-card>
 
     <!-- 数据表格 -->
@@ -192,6 +273,11 @@ const isLoading = ref(false);
 const isRefreshing = ref(false);
 const lastUpdateTime = ref('--');
 const tableData = ref([]);
+
+// 滑点模拟相关
+const simulationQuantity = ref(1.0);
+const slippageData = ref([]);
+const isCalculating = ref(false);
 
 // 交易对选项
 const symbolOptions = ref([
@@ -335,6 +421,115 @@ const updateTableData = () => {
   lastUpdateTime.value = new Date().toLocaleTimeString();
 };
 
+// 计算滑点
+const calculateSlippage = () => {
+  if (!simulationQuantity.value || simulationQuantity.value <= 0) {
+    return;
+  }
+  
+  isCalculating.value = true;
+  
+  try {
+    const data = [];
+    
+    // 只计算币安和Toobit
+    const targetExchanges = ['binance', 'toobit'];
+    
+    targetExchanges.forEach(exchange => {
+      const exchangeData = getExchangeDepthData(exchange, symbol.value);
+      if (exchangeData) {
+        const buySlippage = calculateSlippageForSide(exchangeData.asks, simulationQuantity.value, 'buy');
+        const sellSlippage = calculateSlippageForSide(exchangeData.bids, simulationQuantity.value, 'sell');
+        data.push({
+          exchange: exchange,
+          buySlippage: buySlippage.slippagePercent,
+          sellSlippage: sellSlippage.slippagePercent,
+          buyAvgPrice: buySlippage.averagePrice,
+          sellAvgPrice: sellSlippage.averagePrice
+        });
+      } else {
+        data.push({
+          exchange: exchange,
+          buySlippage: 0,
+          sellSlippage: 0,
+          buyAvgPrice: 0,
+          sellAvgPrice: 0
+        });
+      }
+    });
+    
+    slippageData.value = data;
+  } catch (error) {
+    console.error('滑点计算错误:', error);
+  } finally {
+    isCalculating.value = false;
+  }
+};
+
+// 获取交易所深度数据
+const getExchangeDepthData = (exchange, symbol) => {
+  switch (exchange.toLowerCase()) {
+  case 'binance':
+    return binanceStore.getDepthDataBySymbol(symbol);
+  case 'toobit':
+    return toobitStore.getDepthDataBySymbol(symbol);
+  default:
+    return null;
+  }
+};
+
+// 计算单边滑点
+const calculateSlippageForSide = (depthData, targetQuantity, side) => {
+  if (!depthData || depthData.length === 0) {
+    return { slippagePercent: 0, averagePrice: 0, startPrice: 0, finalPrice: 0 };
+  }
+  
+  // 确定起始价格
+  const startPrice = depthData[0].price;
+  
+  let totalExecutedValue = 0; // 累计成交金额
+  let totalExecutedQuantity = 0; // 累计成交数量
+  let remainingQuantity = targetQuantity; // 剩余未成交数量
+  let finalPrice = startPrice; // 最终成交的最后一档价格
+  
+  // 模拟吃单过程
+  for (const order of depthData) {
+    if (remainingQuantity <= 0) {
+      break; // 订单已完全成交
+    }
+    
+    const price = order.price;
+    const availableQuantity = order.quantity;
+    
+    // 计算当前档位成交量
+    const executedQty = Math.min(remainingQuantity, availableQuantity);
+    
+    // 累计金额和数量
+    totalExecutedValue += executedQty * price;
+    totalExecutedQuantity += executedQty;
+    remainingQuantity -= executedQty;
+    finalPrice = price; // 记录当前档位价格
+  }
+  
+  // 检查是否全部成交
+  if (remainingQuantity > 0) {
+    console.warn(`警告: 市场深度不足! 尚有 ${remainingQuantity.toFixed(2)} 未成交`);
+  }
+  
+  // 计算实际成交均价
+  const averagePrice = totalExecutedQuantity > 0 ? totalExecutedValue / totalExecutedQuantity : startPrice;
+  
+  // 计算滑点百分比
+  const slippage = ((averagePrice - startPrice) / startPrice) * 100;
+  
+  return {
+    slippagePercent: slippage,
+    averagePrice: averagePrice,
+    startPrice: startPrice,
+    finalPrice: finalPrice
+  };
+};
+
 // 刷新数据
 const refreshData = async() => {
   isRefreshing.value = true;
@@ -409,6 +604,25 @@ const formatLiquidity = liquidity => {
   } else {
     return liquidity.toFixed(1);
   }
+};
+
+// 格式化滑点
+const formatSlippage = slippage => {
+  if (!slippage || slippage === 0) return '0.0000 %';
+  return `${slippage.toFixed(4)} %`;
+};
+
+// 格式化价格
+const formatPrice = price => {
+  if (!price || price === 0) return '--';
+  return price.toFixed(2);
+};
+
+// 获取滑点标签类型
+const getSlippageTagType = slippage => {
+  if (slippage < 0.05) return 'success'; // 小于0.05%为绿色
+  if (slippage < 0.1) return 'warning';  // 0.05%-0.1%为黄色
+  return 'danger'; // 大于0.1%为红色
 };
 
 // 获取单元格样式
@@ -507,6 +721,9 @@ onMounted(() => {
   // 初始化数据
   updateTableData();
   
+  // 初始化滑点计算
+  calculateSlippage();
+  
   // 设置每秒更新
   const timer = setInterval(updateTableData, 1000);
   
@@ -531,6 +748,7 @@ onMounted(() => {
 /* 卡片样式 */
 .header-card,
 .control-card,
+.slippage-card,
 .table-card,
 .status-card {
   margin-bottom: 20px;
@@ -579,6 +797,32 @@ onMounted(() => {
   font-weight: 500;
   color: var(--el-text-color-regular);
   margin-bottom: 8px;
+}
+
+/* 滑点控制面板样式 */
+.slippage-controls {
+  display: flex;
+  align-items: end;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.input-group {
+  flex: 1;
+}
+
+.input-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--el-text-color-regular);
+  margin-bottom: 8px;
+}
+
+.price-text {
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+  color: var(--el-text-color-primary);
 }
 
 /* 表格样式 */

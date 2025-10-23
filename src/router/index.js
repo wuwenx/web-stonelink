@@ -28,36 +28,13 @@ const routes = [
       //   component: () => import('../pages/OrderBook.vue'),
       //   meta: { title: '深度聚合器' },
       // },
-      {
-        path: 'multi-symbol',
-        name: 'MultiSymbolExample',
-        component: () => import('../views/MultiSymbolExample.vue'),
-        meta: { title: '多币对示例' },
-      },
+
       {
         path: 'symbol/:symbol',
         name: 'SymbolDetail',
         component: () => import('../pages/SymbolDetail.vue'),
         meta: { title: '币对详情' },
       },
-      // {
-      //   path: 'analytics',
-      //   name: 'Analytics',
-      //   component: () => import('../views/Analytics.vue'),
-      //   meta: { title: '数据分析' }
-      // },
-      // {
-      //   path: 'users',
-      //   name: 'Users',
-      //   component: () => import('../views/Users.vue'),
-      //   meta: { title: '用户管理' }
-      // },
-      // {
-      //   path: 'settings',
-      //   name: 'Settings',
-      //   component: () => import('../views/Settings.vue'),
-      //   meta: { title: '设置' }
-      // }
     ],
   },
   // {
