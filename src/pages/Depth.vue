@@ -1,123 +1,185 @@
 <template>
-  <div class="minimal-container">
-    <!-- 简约控制面板 -->
-    <div class="controls">
-      <div class="control-group">
-        <label class="control-label">资产类型</label>
-        <div class="toggle-group">
-          <button 
-            :class="['toggle-btn', { active: assetType === 'futures' }]"
-            @click="updateAssetType('futures')"
-          >
-            合约
-          </button>
-          <button 
-            :class="['toggle-btn', { active: assetType === 'spot' }]"
-            @click="updateAssetType('spot')"
-          >
-            现货
-          </button>
+  <div class="depth-container">
+    <!-- 页面头部 -->
+    <el-card class="header-card" shadow="hover">
+      <div class="card-header">
+        <div class="header-left">
+          <h1 class="page-title">
+            深度对比
+          </h1>
+        </div>
+        <div class="header-right">
+          <el-tag type="info" size="small">
+            实时数据
+          </el-tag>
         </div>
       </div>
+    </el-card>
 
-      <div class="control-group">
-        <label class="control-label">深度范围</label>
-        <div class="depth-selector">
-          <button 
-            v-for="option in depthOptions" 
-            :key="option.value"
-            :class="['depth-btn', { active: depthPercentage === option.value }]"
-            @click="updateDepthPercentage(option.value)"
-          >
-            {{ option.label }}
-          </button>
+    <!-- 控制面板 -->
+    <el-card class="control-card" shadow="hover">
+      <template #header>
+        <div class="card-header">
+          <span class="card-title">控制面板</span>
         </div>
-      </div>
-
-      <div class="control-group">
-        <label class="control-label">订单方向</label>
-        <div class="toggle-group">
-          <button 
-            :class="['toggle-btn', { active: orderSide === 'buy' }]"
-            @click="updateOrderSide('buy')"
-          >
-            买盘
-          </button>
-          <button 
-            :class="['toggle-btn', { active: orderSide === 'sell' }]"
-            @click="updateOrderSide('sell')"
-          >
-            卖盘
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- 简约数据表格 -->
-    <div class="data-table">
-      <div class="table-header">
-        <div class="header-cell">
-          资产
-        </div>
-        <div class="header-cell">
-          BINANCE
-        </div>
-        <div class="header-cell">
-          TOOBIT
-        </div>
-        <div class="header-cell">
-          分数
-        </div>
-      </div>
+      </template>
       
-      <div class="table-body">
-        <div 
-          v-for="item in tableData" 
-          :key="item.symbol"
-          class="table-row"
-          @click="goToSymbolDetail(item.symbol)"
-        >
-          <div class="table-cell asset">
-            <div class="asset-name">
-              {{ item.symbol }}
-            </div>
-            <div class="asset-type">
-              {{ assetType.toUpperCase() }}
-            </div>
+      <el-row :gutter="20">
+        <el-col :span="12">
+          <div class="control-group">
+            <label class="control-label">资产类型</label>
+            <el-radio-group v-model="assetType" @change="updateAssetType">
+              <el-radio-button label="futures">
+                合约
+              </el-radio-button>
+              <el-radio-button label="spot">
+                现货
+              </el-radio-button>
+            </el-radio-group>
           </div>
-          
-          <div class="table-cell value">
-            <div class="value-text binance">
-              {{ formatValue(item.binanceValue) }}
-            </div>
+        </el-col>
+        
+        <el-col :span="12">
+          <div class="control-group">
+            <label class="control-label">订单方向</label>
+            <el-radio-group v-model="orderSide" @change="updateOrderSide">
+              <el-radio-button label="buy">
+                买盘
+              </el-radio-button>
+              <el-radio-button label="sell">
+                卖盘
+              </el-radio-button>
+            </el-radio-group>
           </div>
-          
-          <div class="table-cell value">
-            <div class="value-text toobit">
-              {{ formatValue(item.toobitValue) }}
-            </div>
+        </el-col>
+      </el-row>
+    </el-card>
+
+    <!-- 数据表格 -->
+    <el-card class="table-card" shadow="hover">
+      <template #header>
+        <div class="card-header">
+          <div class="header-left">
+            <span class="card-title">深度对比数据</span>
           </div>
-          
-          <div class="table-cell score">
-            <div :class="['score', getScoreClass(item.score)]">
-              {{ item.score > 0 ? '+' : '' }}{{ item.score }}
+          <div class="header-right">
+            <div class="depth-selector">
+              <label class="depth-label">深度范围:</label>
+              <el-radio-group v-model="depthPercentage" size="small" @change="updateDepthPercentage">
+                <el-radio-button 
+                  v-for="option in depthOptions" 
+                  :key="option.value"
+                  :label="option.value"
+                >
+                  {{ option.label }}
+                </el-radio-button>
+              </el-radio-group>
             </div>
           </div>
         </div>
-      </div>
-    </div>
+      </template>
+      
+      <el-table 
+        :data="tableData" 
+        stripe 
+        border 
+        class="comparison-table"
+        :cell-style="getCellStyle"
+        :header-cell-style="getHeaderCellStyle"
+      >
+        <el-table-column prop="symbol" label="资产" width="200" align="center">
+          <template #default="{ row }">
+            <el-button 
+              type="primary" 
+              size="small" 
+              @click="goToSymbolDetail(row.symbol)"
+            >
+              {{ row.symbol }} {{ assetType.toUpperCase() }}
+            </el-button>
+          </template>
+        </el-table-column>
+        
+        <el-table-column prop="binanceValue" label="BINANCE" width="200" align="center">
+          <template #default="{ row }">
+            <el-tag 
+              :type="getValueTagType(row.binanceValue, row.toobitValue)"
+              size="large"
+            >
+              {{ formatValue(row.binanceValue) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        
+        <el-table-column prop="toobitValue" label="TOOBIT" width="200" align="center">
+          <template #default="{ row }">
+            <el-tag 
+              :type="getValueTagType(row.toobitValue, row.binanceValue)"
+              size="large"
+            >
+              {{ formatValue(row.toobitValue) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        
+        <el-table-column prop="score" label="分数" width="100" align="center">
+          <template #default="{ row }">
+            <el-tag 
+              :type="getScoreTagType(row.score)"
+              size="large"
+            >
+              {{ row.score > 0 ? '+' : '' }}{{ row.score }}
+            </el-tag>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
 
-    <!-- 简约状态栏 -->
-    <div class="status-bar">
-      <div class="status-item">
-        <div class="status-dot binance" />
-        <span>币安</span>
-      </div>
-      <div class="status-item">
-        <div class="status-dot toobit" />
-        <span>Toobit</span>
-      </div>
-    </div>
+    <!-- 连接状态 -->
+    <el-card class="status-card" shadow="hover">
+      <template #header>
+        <div class="card-header">
+          <span class="card-title">连接状态</span>
+        </div>
+      </template>
+      
+      <el-row :gutter="20">
+        <el-col :span="12">
+          <div class="status-item">
+            <div class="status-icon">
+              <el-icon :color="getStatusColor('binance')" size="20">
+                <component :is="getStatusIcon('binance')" />
+              </el-icon>
+            </div>
+            <div class="status-content">
+              <div class="status-title">
+                币安
+              </div>
+              <div class="status-value" :style="getStatusStyle('binance')">
+                {{ getConnectionStatusText('binance') }}
+              </div>
+            </div>
+          </div>
+        </el-col>
+        
+        <el-col :span="12">
+          <div class="status-item">
+            <div class="status-icon">
+              <el-icon :color="getStatusColor('toobit')" size="20">
+                <component :is="getStatusIcon('toobit')" />
+              </el-icon>
+            </div>
+            <div class="status-content">
+              <div class="status-title">
+                Toobit
+              </div>
+              <div class="status-value" :style="getStatusStyle('toobit')">
+                {{ getConnectionStatusText('toobit') }}
+              </div>
+            </div>
+          </div>
+        </el-col>
+      </el-row>
+    </el-card>
   </div>
 </template>
 
@@ -244,6 +306,107 @@ const formatValue = value => {
   }
 };
 
+// 获取数值标签类型
+const getValueTagType = (value1, value2) => {
+  if (value1 > value2) return 'success';
+  if (value1 < value2) return 'danger';
+  return 'warning';
+};
+
+// 获取分数标签类型
+const getScoreTagType = score => {
+  if (score > 0) return 'success';
+  if (score < 0) return 'danger';
+  return 'info';
+};
+
+// 获取连接状态
+const getConnectionStatus = exchange => {
+  if (exchange === 'binance') {
+    const statuses = symbols.map(symbol => 
+      binanceStore.getConnectionStatus(symbol)
+    );
+    
+    if (statuses.every(status => status === 'connected')) return 'connected';
+    if (statuses.some(status => status === 'connecting')) return 'connecting';
+    if (statuses.some(status => status === 'error')) return 'error';
+    return 'disconnected';
+  } else if (exchange === 'toobit') {
+    const statuses = symbols.map(symbol => 
+      toobitStore.getConnectionStatus(symbol)
+    );
+    
+    if (statuses.every(status => status === 'connected')) return 'connected';
+    if (statuses.some(status => status === 'connecting')) return 'connecting';
+    if (statuses.some(status => status === 'error')) return 'error';
+    return 'disconnected';
+  }
+  
+  return 'disconnected';
+};
+
+// 获取连接状态文本
+const getConnectionStatusText = exchange => {
+  const status = getConnectionStatus(exchange);
+  const statusMap = {
+    connected: '已连接',
+    connecting: '连接中',
+    disconnected: '未连接',
+    error: '连接错误'
+  };
+  return statusMap[status] || '未知';
+};
+
+// 获取连接状态颜色
+const getStatusColor = exchange => {
+  const status = getConnectionStatus(exchange);
+  const colorMap = {
+    connected: '#67c23a',
+    connecting: '#e6a23c',
+    disconnected: '#909399',
+    error: '#f56c6c'
+  };
+  return colorMap[status] || '#909399';
+};
+
+// 获取连接状态样式
+const getStatusStyle = exchange => {
+  const status = getConnectionStatus(exchange);
+  const styleMap = {
+    connected: { color: '#67c23a', fontSize: '14px' },
+    connecting: { color: '#e6a23c', fontSize: '14px' },
+    disconnected: { color: '#909399', fontSize: '14px' },
+    error: { color: '#f56c6c', fontSize: '14px' }
+  };
+  return styleMap[status] || { color: '#909399', fontSize: '14px' };
+};
+
+// 获取连接状态图标
+const getStatusIcon = exchange => {
+  const status = getConnectionStatus(exchange);
+  const iconMap = {
+    connected: 'CircleCheck',
+    connecting: 'Loading',
+    disconnected: 'CircleClose',
+    error: 'Warning'
+  };
+  return iconMap[status] || 'CircleClose';
+};
+
+// 表格样式
+const getCellStyle = ({ row, column, rowIndex, columnIndex }) => {
+  return {
+    textAlign: 'center'
+  };
+};
+
+const getHeaderCellStyle = ({ row, column, rowIndex, columnIndex }) => {
+  return {
+    textAlign: 'center',
+    fontWeight: 'bold'
+  };
+};
+
 // 获取分数样式类
 const getScoreClass = score => {
   if (score > 0) return 'positive';
@@ -264,378 +427,238 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-/* 简约现代化样式 */
-.minimal-container {
-  max-width: 1200px;
+.depth-container {
+  padding: 20px;
+  max-width: 1400px;
   margin: 0 auto;
-  padding: 24px;
-  background: #fafafa;
+  background: var(--el-bg-color-page);
   min-height: 100vh;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
-/* 控制面板 */
-.controls {
+/* 卡片样式 */
+.header-card,
+.control-card,
+.table-card,
+.status-card {
+  margin-bottom: 20px;
+  border-radius: 8px;
+}
+
+.card-header {
   display: flex;
-  gap: 32px;
-  margin-bottom: 32px;
-  padding: 24px;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-  border: 1px solid #e5e7eb;
+  justify-content: space-between;
+  align-items: center;
 }
 
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: bold;
+  color: var(--el-text-color-primary);
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.card-title {
+  font-size: 16px;
+  font-weight: bold;
+  color: var(--el-text-color-primary);
+}
+
+/* 深度选择器样式 */
+.depth-selector {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.depth-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--el-text-color-regular);
+  white-space: nowrap;
+}
+
+/* 控制面板样式 */
 .control-group {
-  flex: 1;
+  margin-bottom: 15px;
 }
 
 .control-label {
   display: block;
   font-size: 14px;
   font-weight: 500;
-  color: #374151;
+  color: var(--el-text-color-regular);
   margin-bottom: 8px;
 }
 
-.toggle-group {
-  display: flex;
-  background: #f3f4f6;
-  border-radius: 8px;
-  padding: 2px;
+/* 表格样式 */
+.comparison-table {
+  width: 100%;
 }
 
-.toggle-btn {
-  flex: 1;
-  padding: 8px 16px;
-  border: none;
-  background: transparent;
-  color: #6b7280;
-  font-size: 14px;
-  font-weight: 500;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.2s ease;
+.comparison-table :deep(.el-table__header) {
+  background-color: var(--el-bg-color);
 }
 
-.toggle-btn:hover {
-  color: #374151;
+.comparison-table :deep(.el-table__header th) {
+  background-color: var(--el-bg-color);
+  color: var(--el-text-color-primary);
+  font-weight: bold;
 }
 
-.toggle-btn.active {
-  background: white;
-  color: #111827;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+.comparison-table :deep(.el-table__body tr) {
+  background-color: var(--el-bg-color);
 }
 
-.depth-selector {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+.comparison-table :deep(.el-table__body tr:hover) {
+  background-color: var(--el-bg-color-page);
 }
 
-.depth-btn {
-  padding: 6px 12px;
-  border: 1px solid #d1d5db;
-  background: white;
-  color: #6b7280;
-  font-size: 12px;
-  font-weight: 500;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.2s ease;
+.comparison-table :deep(.el-table__body td) {
+  color: var(--el-text-color-primary);
 }
 
-.depth-btn:hover {
-  border-color: #9ca3af;
-  color: #374151;
+/* 确保按钮文字颜色清晰 */
+.comparison-table :deep(.el-button--primary) {
+  color: #ffffff !important;
+  background-color: #409eff !important;
+  border-color: #409eff !important;
 }
 
-.depth-btn.active {
-  background: #111827;
-  color: white;
-  border-color: #111827;
+.comparison-table :deep(.el-button--primary:hover) {
+  background-color: #66b1ff !important;
+  border-color: #66b1ff !important;
 }
 
-/* 数据表格 */
-.data-table {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-  border: 1px solid #e5e7eb;
-  overflow: hidden;
-  margin-bottom: 24px;
+/* 确保标签颜色对比度 */
+.comparison-table :deep(.el-tag--success) {
+  background-color: #f0f9ff !important;
+  color: #0369a1 !important;
+  border-color: #bae6fd !important;
 }
 
-.table-header {
-  display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr;
-  background: #f9fafb;
-  border-bottom: 1px solid #e5e7eb;
+.comparison-table :deep(.el-tag--danger) {
+  background-color: #fef2f2 !important;
+  color: #dc2626 !important;
+  border-color: #fecaca !important;
 }
 
-.header-cell {
-  padding: 16px 20px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #374151;
-  text-align: center;
+.comparison-table :deep(.el-tag--warning) {
+  background-color: #fffbeb !important;
+  color: #d97706 !important;
+  border-color: #fed7aa !important;
 }
 
-.table-body {
-  background: white;
-}
-
-.table-row {
-  display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr;
-  border-bottom: 1px solid #f3f4f6;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-}
-
-.table-row:hover {
-  background: #f9fafb;
-}
-
-.table-row:last-child {
-  border-bottom: none;
-}
-
-.table-cell {
-  padding: 16px 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.table-cell.asset {
-  justify-content: flex-start;
-}
-
-.asset-name {
-  font-size: 16px;
-  font-weight: 600;
-  color: #111827;
-  margin-bottom: 2px;
-}
-
-.asset-type {
-  font-size: 12px;
-  color: #6b7280;
-  background: #f3f4f6;
-  padding: 2px 6px;
-  border-radius: 4px;
-}
-
-.value-text {
-  font-size: 16px;
-  font-weight: 600;
-  padding: 6px 12px;
-  border-radius: 6px;
-}
-
-.value-text.binance {
-  color: #dc2626;
-  background: #fef2f2;
-}
-
-.value-text.toobit {
-  color: #059669;
-  background: #f0fdf4;
-}
-
-.score {
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 600;
-  min-width: 40px;
-  text-align: center;
-}
-
-.score.positive {
-  background: #dcfce7;
-  color: #166534;
-}
-
-.score.negative {
-  background: #fef2f2;
-  color: #dc2626;
-}
-
-.score.neutral {
-  background: #f3f4f6;
-  color: #6b7280;
-}
-
-/* 状态栏 */
-.status-bar {
-  display: flex;
-  justify-content: center;
-  gap: 24px;
-  padding: 16px;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-  border: 1px solid #e5e7eb;
-}
-
+/* 状态样式 */
 .status-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  color: #6b7280;
+  gap: 12px;
+  padding: 10px 0;
 }
 
-.status-dot {
-  width: 8px;
-  height: 8px;
+.status-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
-  background: #10b981;
+  background-color: var(--el-bg-color-page);
 }
 
-.status-dot.binance {
-  background: #3b82f6;
+.status-content {
+  flex: 1;
 }
 
-.status-dot.toobit {
-  background: #8b5cf6;
+.status-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--el-text-color-primary);
+  margin-bottom: 4px;
 }
 
-/* 暗色模式 */
+.status-value {
+  font-size: 12px;
+  color: var(--el-text-color-regular);
+}
+
+/* 深色模式适配 */
 @media (prefers-color-scheme: dark) {
-  .minimal-container {
-    background: #111827;
+  /* 深色模式下的标签颜色 */
+  .comparison-table :deep(.el-tag--success) {
+    background-color: #14532d !important;
+    color: #86efac !important;
+    border-color: #22c55e !important;
   }
-  
-  .controls,
-  .data-table,
-  .status-bar {
-    background: #1f2937;
-    border-color: #374151;
+
+  .comparison-table :deep(.el-tag--danger) {
+    background-color: #7f1d1d !important;
+    color: #fca5a5 !important;
+    border-color: #ef4444 !important;
   }
-  
-  .control-label {
-    color: #d1d5db;
-  }
-  
-  .toggle-group {
-    background: #374151;
-  }
-  
-  .toggle-btn {
-    color: #9ca3af;
-  }
-  
-  .toggle-btn:hover {
-    color: #d1d5db;
-  }
-  
-  .toggle-btn.active {
-    background: #111827;
-    color: #f9fafb;
-  }
-  
-  .depth-btn {
-    background: #1f2937;
-    color: #9ca3af;
-    border-color: #374151;
-  }
-  
-  .depth-btn:hover {
-    border-color: #6b7280;
-    color: #d1d5db;
-  }
-  
-  .depth-btn.active {
-    background: #111827;
-    color: #f9fafb;
-    border-color: #111827;
-  }
-  
-  .table-header {
-    background: #111827;
-    border-bottom-color: #374151;
-  }
-  
-  .header-cell {
-    color: #d1d5db;
-  }
-  
-  .table-row {
-    border-bottom-color: #374151;
-  }
-  
-  .table-row:hover {
-    background: #111827;
-  }
-  
-  .asset-name {
-    color: #f9fafb;
-  }
-  
-  .asset-type {
-    background: #374151;
-    color: #9ca3af;
-  }
-  
-  .value-text.binance {
-    background: #7f1d1d;
-    color: #fca5a5;
-  }
-  
-  .value-text.toobit {
-    background: #14532d;
-    color: #86efac;
-  }
-  
-  .score.positive {
-    background: #14532d;
-    color: #86efac;
-  }
-  
-  .score.negative {
-    background: #7f1d1d;
-    color: #fca5a5;
-  }
-  
-  .score.neutral {
-    background: #374151;
-    color: #9ca3af;
-  }
-  
-  .status-item {
-    color: #9ca3af;
+
+  .comparison-table :deep(.el-tag--warning) {
+    background-color: #78350f !important;
+    color: #fbbf24 !important;
+    border-color: #f59e0b !important;
   }
 }
 
 /* 响应式设计 */
 @media (max-width: 768px) {
-  .minimal-container {
+  .depth-container {
     padding: 16px;
   }
   
-  .controls {
+  .card-header {
     flex-direction: column;
-    gap: 20px;
+    align-items: flex-start;
+    gap: 10px;
   }
   
-  .table-header,
-  .table-row {
-    grid-template-columns: 1fr;
+  .header-right {
+    align-self: flex-end;
+  }
+  
+  .control-group {
+    margin-bottom: 20px;
+  }
+  
+  /* 移动端深度选择器 */
+  .depth-selector {
+    flex-direction: column;
+    align-items: flex-start;
     gap: 8px;
   }
   
-  .header-cell,
-  .table-cell {
-    text-align: left;
-    padding: 12px 16px;
+  .depth-selector :deep(.el-radio-group) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
   }
   
-  .depth-selector {
-    justify-content: flex-start;
+  .depth-selector :deep(.el-radio-button) {
+    margin-right: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  /* 超小屏幕优化 */
+  .depth-selector :deep(.el-radio-button__inner) {
+    padding: 6px 8px;
+    font-size: 12px;
   }
 }
 </style>

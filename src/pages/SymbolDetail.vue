@@ -35,6 +35,48 @@
       </template>
     </el-card>
 
+    <!-- 控制面板 -->
+    <el-card class="control-card" shadow="hover">
+      <template #header>
+        <div class="card-header">
+          <span class="card-title">控制面板</span>
+        </div>
+      </template>
+      
+      <el-row :gutter="20">
+        <el-col :span="12">
+          <div class="control-group">
+            <label class="control-label">交易对</label>
+            <el-select v-model="selectedSymbol" placeholder="选择交易对" @change="updateSymbol">
+              <el-option 
+                v-for="option in symbolOptions" 
+                :key="option.value"
+                :label="option.label"
+                :value="option.value"
+              />
+            </el-select>
+          </div>
+        </el-col>
+        
+        <el-col :span="12">
+          <div class="control-group">
+            <label class="control-label">订单方向</label>
+            <el-radio-group v-model="orderSide" @change="updateOrderSide">
+              <el-radio-button label="buy">
+                买盘
+              </el-radio-button>
+              <el-radio-button label="sell">
+                卖盘
+              </el-radio-button>
+              <el-radio-button label="both">
+                全部
+              </el-radio-button>
+            </el-radio-group>
+          </div>
+        </el-col>
+      </el-row>
+    </el-card>
+
     <!-- 数据表格 -->
     <el-card class="table-card" shadow="hover">
       <template #header>
@@ -144,10 +186,18 @@ const toobitStore = useToobitStore();
 
 // 响应式数据
 const symbol = ref('');
+const selectedSymbol = ref('');
+const orderSide = ref('both'); // 'buy', 'sell', 'both'
 const isLoading = ref(false);
 const isRefreshing = ref(false);
 const lastUpdateTime = ref('--');
 const tableData = ref([]);
+
+// 交易对选项
+const symbolOptions = ref([
+  { label: 'BTCUSDT', value: 'BTCUSDT' },
+  { label: 'ETHUSDT', value: 'ETHUSDT' }
+]);
 
 // 深度级别配置
 const depthLevels = [
@@ -214,12 +264,17 @@ const calculateLiquidity = (exchange, symbol, percentage) => {
   
   const percentageValue = parseFloat(percentage) / 100;
   
-  // 计算买盘和卖盘的流动性
-  const buyLiquidity = calculateBuyDepth(data.bids, data.bestBid, percentageValue);
-  const sellLiquidity = calculateSellDepth(data.asks, data.bestAsk, percentageValue);
-  
-  // 返回总流动性（买盘 + 卖盘）
-  return buyLiquidity + sellLiquidity;
+  // 根据订单方向计算流动性
+  if (orderSide.value === 'buy') {
+    return calculateBuyDepth(data.bids, data.bestBid, percentageValue);
+  } else if (orderSide.value === 'sell') {
+    return calculateSellDepth(data.asks, data.bestAsk, percentageValue);
+  } else {
+    // 全部：买盘 + 卖盘
+    const buyLiquidity = calculateBuyDepth(data.bids, data.bestBid, percentageValue);
+    const sellLiquidity = calculateSellDepth(data.asks, data.bestAsk, percentageValue);
+    return buyLiquidity + sellLiquidity;
+  }
 };
 
 // 计算买盘深度
@@ -262,7 +317,7 @@ const calculateSellDepth = (asks, bestAsk, percentage) => {
 const updateTableData = () => {
   const data = [];
   
-  exchanges.forEach(exchange => {
+  exchanges.forEach(exchange => { 
     const exchangeData = {
       exchange: exchange,
       ...calculateSpread(exchange.toLowerCase(), symbol.value)
@@ -273,7 +328,6 @@ const updateTableData = () => {
       const liquidity = calculateLiquidity(exchange.toLowerCase(), symbol.value, depth.value);
       exchangeData[`depth_${depth.value}`] = liquidity;
     });
-    
     data.push(exchangeData);
   });
   
@@ -301,6 +355,19 @@ const refreshData = async() => {
 // 返回上一页
 const goBack = () => {
   router.go(-1);
+};
+
+// 更新交易对
+const updateSymbol = newSymbol => {
+  symbol.value = newSymbol;
+  selectedSymbol.value = newSymbol;
+  updateTableData();
+};
+
+// 更新订单方向
+const updateOrderSide = side => {
+  orderSide.value = side;
+  updateTableData();
 };
 
 // 获取交易所标签类型
@@ -432,6 +499,7 @@ const getStatusIcon = exchange => {
 // 组件挂载
 onMounted(() => {
   symbol.value = route.params.symbol || 'BTCUSDT';
+  selectedSymbol.value = symbol.value;
   
   // WebSocket连接由SimpleLayout管理，这里不需要连接
   console.log('SymbolDetail页面已挂载，WebSocket连接由SimpleLayout管理');
@@ -462,6 +530,7 @@ onMounted(() => {
 
 /* 卡片样式 */
 .header-card,
+.control-card,
 .table-card,
 .status-card {
   margin-bottom: 20px;
@@ -497,6 +566,19 @@ onMounted(() => {
   font-size: 16px;
   font-weight: bold;
   color: var(--el-text-color-primary);
+}
+
+/* 控制面板样式 */
+.control-group {
+  margin-bottom: 15px;
+}
+
+.control-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--el-text-color-regular);
+  margin-bottom: 8px;
 }
 
 /* 表格样式 */
