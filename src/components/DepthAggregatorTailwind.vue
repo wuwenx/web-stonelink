@@ -141,7 +141,7 @@
                     width: `${getAskBackgroundWidth(selectedExchangeAsks[index].total, selectedExchangeAsks)}%`,
                     right: 0
                   }"
-                ></div>
+                />
               </div>
               <div v-else class="grid grid-cols-3 px-4 py-2 text-sm font-mono text-gray-400 dark:text-gray-500 italic">
                 <span>--</span>
@@ -164,7 +164,7 @@
                     width: `${getAskBackgroundWidth(toobitAsks[index].total, toobitAsks)}%`,
                     right: 0
                   }"
-                ></div>
+                />
               </div>
               <div v-else class="grid grid-cols-3 px-4 py-2 text-sm font-mono text-gray-400 dark:text-gray-500 italic">
                 <span>--</span>
@@ -228,7 +228,7 @@
                     width: `${getBidBackgroundWidth(selectedExchangeBids[index].total, selectedExchangeBids)}%`,
                     left: 0
                   }"
-                ></div>
+                />
               </div>
               <div v-else class="grid grid-cols-3 px-4 py-2 text-sm font-mono text-gray-400 dark:text-gray-500 italic">
                 <span>--</span>
@@ -251,7 +251,7 @@
                     width: `${getBidBackgroundWidth(toobitBids[index].total, toobitBids)}%`,
                     left: 0
                   }"
-                ></div>
+                />
               </div>
               <div v-else class="grid grid-cols-3 px-4 py-2 text-sm font-mono text-gray-400 dark:text-gray-500 italic">
                 <span>--</span>
@@ -499,54 +499,71 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
-import { DepthDataProcessor, WebSocketService } from '../services/WebSocketService.js';
+import { computed, onMounted, onUnmounted } from 'vue';
+import { DepthDataProcessor } from '../services/WebSocketService.js';
+import { useDepthStore } from '../stores/depth.js';
 
-// 响应式数据
-const selectedSymbol = ref('BTCUSDT');
-const selectedExchange = ref('binance'); // 新增：选择的交易所
-const exchangeType = ref('futures');
-const depthLevels = ref(250);
-const depthPercentage = ref('0.01'); // 新增：深度百分比
-const selectedExchangeStatus = ref('disconnected'); // 新增：选择的交易所状态
-const toobitStatus = ref('disconnected');
-const selectedExchangeMarkPriceStatus = ref('disconnected'); // 新增：选择的交易所标记价格状态
-const isLoadingData = ref(false);
-const selectedExchangeLastUpdate = ref('--'); // 新增：选择的交易所最后更新时间
-const toobitLastUpdate = ref('--');
-const selectedExchangeMarkPriceLastUpdate = ref('--'); // 新增：选择的交易所标记价格最后更新时间
-const selectedExchangeAsks = ref([]); // 新增：选择的交易所卖盘数据
-const selectedExchangeBids = ref([]); // 新增：选择的交易所买盘数据
-const toobitAsks = ref([]);
-const toobitBids = ref([]);
-const selectedExchangeBestBid = ref(0); // 新增：选择的交易所最佳买价
-const selectedExchangeBestAsk = ref(0); // 新增：选择的交易所最佳卖价
-const toobitBestBid = ref(0);
-const toobitBestAsk = ref(0);
-const selectedExchangeMarkPrice = ref(0); // 新增：选择的交易所标记价格
-const selectedExchangeIndexPrice = ref(0); // 新增：选择的交易所指数价格
-const selectedExchangeFundingRate = ref(0); // 新增：选择的交易所资金费率
-const selectedExchangeNextFundingTime = ref(0); // 新增：选择的交易所下次资金时间
+// 使用深度store
+const depthStore = useDepthStore();
 
-// WebSocket服务实例
-let wsService = null;
-let reconnectTimer = null;
-let currentConnectionConfig = null; // 跟踪当前连接配置
+// 响应式数据 - 现在从store获取
+const selectedSymbol = computed({
+  get: () => depthStore.config.selectedSymbol,
+  set: value => depthStore.updateConfig({ selectedSymbol: value })
+});
+
+const selectedExchange = computed({
+  get: () => depthStore.config.selectedExchange,
+  set: value => depthStore.updateConfig({ selectedExchange: value })
+});
+
+const exchangeType = computed({
+  get: () => depthStore.config.exchangeType,
+  set: value => depthStore.updateConfig({ exchangeType: value })
+});
+
+const depthLevels = computed({
+  get: () => depthStore.config.depthLevels,
+  set: value => depthStore.updateConfig({ depthLevels: value })
+});
+
+const depthPercentage = computed({
+  get: () => depthStore.config.depthPercentage,
+  set: value => depthStore.updateConfig({ depthPercentage: value })
+});
+
+// 从store获取状态和数据
+const selectedExchangeStatus = computed(() => depthStore.getConnectionStatus(depthStore.config.selectedExchange));
+const toobitStatus = computed(() => depthStore.getConnectionStatus('toobit'));
+const selectedExchangeMarkPriceStatus = computed(() => depthStore.getConnectionStatus(depthStore.config.selectedExchange));
+const isLoadingData = computed(() => depthStore.isLoading);
+
+// 从store获取深度数据
+const selectedExchangeDepthData = computed(() => depthStore.getDepthDataByExchange(depthStore.config.selectedExchange));
+const toobitDepthData = computed(() => depthStore.getDepthDataByExchange('toobit'));
+
+// 计算属性 - 从store数据中提取
+const selectedExchangeLastUpdate = computed(() => selectedExchangeDepthData.value.lastUpdate);
+const toobitLastUpdate = computed(() => toobitDepthData.value.lastUpdate);
+const selectedExchangeMarkPriceLastUpdate = computed(() => selectedExchangeDepthData.value.markPriceLastUpdate);
+const selectedExchangeAsks = computed(() => selectedExchangeDepthData.value.asks);
+const selectedExchangeBids = computed(() => selectedExchangeDepthData.value.bids);
+const toobitAsks = computed(() => toobitDepthData.value.asks);
+const toobitBids = computed(() => toobitDepthData.value.bids);
+const selectedExchangeBestBid = computed(() => selectedExchangeDepthData.value.bestBid);
+const selectedExchangeBestAsk = computed(() => selectedExchangeDepthData.value.bestAsk);
+const toobitBestBid = computed(() => toobitDepthData.value.bestBid);
+const toobitBestAsk = computed(() => toobitDepthData.value.bestAsk);
+const selectedExchangeMarkPrice = computed(() => selectedExchangeDepthData.value.markPrice);
+const selectedExchangeIndexPrice = computed(() => selectedExchangeDepthData.value.indexPrice);
+const selectedExchangeFundingRate = computed(() => selectedExchangeDepthData.value.fundingRate);
+const selectedExchangeNextFundingTime = computed(() => selectedExchangeDepthData.value.nextFundingTime);
 
 // 计算属性
-const priceDifference = computed(() => {
-  return selectedExchangeBestBid.value - toobitBestBid.value;
-});
+const priceDifference = computed(() => depthStore.priceDifference);
 
-// 深度对比数据计算
-const depthComparisonData = computed(() => {  
-  const percentage = parseFloat(depthPercentage.value) / 100;
-  return [{
-    symbol: selectedSymbol.value,
-    selectedExchangeValue: calculateDepthValue(selectedExchangeBids.value, selectedExchangeBestBid.value, percentage),
-    toobitValue: calculateDepthValue(toobitBids.value, toobitBestBid.value, percentage)
-  }];
-});
+// 深度对比数据计算 - 使用store的getter
+const depthComparisonData = computed(() => depthStore.depthComparisonData);
 
 // 方法
 const getStatusText = status => {
@@ -597,27 +614,6 @@ const getExchangeDisplayName = exchange => {
     toobit: 'Toobit'
   };
   return exchangeNames[exchange] || exchange;
-};
-
-// 新增：计算深度值
-const calculateDepthValue = (bids, bestBid, percentage) => {
-  if (!bids || bids.length === 0 || !bestBid || bestBid === 0) {
-    return 0;
-  }
- 
-  // 计算目标价格：最优买价 + 最优买价 * 百分比
-  // 例如：万1 = 最优买价 * (1 + 0.01%)
-  const targetPrice = bestBid * (1 + percentage);
-  let totalQuantity = 0;
-  
-  // 累计从最优买价到目标价格之间的所有买单数量
-  for (const bid of bids) {
-    if (bid.price <= targetPrice && bid.price >= bestBid) {
-      totalQuantity += bid.quantity;
-    }
-  }
-  
-  return totalQuantity;
 };
 
 // 新增：格式化深度值
@@ -697,261 +693,36 @@ const getBidBackgroundWidth = (currentTotal, bidsArray) => {
   return Math.min(percentage, 100); // 确保不超过100%
 };
 
-// WebSocket连接管理
-const initializeWebSockets = async() => {
-  wsService = new WebSocketService();
-  await connectSelectedExchange();
-  connectToobit();
-};
-
-// 新增：连接选择的交易所
-const connectSelectedExchange = async() => {
-  if (selectedExchange.value === 'binance') {
-    await connectBinance();
-  } else if (selectedExchange.value === 'okx') {
-    connectOKX();
-  }
-};
-
-const connectBinance = async() => {
-  if (exchangeType.value === 'futures') {
-    // 使用合并连接，同时获取深度数据和标记价格
-    await wsService.connectBinanceFuturesWithMarkPrice(
-      selectedSymbol.value, 
-      handleSelectedExchangeData, 
-      handleSelectedExchangeMarkPriceData, 
-      status => {
-        selectedExchangeStatus.value = status;
-        selectedExchangeMarkPriceStatus.value = status; // 标记价格状态与深度数据状态同步
-        
-        // 连接成功后隐藏 loading
-        if (status === 'connected') {
-          // 延迟隐藏 loading，确保数据已经加载
-          setTimeout(() => {
-            isLoadingData.value = false;
-          }, 1000);
-        }
-      },
-      depthLevels.value // 传递深度档位参数
-    );
-  } else {
-    wsService.connectBinance(selectedSymbol.value, handleSelectedExchangeData, status => {
-      selectedExchangeStatus.value = status;
-      
-      // 连接成功后隐藏 loading
-      if (status === 'connected') {
-        setTimeout(() => {
-          isLoadingData.value = false;
-        }, 1000);
-      }
-    });
-  }
-};
-
-const connectOKX = () => {
-  wsService.connectOKX(selectedSymbol.value, handleSelectedExchangeData, status => {
-    selectedExchangeStatus.value = status;
-    
-    // 连接成功后隐藏 loading
-    if (status === 'connected') {
-      setTimeout(() => {
-        isLoadingData.value = false;
-      }, 1000);
-    }
-  });
-};
-
-const connectToobit = () => {
-  wsService.connectToobit(selectedSymbol.value, handleToobitData, status => {
-    toobitStatus.value = status;
-  });
-};
-
-// 数据处理
-const handleSelectedExchangeData = data => {
-  if (data.e === 'depthUpdate' || (data.a && data.b)) {
-    const processedAsks = DepthDataProcessor.processDepthData(data.a, 'asks', depthLevels.value);
-    const processedBids = DepthDataProcessor.processDepthData(data.b, 'bids', depthLevels.value);
-
-    selectedExchangeAsks.value = processedAsks;
-    selectedExchangeBids.value = processedBids;
-
-    const bestPrices = DepthDataProcessor.calculateBestPrices(processedBids, processedAsks);
-    selectedExchangeBestBid.value = bestPrices.bestBid;
-    selectedExchangeBestAsk.value = bestPrices.bestAsk;
-
-    selectedExchangeLastUpdate.value = new Date().toLocaleTimeString();
-    
-    // 隐藏 loading 状态
-    isLoadingData.value = false;
-  } else {
-  }
-};
-
-const handleToobitData = data => {
-
-  // 检查数据格式是否正确
-  if (!data || (!data.a && !data.b)) {
-    return;
-  }
-
-  const processedAsks = DepthDataProcessor.processDepthData(data.a, 'asks', depthLevels.value,'0.001');
-  const processedBids = DepthDataProcessor.processDepthData(data.b, 'bids', depthLevels.value,'0.001');
-  toobitAsks.value = processedAsks;
-  toobitBids.value = processedBids;
-
-  const bestPrices = DepthDataProcessor.calculateBestPrices(processedBids, processedAsks);
-  toobitBestBid.value = bestPrices.bestBid;
-  toobitBestAsk.value = bestPrices.bestAsk;
-
-  toobitLastUpdate.value = new Date().toLocaleTimeString();
-  
-  // 隐藏 loading 状态
-  isLoadingData.value = false;
-};
-
-const handleSelectedExchangeMarkPriceData = data => {
-  
-  const processedData = DepthDataProcessor.processMarkPriceData(data);
-  
-  selectedExchangeMarkPrice.value = processedData.markPrice;
-  selectedExchangeIndexPrice.value = processedData.indexPrice;
-  selectedExchangeFundingRate.value = processedData.lastFundingRate;
-  selectedExchangeNextFundingTime.value = processedData.nextFundingTime;
-  
-  selectedExchangeMarkPriceLastUpdate.value = new Date().toLocaleTimeString();
-  
-};
-
-// 事件处理
+// 事件处理 - 现在直接使用store的方法
 const onSymbolChange = () => {
-  handleConnectionChange();
+  console.log('交易对变更:', selectedSymbol.value);
 };
 
 const onExchangeChange = () => {
-  handleConnectionChange();
+  console.log('交易所变更:', selectedExchange.value);
 };
 
 const onExchangeTypeChange = () => {
-  handleConnectionChange();
+  console.log('交易所类型变更:', exchangeType.value);
 };
 
 const onDepthLevelsChange = () => {
-  // 深度档位变更时需要重新连接以获取新的深度数据
   console.log('深度档位变更:', depthLevels.value);
-  handleConnectionChange();
 };
 
 const onDepthPercentageChange = () => {
-  // 深度百分比变更时不需要重新连接，只需要重新计算数据
   console.log('深度百分比变更:', depthPercentage.value);
 };
-
-// 统一的连接变更处理
-const handleConnectionChange = async() => {
-  // 显示 loading 状态
-  isLoadingData.value = true;
-  
-  // 清除之前的重连定时器
-  if (reconnectTimer) {
-    clearTimeout(reconnectTimer);
-    reconnectTimer = null;
-  }
-
-  // 检查是否需要重新连接
-  const needsReconnect = checkIfReconnectNeeded();
-  
-  if (needsReconnect) {
-    console.log('检测到配置变更，需要重新连接');
-    // 立即清空数据和重置状态
-    closeWebSockets();
-
-    // 延迟重新连接，确保旧连接完全关闭
-    reconnectTimer = setTimeout(async() => {
-      await initializeWebSockets();
-      reconnectTimer = null;
-    }, 1500);
-  } else {
-    console.log('配置未变更，无需重新连接');
-    isLoadingData.value = false;
-  }
-};
-
-// 检查是否需要重新连接
-const checkIfReconnectNeeded = () => {
-  const newConfig = {
-    symbol: selectedSymbol.value,
-    exchange: selectedExchange.value,
-    exchangeType: exchangeType.value,
-    depthLevels: depthLevels.value
-  };
-  
-  // 如果是第一次连接或者配置发生了变化，需要重新连接
-  if (!currentConnectionConfig) {
-    currentConnectionConfig = newConfig;
-    return true;
-  }
-  
-  const configChanged = JSON.stringify(currentConnectionConfig) !== JSON.stringify(newConfig);
-  if (configChanged) {
-    currentConnectionConfig = newConfig;
-    console.log('连接配置发生变化:', newConfig);
-    return true;
-  }
-  
-  return false;
-};
-
-const closeWebSockets = () => {
-  if (wsService) {
-    wsService.disconnectAll();
-  }
-
-  // 清空所有数据
-  selectedExchangeAsks.value = [];
-  selectedExchangeBids.value = [];
-  toobitAsks.value = [];
-  toobitBids.value = [];
-
-  // 重置最佳价格
-  selectedExchangeBestBid.value = 0;
-  selectedExchangeBestAsk.value = 0;
-  toobitBestBid.value = 0;
-  toobitBestAsk.value = 0;
-
-  // 重置状态
-  selectedExchangeStatus.value = 'disconnected';
-  toobitStatus.value = 'disconnected';
-  selectedExchangeMarkPriceStatus.value = 'disconnected';
-  selectedExchangeLastUpdate.value = '--';
-  toobitLastUpdate.value = '--';
-  selectedExchangeMarkPriceLastUpdate.value = '--';
-
-  console.log('数据已清空，状态已重置');
-};
-
-// 监听器
-watch([selectedSymbol, selectedExchange, exchangeType], () => {
-  console.log('监听器触发:', { symbol: selectedSymbol.value, exchange: selectedExchange.value, type: exchangeType.value });
-});
 
 // 生命周期
 onMounted(async() => {
   console.log('组件挂载，初始化WebSocket');
-  await initializeWebSockets();
+  await depthStore.connectWebSockets();
 });
 
 onUnmounted(() => {
   console.log('组件卸载，关闭WebSocket');
-
-  // 清除重连定时器
-  if (reconnectTimer) {
-    clearTimeout(reconnectTimer);
-    reconnectTimer = null;
-  }
-
-  // 关闭所有连接
-  closeWebSockets();
+  depthStore.disconnectAll();
 });
 </script>
 

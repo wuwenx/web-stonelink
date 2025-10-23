@@ -23,6 +23,12 @@ const routes = [
         component: DepthAggregatorTailwind,
         meta: { title: '深度聚合器' },
       },
+      {
+        path: 'depth-test',
+        name: 'DepthTest',
+        component: () => import('../views/DepthTest.vue'),
+        meta: { title: '深度数据Store测试' },
+      },
       // {
       //   path: 'analytics',
       //   name: 'Analytics',
