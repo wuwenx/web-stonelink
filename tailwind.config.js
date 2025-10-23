@@ -5,6 +5,9 @@ module.exports = {
     "./src/**/*.{vue,js,ts,jsx,tsx}",
   ],
   darkMode: 'class', // 启用暗色模式
+  corePlugins: {
+    preflight: false, // 禁用Tailwind的base样式重置
+  },
   theme: {
     extend: {
       colors: {
