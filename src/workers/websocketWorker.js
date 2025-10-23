@@ -22,7 +22,8 @@ function processBinanceDepthData(data, symbol) {
       // 检查更新ID的连续性
       if (lastUpdateIds.has(symbol)) {
         const lastU = lastUpdateIds.get(symbol);
-        if (updateData.pu > 0 && updateData.pu !== lastU) {
+        // 只有在lastU > 0时才检查连续性，避免初始化时的误报
+        if (lastU > 0 && updateData.pu > 0 && updateData.pu !== lastU) {
           console.warn(`检测到丢包: 期望 pu=${lastU}, 实际 pu=${updateData.pu}`);
           lastUpdateIds.set(symbol, updateData.u);
           return { type: 'error', message: '丢包检测' };
