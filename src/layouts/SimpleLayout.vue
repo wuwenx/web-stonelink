@@ -20,7 +20,29 @@
               <router-link to="/depth" class="text-gray-500 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200">
                 深度对比
               </router-link>
+              <router-link to="/order-book" class="text-gray-500 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200">
+                盘口展示
+              </router-link>
             </nav>
+
+            <!-- WebSocket连接状态 -->
+            <div class="flex items-center space-x-2">
+              <div class="text-xs text-gray-500 dark:text-gray-400">连接状态:</div>
+              <div class="flex items-center space-x-1">
+                <div class="flex items-center space-x-1">
+                  <div :class="getStatusClass(depthStore.getConnectionStatus('binance'))" class="w-2 h-2 rounded-full" />
+                  <span class="text-xs text-gray-600 dark:text-gray-300">币安</span>
+                </div>
+                <div class="flex items-center space-x-1">
+                  <div :class="getStatusClass(depthStore.getConnectionStatus('okx'))" class="w-2 h-2 rounded-full" />
+                  <span class="text-xs text-gray-600 dark:text-gray-300">OKX</span>
+                </div>
+                <div class="flex items-center space-x-1">
+                  <div :class="getStatusClass(depthStore.getConnectionStatus('toobit'))" class="w-2 h-2 rounded-full" />
+                  <span class="text-xs text-gray-600 dark:text-gray-300">Toobit</span>
+                </div>
+              </div>
+            </div>
 
             <!-- 主题切换按钮 -->
             <button
@@ -60,13 +82,17 @@
 </template>
 
 <script>
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { useDepthStore } from '../stores/depth.js';
 
 export default {
   name: 'SimpleLayout',
   setup() {
     const currentYear = computed(() => new Date().getFullYear());
     const isDark = ref(false);
+    
+    // 使用深度store
+    const depthStore = useDepthStore();
 
     // 切换主题
     const toggleTheme = () => {
@@ -119,15 +145,46 @@ export default {
       });
     };
 
-    onMounted(() => {
+    // WebSocket连接状态样式
+    const getStatusClass = status => {
+      const statusClasses = {
+        connected: 'bg-green-500 animate-pulse',
+        connecting: 'bg-yellow-500 animate-bounce',
+        disconnected: 'bg-red-500',
+        error: 'bg-red-500 animate-pulse',
+      };
+      return statusClasses[status] || 'bg-gray-500';
+    };
+
+    // 初始化WebSocket连接
+    const initializeWebSocket = async() => {
+      try {
+        console.log('SimpleLayout: 初始化WebSocket连接');
+        await depthStore.connectWebSockets();
+      } catch (error) {
+        console.error('SimpleLayout: WebSocket连接失败:', error);
+      }
+    };
+
+    onMounted(async() => {
       initTheme();
       watchSystemTheme();
+      // 初始化WebSocket连接
+      await initializeWebSocket();
+    });
+
+    onUnmounted(() => {
+      console.log('SimpleLayout: 组件卸载，保持WebSocket连接');
+      // 注意：这里不关闭WebSocket连接，因为其他页面可能还在使用
+      // 如果需要关闭，可以调用 depthStore.disconnectAll()
     });
 
     return {
       currentYear,
       isDark,
       toggleTheme,
+      depthStore,
+      getStatusClass,
     };
   },
 };

@@ -1,5 +1,5 @@
 import { createRouter, createWebHashHistory } from 'vue-router';
-import DepthAggregatorTailwind from '../components/DepthAggregatorTailwind.vue';
+import DepthAggregator from '../pages/DepthAggregator.vue';
 // import BaseLayout from '../layouts/BaseLayout.vue';
 import SimpleLayout from '../layouts/SimpleLayout.vue';
 // import AuthLayout from '../layouts/AuthLayout.vue'
@@ -20,14 +20,14 @@ const routes = [
       {
         path: 'depth',
         name: 'DepthAggregator',
-        component: DepthAggregatorTailwind,
+        component: DepthAggregator,
         meta: { title: '深度聚合器' },
       },
       {
-        path: 'depth-test',
-        name: 'DepthTest',
-        component: () => import('../views/DepthTest.vue'),
-        meta: { title: '深度数据Store测试' },
+        path: 'order-book',
+        name: 'OrderBook',
+        component: () => import('../pages/OrderBook.vue'),
+        meta: { title: '盘口展示' },
       },
       // {
       //   path: 'analytics',

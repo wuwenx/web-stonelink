@@ -715,14 +715,14 @@ const onDepthPercentageChange = () => {
 };
 
 // 生命周期
-onMounted(async() => {
-  console.log('组件挂载，初始化WebSocket');
-  await depthStore.connectWebSockets();
+onMounted(() => {
+  console.log('深度聚合器组件挂载，使用全局WebSocket连接');
+  // 不再需要初始化WebSocket，因为SimpleLayout已经处理了
 });
 
 onUnmounted(() => {
-  console.log('组件卸载，关闭WebSocket');
-  depthStore.disconnectAll();
+  console.log('深度聚合器组件卸载，保持WebSocket连接');
+  // 不再关闭WebSocket连接，因为其他页面可能还在使用
 });
 </script>
 
