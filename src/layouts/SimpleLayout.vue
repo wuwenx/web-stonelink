@@ -67,12 +67,17 @@
 
 <script>
 import { computed, onMounted, ref } from 'vue';
+import { useBinanceStore, useToobitStore } from '../stores/index.js';
 
 export default {
   name: 'SimpleLayout',
   setup() {
     const currentYear = computed(() => new Date().getFullYear());
     const isDark = ref(false);
+    
+    // 使用stores
+    const binanceStore = useBinanceStore();
+    const toobitStore = useToobitStore();
 
     // 切换主题
     const toggleTheme = () => {
@@ -125,9 +130,25 @@ export default {
       });
     };
 
-    onMounted(() => {
+    // 初始化WebSocket连接
+    const initializeWebSockets = async() => {
+      try {
+        console.log('SimpleLayout: 初始化WebSocket连接');
+        await Promise.all([
+          binanceStore.connectWebSockets(),
+          toobitStore.connectWebSockets()
+        ]);
+        console.log('SimpleLayout: WebSocket连接初始化完成');
+      } catch (error) {
+        console.error('SimpleLayout: WebSocket连接失败:', error);
+      }
+    };
+
+    onMounted(async() => {
       initTheme();
       watchSystemTheme();
+      // 初始化WebSocket连接
+      await initializeWebSockets();
     });
 
     return {

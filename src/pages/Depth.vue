@@ -252,20 +252,14 @@ const getScoreClass = score => {
 };
 
 // 生命周期
-onMounted(async() => {
-  try {
-    await Promise.all([
-      binanceStore.connectWebSockets(),
-      toobitStore.connectWebSockets()
-    ]);
-  } catch (error) {
-    console.error('WebSocket连接失败:', error);
-  }
+onMounted(() => {
+  // WebSocket连接由SimpleLayout管理，这里不需要连接
+  console.log('Depth页面已挂载，WebSocket连接由SimpleLayout管理');
 });
 
 onUnmounted(() => {
-  binanceStore.disconnectAll();
-  toobitStore.disconnectAll();
+  // 页面离开时不清理连接，保持全局连接
+  console.log('Depth页面已卸载，保持WebSocket连接');
 });
 </script>
 

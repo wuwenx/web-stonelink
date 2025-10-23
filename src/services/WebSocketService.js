@@ -146,6 +146,9 @@ export class WebSocketService {
       const stream = `${symbol.toLowerCase()}@depth20@100ms`;
       const wsUrl = binanceSpotWebSocketUrl + stream;
 
+      // 确保完全清理现有连接
+      this.forceDisconnect(connectionId);
+
       const ws = new WebSocket(wsUrl);
       this.connections.set(connectionId, ws);
       this.reconnectAttempts.set(connectionId, 0);
@@ -241,6 +244,10 @@ export class WebSocketService {
       
       // 步骤3: 建立WebSocket连接
       const wsUrl = binanceFuturesWebSocketUrl;
+      
+      // 确保完全清理现有连接
+      this.forceDisconnect(connectionId);
+      
       const ws = new WebSocket(wsUrl);
       this.connections.set(connectionId, ws);
       this.reconnectAttempts.set(connectionId, 0);
@@ -391,6 +398,9 @@ export class WebSocketService {
     try {
       const wsUrl = okxFuturesWebSocketUrl;
 
+      // 确保完全清理现有连接
+      this.forceDisconnect(connectionId);
+
       const ws = new WebSocket(wsUrl);
       this.connections.set(connectionId, ws);
       this.reconnectAttempts.set(connectionId, 0);
@@ -472,9 +482,29 @@ export class WebSocketService {
         // 连接存在但状态异常，先关闭
         console.log(`连接 ${connectionId} 存在但状态异常，关闭后重新创建`);
         this.disconnect(connectionId);
+        // 延迟重连，确保旧连接完全关闭
+        setTimeout(() => {
+          this.createToobitConnection(symbol, onMessage, onStatusChange);
+        }, 100);
+        return;
       }
     }
 
+    this.createToobitConnection(symbol, onMessage, onStatusChange);
+  }
+
+  /**
+   * 创建Toobit WebSocket连接
+   * @param {string} symbol - 交易对符号
+   * @param {Function} onMessage - 消息处理回调
+   * @param {Function} onStatusChange - 状态变更回调
+   */
+  createToobitConnection(symbol, onMessage, onStatusChange) {
+    const connectionId = `toobit_${symbol}`;
+    
+    // 确保完全清理现有连接
+    this.forceDisconnect(connectionId);
+    
     try {
       const wsUrl = toobitFuturesWebSocketUrl;
 
@@ -542,6 +572,26 @@ export class WebSocketService {
   }
 
   /**
+   * 强制断开连接，确保完全清理
+   * @param {string} connectionId - 连接ID
+   */
+  forceDisconnect(connectionId) {
+    // 先尝试正常断开
+    this.disconnect(connectionId);
+    
+    // 强制清理所有相关状态
+    this.connections.delete(connectionId);
+    this.reconnectAttempts.delete(connectionId);
+    this.reconnecting.delete(connectionId);
+    this.stopHeartbeat(connectionId);
+    
+    // 清理Worker回调
+    this.workerCallbacks.delete(connectionId);
+    
+    console.log(`强制清理连接: ${connectionId}`);
+  }
+
+  /**
    * 断开指定连接
    * @param {string} connectionId - 连接ID
    */
@@ -565,11 +615,16 @@ export class WebSocketService {
         }
       }
 
-      // 清理资源
+      // 立即从连接映射中移除，防止重复处理
       this.connections.delete(connectionId);
+      
+      // 停止心跳
       this.stopHeartbeat(connectionId);
+      
+      // 清理重连状态
+      this.reconnecting.delete(connectionId);
       this.reconnectAttempts.delete(connectionId);
-
+      
       console.log(`连接已关闭: ${connectionId}`);
     }
   }
@@ -855,3 +910,4 @@ export class DepthDataProcessor {
     return new Date(timestamp).toLocaleTimeString();
   }
 }
+

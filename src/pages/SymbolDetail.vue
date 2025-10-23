@@ -430,15 +430,11 @@ const getStatusIcon = exchange => {
 };
 
 // 组件挂载
-onMounted(async() => {
+onMounted(() => {
   symbol.value = route.params.symbol || 'BTCUSDT';
   
-  // 确保WebSocket连接
-  await Promise.all([
-    binanceStore.connectWebSockets(),
-    okxStore.connectWebSockets(),
-    toobitStore.connectWebSockets()
-  ]);
+  // WebSocket连接由SimpleLayout管理，这里不需要连接
+  console.log('SymbolDetail页面已挂载，WebSocket连接由SimpleLayout管理');
   
   // 初始化数据
   updateTableData();
@@ -449,10 +445,8 @@ onMounted(async() => {
   // 组件卸载时清理
   onUnmounted(() => {
     clearInterval(timer);
-    // 断开所有连接
-    binanceStore.disconnectAll();
-    okxStore.disconnectAll();
-    toobitStore.disconnectAll();
+    // 页面离开时不清理连接，保持全局连接
+    console.log('SymbolDetail页面已卸载，保持WebSocket连接');
   });
 });
 </script>

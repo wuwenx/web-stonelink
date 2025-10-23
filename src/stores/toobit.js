@@ -15,6 +15,7 @@ export const useToobitStore = defineStore('toobit', {
     // 配置
     config: {
       depthLevels: 250,
+      depthPercentage: '0.001',
     },
     
     // 加载状态
@@ -130,6 +131,18 @@ export const useToobitStore = defineStore('toobit', {
     // 连接指定币对
     async connectSymbol(symbol) {
       try {
+        // 检查是否已经连接
+        if (this.connections[symbol] === 'connected') {
+          console.log(`Toobit ${symbol} 已连接，跳过重复连接`);
+          return;
+        }
+        
+        // 如果正在连接中，等待一下
+        if (this.connections[symbol] === 'connecting') {
+          console.log(`Toobit ${symbol} 正在连接中，等待完成`);
+          return;
+        }
+        
         this.connectToobit(symbol);
       } catch (error) {
         console.error(`连接币对 ${symbol} 失败:`, error);
@@ -165,9 +178,8 @@ export const useToobitStore = defineStore('toobit', {
     // 处理Toobit数据
     handleToobitData(data, symbol) {
       if (data.a && data.b) {
-        const processedAsks = DepthDataProcessor.processDepthData(data.a, 'asks', this.config.depthLevels);
-        const processedBids = DepthDataProcessor.processDepthData(data.b, 'bids', this.config.depthLevels);
-
+        const processedAsks = DepthDataProcessor.processDepthData(data.a, 'asks', this.config.depthLevels, this.config.depthPercentage);
+        const processedBids = DepthDataProcessor.processDepthData(data.b, 'bids', this.config.depthLevels, this.config.depthPercentage);
         // 初始化币对数据
         if (!this.depthData[symbol]) {
           this.depthData[symbol] = {
