@@ -95,7 +95,7 @@ const calculateSellDepth = (asks, bestAsk, percentage) => {
 ## 数据更新机制
 
 ### 1. 自动更新
-- 每5秒自动更新一次数据
+- 每1秒自动更新一次数据
 - 使用定时器控制更新频率
 
 ### 2. 手动刷新
@@ -162,7 +162,7 @@ const data = depthStore.getDepthDataByExchangeAndSymbol(exchange, symbol);
 
 ### 1. 实时性
 - WebSocket实时数据推送
-- 5秒自动更新机制
+- 1秒自动更新机制
 - 手动刷新功能
 
 ### 2. 计算准确性

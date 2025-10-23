@@ -102,17 +102,21 @@
       
       <el-row :gutter="20">
         <el-col v-for="exchange in exchanges" :key="exchange" :span="6">
-          <el-statistic 
-            :title="exchange" 
-            :value="getConnectionStatusText(exchange)"
-            :value-style="getStatusStyle(exchange)"
-          >
-            <template #prefix>
-              <el-icon :color="getStatusColor(exchange)">
+          <div class="status-item">
+            <div class="status-icon">
+              <el-icon :color="getStatusColor(exchange)" size="20">
                 <component :is="getStatusIcon(exchange)" />
               </el-icon>
-            </template>
-          </el-statistic>
+            </div>
+            <div class="status-content">
+              <div class="status-title">
+                {{ exchange }}
+              </div>
+              <div class="status-value" :style="getStatusStyle(exchange)">
+                {{ getConnectionStatusText(exchange) }}
+              </div>
+            </div>
+          </div>
         </el-col>
       </el-row>
     </el-card>
@@ -130,11 +134,14 @@ import {
 } from '@element-plus/icons-vue';
 import { onMounted, onUnmounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { useDepthStore } from '../stores/depth.js';
+import { useBinanceStore, useBitunixStore, useOKXStore, useToobitStore } from '../stores/index.js';
 
 const route = useRoute();
 const router = useRouter();
-const depthStore = useDepthStore();
+const binanceStore = useBinanceStore();
+const okxStore = useOKXStore();
+const toobitStore = useToobitStore();
+const bitunixStore = useBitunixStore();
 
 // 响应式数据
 const symbol = ref('');
@@ -160,7 +167,25 @@ const exchanges = ['Binance', 'OKX', 'Bitunix', 'Toobit'];
 
 // 计算价差和价差比例
 const calculateSpread = (exchange, symbol) => {
-  const data = depthStore.getDepthDataByExchangeAndSymbol(exchange.toLowerCase(), symbol);
+  let data;
+  
+  switch (exchange.toLowerCase()) {
+  case 'binance':
+    data = binanceStore.getDepthDataBySymbol(symbol);
+    break;
+  case 'okx':
+    data = okxStore.getDepthDataBySymbol(symbol);
+    break;
+  case 'toobit':
+    data = toobitStore.getDepthDataBySymbol(symbol);
+    break;
+  case 'bitunix':
+    data = bitunixStore.getDepthDataBySymbol(symbol);
+    break;
+  default:
+    return { spread: 0, spreadPercent: 0 };
+  }
+  
   if (!data || !data.bestBid || !data.bestAsk) {
     return { spread: 0, spreadPercent: 0 };
   }
@@ -173,7 +198,25 @@ const calculateSpread = (exchange, symbol) => {
 
 // 计算指定深度的流动性
 const calculateLiquidity = (exchange, symbol, percentage) => {
-  const data = depthStore.getDepthDataByExchangeAndSymbol(exchange.toLowerCase(), symbol);
+  let data;
+  
+  switch (exchange.toLowerCase()) {
+  case 'binance':
+    data = binanceStore.getDepthDataBySymbol(symbol);
+    break;
+  case 'okx':
+    data = okxStore.getDepthDataBySymbol(symbol);
+    break;
+  case 'toobit':
+    data = toobitStore.getDepthDataBySymbol(symbol);
+    break;
+  case 'bitunix':
+    data = bitunixStore.getDepthDataBySymbol(symbol);
+    break;
+  default:
+    return 0;
+  }
+  
   if (!data) return 0;
   
   const percentageValue = parseFloat(percentage) / 100;
@@ -249,7 +292,12 @@ const updateTableData = () => {
 const refreshData = async() => {
   isRefreshing.value = true;
   try {
-    await depthStore.reconnectWebSockets();
+    await Promise.all([
+      binanceStore.reconnectWebSockets(),
+      okxStore.reconnectWebSockets(),
+      toobitStore.reconnectWebSockets(),
+      bitunixStore.reconnectWebSockets()
+    ]);
     updateTableData();
   } catch (error) {
     console.error('刷新数据失败:', error);
@@ -325,7 +373,26 @@ const getHeaderCellStyle = () => {
 
 // 获取连接状态
 const getConnectionStatus = exchange => {
-  return depthStore.getConnectionStatus(exchange.toLowerCase(), symbol.value);
+  let store;
+  
+  switch (exchange.toLowerCase()) {
+  case 'binance':
+    store = binanceStore;
+    break;
+  case 'okx':
+    store = okxStore;
+    break;
+  case 'toobit':
+    store = toobitStore;
+    break;
+  case 'bitunix':
+    store = bitunixStore;
+    break;
+  default:
+    return 'disconnected';
+  }
+  
+  return store.getConnectionStatus(symbol.value);
 };
 
 // 获取连接状态文本
@@ -379,19 +446,27 @@ onMounted(async() => {
   symbol.value = route.params.symbol || 'BTCUSDT';
   
   // 确保WebSocket连接
-  if (!depthStore.getConnectionStatus('binance', symbol.value) === 'connected') {
-    await depthStore.connectWebSockets();
-  }
+  await Promise.all([
+    binanceStore.connectWebSockets(),
+    okxStore.connectWebSockets(),
+    toobitStore.connectWebSockets(),
+    bitunixStore.connectWebSockets()
+  ]);
   
   // 初始化数据
   updateTableData();
   
-  // 设置定时更新
-  const timer = setInterval(updateTableData, 5000);
+  // 设置每秒更新
+  const timer = setInterval(updateTableData, 1000);
   
   // 组件卸载时清理
   onUnmounted(() => {
     clearInterval(timer);
+    // 断开所有连接
+    binanceStore.disconnectAll();
+    okxStore.disconnectAll();
+    toobitStore.disconnectAll();
+    bitunixStore.disconnectAll();
   });
 });
 </script>
@@ -469,27 +544,46 @@ onMounted(async() => {
   font-weight: 500;
 }
 
-/* 统计卡片样式 */
-.el-statistic {
-  text-align: center;
-}
-
-.el-statistic :deep(.el-statistic__content) {
+/* 状态项样式 */
+.status-item {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 12px;
+  padding: 15px;
+  border-radius: 8px;
+  background: var(--el-fill-color-lighter);
+  transition: all 0.3s ease;
 }
 
-.el-statistic :deep(.el-statistic__title) {
+.status-item:hover {
+  background: var(--el-fill-color-light);
+  transform: translateY(-2px);
+}
+
+.status-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.status-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.status-title {
   color: var(--el-text-color-regular);
   font-size: 14px;
-  margin-bottom: 8px;
+  font-weight: 500;
 }
 
-.el-statistic :deep(.el-statistic__number) {
+.status-value {
   font-size: 16px;
   font-weight: bold;
+  text-align: center;
 }
 
 /* 响应式设计 */

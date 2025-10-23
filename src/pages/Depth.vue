@@ -141,45 +141,57 @@
       
       <el-row :gutter="20">
         <el-col :span="8">
-          <el-statistic 
-            title="币安" 
-            :value="getConnectionStatusText('binance')"
-            :value-style="getStatusStyle('binance')"
-          >
-            <template #prefix>
-              <el-icon :color="getStatusColor('binance')">
+          <div class="status-item">
+            <div class="status-icon">
+              <el-icon :color="getStatusColor('binance')" size="20">
                 <component :is="getStatusIcon('binance')" />
               </el-icon>
-            </template>
-          </el-statistic>
+            </div>
+            <div class="status-content">
+              <div class="status-title">
+                币安
+              </div>
+              <div class="status-value" :style="getStatusStyle('binance')">
+                {{ getConnectionStatusText('binance') }}
+              </div>
+            </div>
+          </div>
         </el-col>
         
         <el-col :span="8">
-          <el-statistic 
-            title="Toobit" 
-            :value="getConnectionStatusText('toobit')"
-            :value-style="getStatusStyle('toobit')"
-          >
-            <template #prefix>
-              <el-icon :color="getStatusColor('toobit')">
+          <div class="status-item">
+            <div class="status-icon">
+              <el-icon :color="getStatusColor('toobit')" size="20">
                 <component :is="getStatusIcon('toobit')" />
               </el-icon>
-            </template>
-          </el-statistic>
+            </div>
+            <div class="status-content">
+              <div class="status-title">
+                Toobit
+              </div>
+              <div class="status-value" :style="getStatusStyle('toobit')">
+                {{ getConnectionStatusText('toobit') }}
+              </div>
+            </div>
+          </div>
         </el-col>
         
         <el-col :span="8">
-          <el-statistic 
-            title="数据更新时间" 
-            :value="lastUpdateTime"
-            value-style="color: #409EFF; font-size: 14px;"
-          >
-            <template #prefix>
-              <el-icon color="#409EFF">
+          <div class="status-item">
+            <div class="status-icon">
+              <el-icon color="#409EFF" size="20">
                 <Clock />
               </el-icon>
-            </template>
-          </el-statistic>
+            </div>
+            <div class="status-content">
+              <div class="status-title">
+                数据更新时间
+              </div>
+              <div class="status-value" style="color: #409EFF; font-size: 14px;">
+                {{ lastUpdateTime }}
+              </div>
+            </div>
+          </div>
         </el-col>
       </el-row>
     </el-card>
@@ -197,9 +209,10 @@ import {
 } from '@element-plus/icons-vue';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { useDepthStore } from '../stores/depth.js';
+import { useBinanceStore, useToobitStore } from '../stores/index.js';
 
-const depthStore = useDepthStore();
+const binanceStore = useBinanceStore();
+const toobitStore = useToobitStore();
 const router = useRouter();
 
 // 响应式数据
@@ -236,6 +249,66 @@ const currentDepthLabel = computed(() => {
   return option ? option.label : '核心(1%)';
 });
 
+// 计算深度比较数据
+const multiSymbolDepthComparisonData = computed(() => {
+  const percentage = parseFloat(depthPercentage.value) / 100;
+  const isBuySide = orderSide.value === 'buy';
+  
+  return symbols.map(symbol => {
+    const binanceData = binanceStore.getDepthDataBySymbol(symbol);
+    const toobitData = toobitStore.getDepthDataBySymbol(symbol);
+    
+    if (!binanceData || !toobitData) {
+      return {
+        symbol,
+        binanceValue: 0,
+        toobitValue: 0,
+        score: 0
+      };
+    }
+
+    let binanceValue, toobitValue;
+
+    if (isBuySide) {
+      binanceValue = calculateBuyDepth(binanceData.bids, binanceData.bestBid, percentage);
+      toobitValue = calculateBuyDepth(toobitData.bids, toobitData.bestBid, percentage);
+    } else {
+      binanceValue = calculateSellDepth(binanceData.asks, binanceData.bestAsk, percentage);
+      toobitValue = calculateSellDepth(toobitData.asks, toobitData.bestAsk, percentage);
+    }
+
+    const diff = toobitValue - binanceValue;
+    const score = diff > 0 ? 1 : (diff < 0 ? -1 : 0);
+
+    return {
+      symbol,
+      binanceValue,
+      toobitValue,
+      score
+    };
+  });
+});
+
+// 计算买盘深度
+const calculateBuyDepth = (bids, bestBid, percentage) => {
+  if (!bids || bids.length === 0 || !bestBid) return 0;
+  
+  const threshold = bestBid * (1 - percentage);
+  return bids
+    .filter(bid => bid.price >= threshold)
+    .reduce((sum, bid) => sum + bid.quantity, 0);
+};
+
+// 计算卖盘深度
+const calculateSellDepth = (asks, bestAsk, percentage) => {
+  if (!asks || asks.length === 0 || !bestAsk) return 0;
+  
+  const threshold = bestAsk * (1 + percentage);
+  return asks
+    .filter(ask => ask.price <= threshold)
+    .reduce((sum, ask) => sum + ask.quantity, 0);
+};
+
 // 节流更新函数
 const throttledUpdate = () => {
   // 如果已经有待处理的更新，直接返回
@@ -251,7 +324,7 @@ const throttledUpdate = () => {
   // 使用requestAnimationFrame确保在下一个渲染帧更新
   updateTimer.value = setTimeout(() => {
     requestAnimationFrame(() => {
-      const data = depthStore.multiSymbolDepthComparisonData;
+      const data = multiSymbolDepthComparisonData.value;
       throttledTableData.value = data.map(item => ({
         symbol: item.symbol,
         binanceValue: item.binanceValue,
@@ -267,9 +340,9 @@ const throttledUpdate = () => {
 
 // 自动刷新函数
 const startAutoRefresh = () => {
-  // 每5秒自动刷新一次数据
+  // 每1秒自动刷新一次数据
   autoRefreshTimer.value = setInterval(() => {
-    const data = depthStore.multiSymbolDepthComparisonData;
+    const data = multiSymbolDepthComparisonData.value;
     throttledTableData.value = data.map(item => ({
       symbol: item.symbol,
       binanceValue: item.binanceValue,
@@ -277,7 +350,7 @@ const startAutoRefresh = () => {
       score: item.score
     }));
     lastUpdateTime.value = new Date().toLocaleTimeString();
-  }, 5000);
+  }, 1000);
 };
 
 // 跳转到币对详情页面
@@ -299,29 +372,32 @@ const tableData = computed(() => throttledTableData.value);
 // 更新资产类型
 const updateAssetType = type => {
   assetType.value = type;
-  depthStore.updateConfig({ exchangeType: type });
+  binanceStore.updateConfig({ exchangeType: type });
 };
 
 // 更新深度百分比
 const updateDepthPercentage = percentage => {
   depthPercentage.value = percentage;
-  depthStore.updateConfig({ depthPercentage: percentage });
+  // 深度百分比不需要重新连接WebSocket
 };
 
 // 更新订单方向
 const updateOrderSide = side => {
   orderSide.value = side;
-  depthStore.updateConfig({ orderSide: side });
+  // 订单方向不需要重新连接WebSocket
 };
 
 // 刷新数据
 const refreshData = async() => {
   isRefreshing.value = true;
   try {
-    await depthStore.reconnectWebSockets();
+    await Promise.all([
+      binanceStore.reconnectWebSockets(),
+      toobitStore.reconnectWebSockets()
+    ]);
     
     // 立即更新数据，不等待节流
-    const data = depthStore.multiSymbolDepthComparisonData;
+    const data = multiSymbolDepthComparisonData.value;
     throttledTableData.value = data.map(item => ({
       symbol: item.symbol,
       binanceValue: item.binanceValue,
@@ -345,7 +421,7 @@ const refreshData = async() => {
 
 // 获取深度值
 const getDepthValue = (symbol, exchange) => {
-  const comparisonData = depthStore.multiSymbolDepthComparisonData;
+  const comparisonData = multiSymbolDepthComparisonData.value;
   const symbolData = comparisonData.find(item => item.symbol === symbol);
   
   if (!symbolData) return 0;
@@ -361,7 +437,7 @@ const getDepthValue = (symbol, exchange) => {
 
 // 获取分数
 const getScore = symbol => {
-  const comparisonData = depthStore.multiSymbolDepthComparisonData;
+  const comparisonData = multiSymbolDepthComparisonData.value;
   const symbolData = comparisonData.find(item => item.symbol === symbol);
   
   if (!symbolData) return '0';
@@ -426,13 +502,26 @@ const formatQuantity = quantity => {
 
 // 获取连接状态
 const getConnectionStatus = exchange => {
-  const statuses = symbols.map(symbol => 
-    depthStore.getConnectionStatus(exchange, symbol)
-  );
+  if (exchange === 'binance') {
+    const statuses = symbols.map(symbol => 
+      binanceStore.getConnectionStatus(symbol)
+    );
+    
+    if (statuses.every(status => status === 'connected')) return 'connected';
+    if (statuses.some(status => status === 'connecting')) return 'connecting';
+    if (statuses.some(status => status === 'error')) return 'error';
+    return 'disconnected';
+  } else if (exchange === 'toobit') {
+    const statuses = symbols.map(symbol => 
+      toobitStore.getConnectionStatus(symbol)
+    );
+    
+    if (statuses.every(status => status === 'connected')) return 'connected';
+    if (statuses.some(status => status === 'connecting')) return 'connecting';
+    if (statuses.some(status => status === 'error')) return 'error';
+    return 'disconnected';
+  }
   
-  if (statuses.every(status => status === 'connected')) return 'connected';
-  if (statuses.some(status => status === 'connecting')) return 'connecting';
-  if (statuses.some(status => status === 'error')) return 'error';
   return 'disconnected';
 };
 
@@ -485,7 +574,7 @@ const getStatusIcon = exchange => {
 // 监听配置变化
 watch([assetType, depthPercentage, orderSide], () => {
   // 配置变化时立即更新数据
-  const data = depthStore.multiSymbolDepthComparisonData;
+  const data = multiSymbolDepthComparisonData.value;
   throttledTableData.value = data.map(item => ({
     symbol: item.symbol,
     binanceValue: item.binanceValue,
@@ -504,16 +593,18 @@ watch([assetType, depthPercentage, orderSide], () => {
 
 // 组件挂载时连接WebSocket
 onMounted(async() => {
-  depthStore.updateConfig({
+  binanceStore.updateConfig({
     exchangeType: assetType.value,
-    depthPercentage: depthPercentage.value,
-    orderSide: orderSide.value
+    depthLevels: 250
   });
   
-  await depthStore.connectWebSockets();
+  await Promise.all([
+    binanceStore.connectWebSockets(),
+    toobitStore.connectWebSockets()
+  ]);
   
   // 初始化表格数据
-  const data = depthStore.multiSymbolDepthComparisonData;
+  const data = multiSymbolDepthComparisonData.value;
   throttledTableData.value = data.map(item => ({
     symbol: item.symbol,
     binanceValue: item.binanceValue,
@@ -537,7 +628,9 @@ onUnmounted(() => {
     updateTimer.value = null;
   }
   
-  depthStore.disconnectAll();
+  // 断开WebSocket连接
+  binanceStore.disconnectAll();
+  toobitStore.disconnectAll();
 });
 </script>
 
@@ -617,27 +710,46 @@ onUnmounted(() => {
   font-weight: 500;
 }
 
-/* 统计卡片样式 */
-.el-statistic {
-  text-align: center;
-}
-
-.el-statistic :deep(.el-statistic__content) {
+/* 状态项样式 */
+.status-item {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 12px;
+  padding: 15px;
+  border-radius: 8px;
+  background: var(--el-fill-color-lighter);
+  transition: all 0.3s ease;
 }
 
-.el-statistic :deep(.el-statistic__title) {
+.status-item:hover {
+  background: var(--el-fill-color-light);
+  transform: translateY(-2px);
+}
+
+.status-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.status-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.status-title {
   color: var(--el-text-color-regular);
   font-size: 14px;
-  margin-bottom: 8px;
+  font-weight: 500;
 }
 
-.el-statistic :deep(.el-statistic__number) {
+.status-value {
   font-size: 16px;
   font-weight: bold;
+  text-align: center;
 }
 
 /* 响应式设计 */

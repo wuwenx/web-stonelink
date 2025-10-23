@@ -33,8 +33,8 @@
         <el-button 
           type="primary" 
           size="large"
-          @click="goHome"
           class="px-8"
+          @click="goHome"
         >
           <el-icon class="mr-2">
             <House />
@@ -43,8 +43,8 @@
         </el-button>
         <el-button 
           size="large"
-          @click="goBack"
           class="px-8"
+          @click="goBack"
         >
           <el-icon class="mr-2">
             <Back />

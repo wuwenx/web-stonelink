@@ -6,5 +6,9 @@ export default pinia;
 
 // 导出所有stores
 export { useAppStore } from './app.js';
+export { useBinanceStore } from './binance.js';
+export { useBitunixStore } from './bitunix.js';
 export { useDepthStore } from './depth.js';
+export { useOKXStore } from './okx.js';
+export { useToobitStore } from './toobit.js';
 

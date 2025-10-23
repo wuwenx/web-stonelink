@@ -14,17 +14,96 @@ export class WebSocketService {
     this.heartbeatInterval = 30000;
     this.reconnecting = new Set(); // 跟踪正在重连的连接
     this.heartbeatTimers = new Map();
-    // 本地orderbook管理
-    this.localOrderBooks = new Map();
-    this.lastUpdateIds = new Map();
+    
+    // Web Worker管理
+    this.worker = null;
+    this.workerCallbacks = new Map(); // 存储回调函数
+    this.initWorker();
   }
 
   /**
-   * 获取Binance深度快照
-   * @param {string} symbol - 交易对符号
-   * @param {number} limit - 深度档位数，默认1000
-   * @returns {Promise} 深度快照数据
+   * 初始化Web Worker
    */
+  initWorker() {
+    try {
+      this.worker = new Worker(new URL('../workers/websocketWorker.js', import.meta.url));
+      
+      this.worker.onmessage = event => {
+        const { type, exchange, symbol, result } = event.data;
+        
+        if (type === 'result') {
+          const callbackKey = `${exchange}_${symbol}`;
+          const callbacks = this.workerCallbacks.get(callbackKey);
+          
+          if (callbacks) {
+            switch (result.type) {
+            case 'ping':
+              // 处理ping消息
+              if (callbacks.onPing) {
+                callbacks.onPing(result.data);
+              }
+              break;
+                
+            case 'depthUpdate':
+              // 处理深度更新
+              if (callbacks.onDepthMessage) {
+                callbacks.onDepthMessage(result.data);
+              }
+              break;
+                
+            case 'initialData':
+              // 处理初始数据
+              if (callbacks.onDepthMessage) {
+                callbacks.onDepthMessage(result.data);
+              }
+              break;
+                
+            case 'error':
+              console.error(`Worker处理错误 (${exchange}_${symbol}):`, result.message);
+              break;
+            }
+          }
+        }
+      };
+      
+      this.worker.onerror = error => {
+        console.error('Web Worker错误:', error);
+      };
+      
+    } catch (error) {
+      console.error('初始化Web Worker失败:', error);
+      this.worker = null;
+    }
+  }
+
+  /**
+   * 注册Worker回调函数
+   * @param {string} exchange - 交易所名称
+   * @param {string} symbol - 交易对符号
+   * @param {Object} callbacks - 回调函数对象
+   */
+  registerWorkerCallbacks(exchange, symbol, callbacks) {
+    const callbackKey = `${exchange}_${symbol}`;
+    this.workerCallbacks.set(callbackKey, callbacks);
+  }
+
+  /**
+   * 发送消息到Worker
+   * @param {string} type - 消息类型
+   * @param {string} exchange - 交易所名称
+   * @param {string} symbol - 交易对符号
+   * @param {*} data - 数据
+   */
+  sendToWorker(type, exchange, symbol, data) {
+    if (this.worker) {
+      this.worker.postMessage({
+        type,
+        exchange,
+        symbol,
+        data
+      });
+    }
+  }
   async getBinanceDepthSnapshot(symbol, limit = 1000) {
     try {
       const response = await axios.get('https://fapi.binance.com/fapi/v1/depth', {
@@ -38,113 +117,6 @@ export class WebSocketService {
       console.error('获取Binance深度快照失败:', error);
       throw error;
     }
-  }
-
-  /**
-   * 初始化本地orderbook
-   * @param {string} symbol - 交易对符号
-   * @param {Object} snapshot - 深度快照数据
-   */
-  initializeLocalOrderBook(symbol, snapshot) {
-    const orderBook = {
-      bids: new Map(),
-      asks: new Map(),
-      lastUpdateId: snapshot.lastUpdateId
-    };
-
-    // 处理买单
-    snapshot.bids.forEach(([price, quantity]) => {
-      const numPrice = parseFloat(price);
-      const numQuantity = parseFloat(quantity);
-      if (numQuantity > 0) {
-        orderBook.bids.set(numPrice, numQuantity);
-      }
-    });
-
-    // 处理卖单
-    snapshot.asks.forEach(([price, quantity]) => {
-      const numPrice = parseFloat(price);
-      const numQuantity = parseFloat(quantity);
-      if (numQuantity > 0) {
-        orderBook.asks.set(numPrice, numQuantity);
-      }
-    });
-
-    this.localOrderBooks.set(symbol, orderBook);
-    this.lastUpdateIds.set(symbol, 0);
-    
-    console.log(`本地orderbook初始化: ${symbol}, bids=${orderBook.bids.size}, asks=${orderBook.asks.size}, lastUpdateId=${snapshot.lastUpdateId}`);
-  }
-
-  /**
-   * 更新本地orderbook
-   * @param {string} symbol - 交易对符号
-   * @param {Object} updateData - 增量更新数据
-   * @returns {Object} 更新后的orderbook数据
-   */
-  updateLocalOrderBook(symbol, updateData) {
-    const orderBook = this.localOrderBooks.get(symbol);
-    if (!orderBook) {
-      console.warn(`本地orderbook不存在: ${symbol}`);
-      return null;
-    }
-
-    // 检查更新ID的连续性 - 按照币安官方文档要求
-    // lastU应该是上一次推送的u值，而不是REST中的lastUpdateId
-    if (this.lastUpdateIds.has(symbol)) {
-      const lastU = this.lastUpdateIds.get(symbol);
-      // 每个新event的pu应该等于上一个event的u，否则可能出现了丢包
-      // 但是第一次WebSocket推送时，pu应该等于快照的lastUpdateId
-      if (updateData.pu && updateData.pu !== lastU) {
-        console.warn(`检测到丢包: 期望 pu=${lastU}, 实际 pu=${updateData.pu}`);
-        // 即使检测到丢包，也要更新lastUpdateIds，避免一直触发丢包检测
-        this.lastUpdateIds.set(symbol, updateData.u);
-        return null; // 需要重新初始化
-      }
-    }
-    
-    // 更新买单
-    updateData.b.forEach(([price, quantity]) => {
-      const numPrice = parseFloat(price);
-      const numQuantity = parseFloat(quantity);
-      
-      if (numQuantity === 0) {
-        orderBook.bids.delete(numPrice);
-      } else {
-        orderBook.bids.set(numPrice, numQuantity);
-      }
-    });
-
-    // 更新卖单
-    updateData.a.forEach(([price, quantity]) => {
-      const numPrice = parseFloat(price);
-      const numQuantity = parseFloat(quantity);
-      
-      if (numQuantity === 0) {
-        orderBook.asks.delete(numPrice);
-      } else {
-        orderBook.asks.set(numPrice, numQuantity);
-      }
-    });
-
-    // 更新lastUpdateId
-    this.lastUpdateIds.set(symbol, updateData.u);
-    orderBook.lastUpdateId = updateData.u;
-
-    // 转换为数组格式返回
-    const bids = Array.from(orderBook.bids.entries())
-      .sort((a, b) => b[0] - a[0]) // 买单按价格降序排列（最高价在前）
-      .map(([price, quantity]) => [price, quantity]);
-    
-    const asks = Array.from(orderBook.asks.entries())
-      .sort((a, b) => a[0] - b[0]) // 卖单按价格升序排列（最低价在前）
-      .map(([price, quantity]) => [price, quantity]);
-
-    return {
-      bids: bids,
-      asks: asks,
-      lastUpdateId: updateData.u
-    };
   }
 
   /**
@@ -248,9 +220,9 @@ export class WebSocketService {
         console.log('深度快照获取成功，lastUpdateId:', snapshot.lastUpdateId);
         hasSnapshot = true;
         
-        // 步骤2: 初始化本地orderbook
-        this.initializeLocalOrderBook(symbol, snapshot);
-        console.log(`初始化本地orderbook完成: ${symbol}, lastUpdateId: ${snapshot.lastUpdateId}`);
+        // 步骤2: 初始化Worker中的orderbook
+        this.sendToWorker('initBinanceOrderBook', 'binance', symbol, snapshot);
+        console.log(`初始化Worker orderbook完成: ${symbol}, lastUpdateId: ${snapshot.lastUpdateId}`);
         
         // 步骤2.5: 发送初始快照数据
         const initialData = {
@@ -290,6 +262,16 @@ export class WebSocketService {
         ws.send(JSON.stringify(subscribeMessage));
       };
 
+      // 注册Worker回调
+      this.registerWorkerCallbacks('binance', symbol, {
+        onPing: pingData => {
+          ws.send(JSON.stringify({ pong: pingData }));
+        },
+        onDepthMessage: formattedData => {
+          onDepthMessage(formattedData);
+        }
+      });
+
       ws.onmessage = event => {
         try {
           const data = JSON.parse(event.data);
@@ -302,52 +284,8 @@ export class WebSocketService {
 
           // 处理深度数据流
           if (data.e && data.e === 'depthUpdate') {
-            const updateData = data; // 直接使用data，因为币安@depth格式是直接的消息对象
-            
-            // 如果有快照数据，按照币安官方文档处理
-            if (hasSnapshot && snapshot) {
-              // 丢弃u < lastUpdateId的数据（过期数据）
-              if (updateData.u < snapshot.lastUpdateId) {
-                console.log(`丢弃过期数据: u=${updateData.u}, snapshot.lastUpdateId=${snapshot.lastUpdateId}`);
-                return;
-              }
-
-              // 从第一个U <= lastUpdateId 且 u >= lastUpdateId 的event开始更新
-              if (updateData.u >= snapshot.lastUpdateId) {
-                
-                // 更新本地orderbook
-                const updatedOrderBook = this.updateLocalOrderBook(symbol, updateData);
-                
-                if (updatedOrderBook) {
-                  // 转换为标准格式
-                  const formattedData = {
-                    e: 'depthUpdate',
-                    a: updatedOrderBook.asks,
-                    b: updatedOrderBook.bids,
-                    lastUpdateId: updatedOrderBook.lastUpdateId
-                  };
-                  onDepthMessage(formattedData);
-                } else {
-                  console.warn('检测到丢包，需要重新初始化');
-                  // 延迟重新初始化，避免频繁重连
-                  setTimeout(() => {
-                    // this.reconnectBinanceFutures(symbol, onDepthMessage, onMarkPriceMessage, onStatusChange, depthLevels);
-                  }, 3000);
-                }
-              } else {
-                console.log(`跳过数据: U=${updateData.U}, u=${updateData.u}, lastUpdateId=${snapshot.lastUpdateId}`);
-              }
-            } else {
-              // 没有快照数据，直接使用WebSocket数据
-              console.log('没有快照数据，直接使用WebSocket数据');
-              const formattedData = {
-                e: 'depthUpdate',
-                a: updateData.a || [],
-                b: updateData.b || [],
-                lastUpdateId: updateData.u || 0
-              };
-              onDepthMessage(formattedData);
-            }
+            // 发送到Worker处理
+            this.sendToWorker('processBinanceMessage', 'binance', symbol, data);
           } else if (data.e && data.e === 'markPriceUpdate') {
             // 处理标记价格流
             onMarkPriceMessage(data);
@@ -509,109 +447,6 @@ export class WebSocketService {
   }
 
   /**
-   * 初始化Toobit本地orderbook
-   * @param {string} symbol - 交易对符号
-   * @param {Object} snapshot - 深度快照数据
-   */
-  initializeToobitOrderBook(symbol, snapshot) {
-    const orderBook = {
-      bids: new Map(),
-      asks: new Map(),
-      lastUpdateTime: snapshot.t || Date.now()
-    };
-
-    // 处理买单
-    if (snapshot.b && Array.isArray(snapshot.b)) {
-      snapshot.b.forEach(([price, quantity]) => {
-        const numPrice = parseFloat(price);
-        const numQuantity = parseFloat(quantity);
-        if (numQuantity > 0) {
-          orderBook.bids.set(numPrice, numQuantity);
-        }
-      });
-    }
-
-    // 处理卖单
-    if (snapshot.a && Array.isArray(snapshot.a)) {
-      snapshot.a.forEach(([price, quantity]) => {
-        const numPrice = parseFloat(price);
-        const numQuantity = parseFloat(quantity);
-        if (numQuantity > 0) {
-          orderBook.asks.set(numPrice, numQuantity);
-        }
-      });
-    }
-
-    this.localOrderBooks.set(`toobit_${symbol}`, orderBook);
-    
-    console.log(`Toobit本地orderbook初始化: ${symbol}, bids=${orderBook.bids.size}, asks=${orderBook.asks.size}`);
-  }
-
-  /**
-   * 更新Toobit本地orderbook
-   * @param {string} symbol - 交易对符号
-   * @param {Object} updateData - 增量更新数据
-   * @returns {Object} 更新后的orderbook数据
-   */
-  updateToobitOrderBook(symbol, updateData) {
-    const orderBook = this.localOrderBooks.get(`toobit_${symbol}`);
-    if (!orderBook) {
-      console.warn(`Toobit本地orderbook不存在: ${symbol}`);
-      return null;
-    }
-
-    // 更新买单
-    if (updateData.b && Array.isArray(updateData.b)) {
-      updateData.b.forEach(([price, quantity]) => {
-        const numPrice = parseFloat(price);
-        const numQuantity = parseFloat(quantity);
-        
-        if (numQuantity === 0) {
-          // 数量为0表示删除该价格档位
-          orderBook.bids.delete(numPrice);
-        } else {
-          // 更新或添加该价格档位
-          orderBook.bids.set(numPrice, numQuantity);
-        }
-      });
-    }
-
-    // 更新卖单
-    if (updateData.a && Array.isArray(updateData.a)) {
-      updateData.a.forEach(([price, quantity]) => {
-        const numPrice = parseFloat(price);
-        const numQuantity = parseFloat(quantity);
-        
-        if (numQuantity === 0) {
-          // 数量为0表示删除该价格档位
-          orderBook.asks.delete(numPrice);
-        } else {
-          // 更新或添加该价格档位
-          orderBook.asks.set(numPrice, numQuantity);
-        }
-      });
-    }
-
-    // 更新最后更新时间
-    orderBook.lastUpdateTime = updateData.t || Date.now();
-
-    // 转换为数组格式返回
-    const bids = Array.from(orderBook.bids.entries())
-      .sort((a, b) => b[0] - a[0]) // 买单按价格降序排列（最高价在前）
-      .map(([price, quantity]) => [price, quantity]);
-    
-    const asks = Array.from(orderBook.asks.entries())
-      .sort((a, b) => a[0] - b[0]) // 卖单按价格升序排列（最低价在前）
-      .map(([price, quantity]) => [price, quantity]);
-
-    return {
-      bids: bids,
-      asks: asks,
-      lastUpdateTime: orderBook.lastUpdateTime
-    };
-  }
-
-  /**
    * 连接Toobit WebSocket
    * @param {string} symbol - 交易对符号
    * @param {Function} onMessage - 消息处理回调
@@ -655,45 +490,21 @@ export class WebSocketService {
         ws.send(JSON.stringify(subscribeMessage));
       };
 
+      // 注册Worker回调
+      this.registerWorkerCallbacks('toobit', symbol, {
+        onDepthMessage: formattedData => {
+          onMessage(formattedData);
+        }
+      });
+
       ws.onmessage = event => {
         try {
           const data = JSON.parse(event.data);
 
           // 处理深度数据
           if (data.topic && data.topic === 'diffDepth' && data.data && Array.isArray(data.data)) {
-            // Toobit返回的是数组格式，取第一个元素
-            const depthData = data.data[0];
-            if (depthData && (depthData.b || depthData.a)) {
-              
-              // 检查是否为全量数据 (f=true)
-              if (data.f === true) {
-                // 全量数据，初始化本地orderbook
-                this.initializeToobitOrderBook(symbol, depthData);
-                
-                // 发送初始数据
-                const initialData = {
-                  e: 'depthUpdate',
-                  a: depthData.a || [],
-                  b: depthData.b || [],
-                  lastUpdateTime: depthData.t || Date.now()
-                };
-                onMessage(initialData);
-              } else {
-                // 增量数据，更新本地orderbook
-                const updatedOrderBook = this.updateToobitOrderBook(symbol, depthData);
-                
-                if (updatedOrderBook) {
-                  // 转换为标准格式
-                  const formattedData = {
-                    e: 'depthUpdate',
-                    a: updatedOrderBook.asks,
-                    b: updatedOrderBook.bids,
-                    lastUpdateTime: updatedOrderBook.lastUpdateTime
-                  };
-                  onMessage(formattedData);
-                }
-              }
-            }
+            // 发送到Worker处理
+            this.sendToWorker('processToobitMessage', 'toobit', symbol, data);
           }
         } catch (error) {
           console.error('处理Toobit WebSocket消息时出错:', error);
