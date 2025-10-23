@@ -274,6 +274,12 @@ export class WebSocketService {
 
       ws.onmessage = event => {
         try {
+          // 检查连接状态，如果已关闭则不处理消息
+          if (ws.readyState !== WebSocket.OPEN) {
+            console.warn(`Binance WebSocket连接已关闭，忽略消息: ${connectionId}`);
+            return;
+          }
+
           const data = JSON.parse(event.data);
           
           // 处理ping消息 - 必须回复pong
@@ -499,6 +505,12 @@ export class WebSocketService {
 
       ws.onmessage = event => {
         try {
+          // 检查连接状态，如果已关闭则不处理消息
+          if (ws.readyState !== WebSocket.OPEN) {
+            console.warn(`Toobit WebSocket连接已关闭，忽略消息: ${connectionId}`);
+            return;
+          }
+
           const data = JSON.parse(event.data);
 
           // 处理深度数据
@@ -546,7 +558,11 @@ export class WebSocketService {
 
       // 关闭连接
       if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
-        ws.close(1000, 'Connection closed by user');
+        try {
+          ws.close(1000, 'Connection closed by user');
+        } catch (error) {
+          console.warn(`关闭WebSocket连接时出错: ${error.message}`);
+        }
       }
 
       // 清理资源
@@ -572,14 +588,21 @@ export class WebSocketService {
     // 确保所有资源都被清理
     this.connections.clear();
     this.reconnectAttempts.clear();
-    this.localOrderBooks.clear();
-    this.lastUpdateIds.clear();
-
+    
+    // 清理Worker回调
+    this.workerCallbacks.clear();
+    
     // 停止所有心跳定时器
     for (const [connectionId] of this.heartbeatTimers) {
       this.stopHeartbeat(connectionId);
     }
     this.heartbeatTimers.clear();
+    
+    // 清理Worker
+    if (this.worker) {
+      this.worker.terminate();
+      this.worker = null;
+    }
 
     console.log('所有WebSocket连接已断开，资源已清理');
   }

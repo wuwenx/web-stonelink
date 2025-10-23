@@ -1,213 +1,128 @@
 <template>
-  <div class="depth-comparison-container">
-    <!-- 资产类型筛选 -->
-    <el-card class="filter-card" shadow="hover">
-      <template #header>
-        <div class="card-header">
-          <span class="card-title">资产类型筛选</span>
+  <div class="minimal-container">
+    <!-- 简约控制面板 -->
+    <div class="controls">
+      <div class="control-group">
+        <label class="control-label">资产类型</label>
+        <div class="toggle-group">
+          <button 
+            :class="['toggle-btn', { active: assetType === 'futures' }]"
+            @click="updateAssetType('futures')"
+          >
+            合约
+          </button>
+          <button 
+            :class="['toggle-btn', { active: assetType === 'spot' }]"
+            @click="updateAssetType('spot')"
+          >
+            现货
+          </button>
         </div>
-      </template>
-      <el-radio-group v-model="assetType" class="filter-group" @change="updateAssetType">
-        <el-radio-button label="futures">
-          合约(PERP)
-        </el-radio-button>
-        <el-radio-button label="spot">
-          现货(SPOT)
-        </el-radio-button>
-      </el-radio-group>
-    </el-card>
+      </div>
 
-    <!-- 深度详情对比选项 -->
-    <el-card class="filter-card" shadow="hover">
-      <template #header>
-        <div class="card-header">
-          <span class="card-title">深度详情对比(Depth Detail Comparison)</span>
-          <el-tag type="info" size="small">
-            当前: {{ currentDepthLabel }}
-          </el-tag>
+      <div class="control-group">
+        <label class="control-label">深度范围</label>
+        <div class="depth-selector">
+          <button 
+            v-for="option in depthOptions" 
+            :key="option.value"
+            :class="['depth-btn', { active: depthPercentage === option.value }]"
+            @click="updateDepthPercentage(option.value)"
+          >
+            {{ option.label }}
+          </button>
         </div>
-      </template>
-      <el-radio-group v-model="depthPercentage" class="depth-group" @change="updateDepthPercentage">
-        <el-radio-button 
-          v-for="option in depthOptions" 
-          :key="option.value"
-          :label="option.value"
+      </div>
+
+      <div class="control-group">
+        <label class="control-label">订单方向</label>
+        <div class="toggle-group">
+          <button 
+            :class="['toggle-btn', { active: orderSide === 'buy' }]"
+            @click="updateOrderSide('buy')"
+          >
+            买盘
+          </button>
+          <button 
+            :class="['toggle-btn', { active: orderSide === 'sell' }]"
+            @click="updateOrderSide('sell')"
+          >
+            卖盘
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 简约数据表格 -->
+    <div class="data-table">
+      <div class="table-header">
+        <div class="header-cell">
+          资产
+        </div>
+        <div class="header-cell">
+          BINANCE
+        </div>
+        <div class="header-cell">
+          TOOBIT
+        </div>
+        <div class="header-cell">
+          分数
+        </div>
+      </div>
+      
+      <div class="table-body">
+        <div 
+          v-for="item in tableData" 
+          :key="item.symbol"
+          class="table-row"
+          @click="goToSymbolDetail(item.symbol)"
         >
-          {{ option.label }}
-        </el-radio-button>
-      </el-radio-group>
-    </el-card>
-
-    <!-- 买盘/卖盘选择 -->
-    <el-card class="filter-card" shadow="hover">
-      <template #header>
-        <div class="card-header">
-          <span class="card-title">订单方向</span>
-        </div>
-      </template>
-      <el-radio-group v-model="orderSide" class="side-group" @change="updateOrderSide">
-        <el-radio-button label="buy">
-          买盘
-        </el-radio-button>
-        <el-radio-button label="sell">
-          卖盘
-        </el-radio-button>
-      </el-radio-group>
-    </el-card>
-
-    <!-- 数据表格 -->
-    <el-card class="table-card" shadow="hover">
-      <template #header>
-        <div class="card-header">
-          <span class="card-title">深度对比数据</span>
-          <div class="header-actions">
-            <el-button 
-              type="primary" 
-              size="small" 
-              :icon="RefreshIcon" 
-              :loading="isRefreshing"
-              @click="refreshData"
-            >
-              刷新数据
-            </el-button>
+          <div class="table-cell asset">
+            <div class="asset-name">
+              {{ item.symbol }}
+            </div>
+            <div class="asset-type">
+              {{ assetType.toUpperCase() }}
+            </div>
+          </div>
+          
+          <div class="table-cell value">
+            <div class="value-text binance">
+              {{ formatValue(item.binanceValue) }}
+            </div>
+          </div>
+          
+          <div class="table-cell value">
+            <div class="value-text toobit">
+              {{ formatValue(item.toobitValue) }}
+            </div>
+          </div>
+          
+          <div class="table-cell score">
+            <div :class="['score', getScoreClass(item.score)]">
+              {{ item.score > 0 ? '+' : '' }}{{ item.score }}
+            </div>
           </div>
         </div>
-      </template>
-      
-      <el-table 
-        :data="tableData" 
-        stripe 
-        border 
-        class="comparison-table"
-        :cell-style="getCellStyle"
-        :header-cell-style="getHeaderCellStyle"
-      >
-        <el-table-column prop="symbol" label="资产(ASSET)" width="150" align="center">
-          <template #default="{ row }">
-            <el-button 
-              type="primary" 
-              size="small" 
-              style="border: none; background: transparent; color: var(--el-color-primary);"
-              @click="goToSymbolDetail(row.symbol)"
-            >
-              {{ row.symbol }} PERP
-            </el-button>
-          </template>
-        </el-table-column>
-        
-        <el-table-column prop="binanceValue" label="BINANCE" width="200" align="center">
-          <template #default="{ row }">
-            <el-tag 
-              :type="getValueTagType(row.binanceValue, row.toobitValue)"
-              size="small"
-            >
-              {{ formatQuantity(row.binanceValue) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        
-        <el-table-column prop="toobitValue" label="TOOBIT" width="200" align="center">
-          <template #default="{ row }">
-            <el-tag 
-              :type="getValueTagType(row.toobitValue, row.binanceValue)"
-              size="small"
-            >
-              {{ formatQuantity(row.toobitValue) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        
-        <el-table-column prop="score" label="分数↑" width="120" align="center">
-          <template #default="{ row }">
-            <el-tag 
-              :type="getScoreTagType(row.score)"
-              size="small"
-              effect="dark"
-            >
-              {{ getScoreText(row.score) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
+      </div>
+    </div>
 
-    <!-- 连接状态 -->
-    <el-card class="status-card" shadow="hover">
-      <template #header>
-        <div class="card-header">
-          <span class="card-title">连接状态</span>
-        </div>
-      </template>
-      
-      <el-row :gutter="20">
-        <el-col :span="8">
-          <div class="status-item">
-            <div class="status-icon">
-              <el-icon :color="getStatusColor('binance')" size="20">
-                <component :is="getStatusIcon('binance')" />
-              </el-icon>
-            </div>
-            <div class="status-content">
-              <div class="status-title">
-                币安
-              </div>
-              <div class="status-value" :style="getStatusStyle('binance')">
-                {{ getConnectionStatusText('binance') }}
-              </div>
-            </div>
-          </div>
-        </el-col>
-        
-        <el-col :span="8">
-          <div class="status-item">
-            <div class="status-icon">
-              <el-icon :color="getStatusColor('toobit')" size="20">
-                <component :is="getStatusIcon('toobit')" />
-              </el-icon>
-            </div>
-            <div class="status-content">
-              <div class="status-title">
-                Toobit
-              </div>
-              <div class="status-value" :style="getStatusStyle('toobit')">
-                {{ getConnectionStatusText('toobit') }}
-              </div>
-            </div>
-          </div>
-        </el-col>
-        
-        <el-col :span="8">
-          <div class="status-item">
-            <div class="status-icon">
-              <el-icon color="#409EFF" size="20">
-                <Clock />
-              </el-icon>
-            </div>
-            <div class="status-content">
-              <div class="status-title">
-                数据更新时间
-              </div>
-              <div class="status-value" style="color: #409EFF; font-size: 14px;">
-                {{ lastUpdateTime }}
-              </div>
-            </div>
-          </div>
-        </el-col>
-      </el-row>
-    </el-card>
+    <!-- 简约状态栏 -->
+    <div class="status-bar">
+      <div class="status-item">
+        <div class="status-dot binance" />
+        <span>币安</span>
+      </div>
+      <div class="status-item">
+        <div class="status-dot toobit" />
+        <span>Toobit</span>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import {
-  CircleCheck as CircleCheckIcon,
-  CircleClose as CircleCloseIcon,
-  Clock,
-  Connection as ConnectionIcon,
-  Refresh as RefreshIcon,
-  Warning as WarningIcon
-} from '@element-plus/icons-vue';
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useBinanceStore, useToobitStore } from '../stores/index.js';
 
@@ -217,69 +132,54 @@ const router = useRouter();
 
 // 响应式数据
 const assetType = ref('futures');
-const depthPercentage = ref('0.01');
+const depthPercentage = ref(0.0001); // 万1
 const orderSide = ref('buy');
-const isRefreshing = ref(false);
-const lastUpdateTime = ref('--');
-
-// 节流控制
-const updateTimer = ref(null);
-const pendingUpdate = ref(false);
-const throttledTableData = ref([]);
-const autoRefreshTimer = ref(null);
-
-// 支持的币对
-const symbols = ['BTCUSDT', 'ETHUSDT'];
 
 // 深度选项配置
 const depthOptions = [
-  { label: '万1(0.01%)', value: '0.01' },
-  { label: '万5(0.05%)', value: '0.05' },
-  { label: '微观(0.1%)', value: '0.1' },
-  { label: '紧密(0.5%)', value: '0.5' },
-  { label: '核心(1%)', value: '1' },
-  { label: '巨额(2%)', value: '2' },
-  { label: '大额(5%)', value: '5' },
-  { label: '极限(10%)', value: '10' }
+  { label: '万1(0.01%)', value: 0.0001 },
+  { label: '万5(0.05%)', value: 0.0005 },
+  { label: '微观(0.1%)', value: 0.001 },
+  { label: '紧密(0.5%)', value: 0.005 },
+  { label: '核心(1%)', value: 0.01 },
+  { label: '巨额(2%)', value: 0.02 },
+  { label: '大额(5%)', value: 0.05 },
+  { label: '极限(10%)', value: 0.1 }
 ];
 
-// 计算当前深度标签
-const currentDepthLabel = computed(() => {
-  const option = depthOptions.find(opt => opt.value === depthPercentage.value);
-  return option ? option.label : '核心(1%)';
-});
+// 交易对列表
+const symbols = ['BTCUSDT', 'ETHUSDT'];
 
-// 计算深度比较数据
+// 计算多币对深度对比数据 - 直接使用store数据，无节流
 const multiSymbolDepthComparisonData = computed(() => {
-  const percentage = parseFloat(depthPercentage.value) / 100;
-  const isBuySide = orderSide.value === 'buy';
-  
   return symbols.map(symbol => {
     const binanceData = binanceStore.getDepthDataBySymbol(symbol);
     const toobitData = toobitStore.getDepthDataBySymbol(symbol);
     
-    if (!binanceData || !toobitData) {
-      return {
-        symbol,
-        binanceValue: 0,
-        toobitValue: 0,
-        score: 0
-      };
+    let binanceValue = 0;
+    let toobitValue = 0;
+    
+    if (binanceData && binanceData.bestBid && binanceData.bestAsk) {
+      if (orderSide.value === 'buy') {
+        binanceValue = calculateBuyDepth(binanceData.bids, binanceData.bestBid, depthPercentage.value);
+      } else {
+        binanceValue = calculateSellDepth(binanceData.asks, binanceData.bestAsk, depthPercentage.value);
+      }
     }
-
-    let binanceValue, toobitValue;
-
-    if (isBuySide) {
-      binanceValue = calculateBuyDepth(binanceData.bids, binanceData.bestBid, percentage);
-      toobitValue = calculateBuyDepth(toobitData.bids, toobitData.bestBid, percentage);
-    } else {
-      binanceValue = calculateSellDepth(binanceData.asks, binanceData.bestAsk, percentage);
-      toobitValue = calculateSellDepth(toobitData.asks, toobitData.bestAsk, percentage);
+    
+    if (toobitData && toobitData.bestBid && toobitData.bestAsk) {
+      if (orderSide.value === 'buy') {
+        toobitValue = calculateBuyDepth(toobitData.bids, toobitData.bestBid, depthPercentage.value);
+      } else {
+        toobitValue = calculateSellDepth(toobitData.asks, toobitData.bestAsk, depthPercentage.value);
+      }
     }
-
-    const diff = toobitValue - binanceValue;
-    const score = diff > 0 ? 1 : (diff < 0 ? -1 : 0);
-
+    
+    // 计算分数
+    let score = 0;
+    if (toobitValue > binanceValue) score = 1;
+    else if (toobitValue < binanceValue) score = -1;
+    
     return {
       symbol,
       binanceValue,
@@ -288,6 +188,9 @@ const multiSymbolDepthComparisonData = computed(() => {
     };
   });
 });
+
+// 表格数据 - 直接使用计算属性，无节流
+const tableData = computed(() => multiSymbolDepthComparisonData.value);
 
 // 计算买盘深度
 const calculateBuyDepth = (bids, bestBid, percentage) => {
@@ -309,65 +212,10 @@ const calculateSellDepth = (asks, bestAsk, percentage) => {
     .reduce((sum, ask) => sum + ask.quantity, 0);
 };
 
-// 节流更新函数
-const throttledUpdate = () => {
-  // 如果已经有待处理的更新，直接返回
-  if (pendingUpdate.value) return;
-  
-  pendingUpdate.value = true;
-  
-  // 清除之前的定时器
-  if (updateTimer.value) {
-    clearTimeout(updateTimer.value);
-  }
-  
-  // 使用requestAnimationFrame确保在下一个渲染帧更新
-  updateTimer.value = setTimeout(() => {
-    requestAnimationFrame(() => {
-      const data = multiSymbolDepthComparisonData.value;
-      throttledTableData.value = data.map(item => ({
-        symbol: item.symbol,
-        binanceValue: item.binanceValue,
-        toobitValue: item.toobitValue,
-        score: item.score
-      }));
-      lastUpdateTime.value = new Date().toLocaleTimeString();
-      pendingUpdate.value = false;
-      updateTimer.value = null;
-    });
-  }, 1000);
-};
-
-// 自动刷新函数
-const startAutoRefresh = () => {
-  // 每1秒自动刷新一次数据
-  autoRefreshTimer.value = setInterval(() => {
-    const data = multiSymbolDepthComparisonData.value;
-    throttledTableData.value = data.map(item => ({
-      symbol: item.symbol,
-      binanceValue: item.binanceValue,
-      toobitValue: item.toobitValue,
-      score: item.score
-    }));
-    lastUpdateTime.value = new Date().toLocaleTimeString();
-  }, 1000);
-};
-
 // 跳转到币对详情页面
 const goToSymbolDetail = symbol => {
   router.push(`/symbol/${symbol}`);
 };
-
-// 停止自动刷新
-const stopAutoRefresh = () => {
-  if (autoRefreshTimer.value) {
-    clearInterval(autoRefreshTimer.value);
-    autoRefreshTimer.value = null;
-  }
-};
-
-// 表格数据（节流后的数据）
-const tableData = computed(() => throttledTableData.value);
 
 // 更新资产类型
 const updateAssetType = type => {
@@ -378,481 +226,422 @@ const updateAssetType = type => {
 // 更新深度百分比
 const updateDepthPercentage = percentage => {
   depthPercentage.value = percentage;
-  // 深度百分比不需要重新连接WebSocket
 };
 
 // 更新订单方向
 const updateOrderSide = side => {
   orderSide.value = side;
-  // 订单方向不需要重新连接WebSocket
 };
 
-// 刷新数据
-const refreshData = async() => {
-  isRefreshing.value = true;
+// 格式化数值显示
+const formatValue = value => {
+  if (value >= 1000000) {
+    return (value / 1000000).toFixed(1) + 'M';
+  } else if (value >= 1000) {
+    return (value / 1000).toFixed(1) + 'K';
+  } else {
+    return value.toFixed(1);
+  }
+};
+
+// 获取分数样式类
+const getScoreClass = score => {
+  if (score > 0) return 'positive';
+  if (score < 0) return 'negative';
+  return 'neutral';
+};
+
+// 生命周期
+onMounted(async() => {
   try {
     await Promise.all([
-      binanceStore.reconnectWebSockets(),
-      toobitStore.reconnectWebSockets()
+      binanceStore.connectWebSockets(),
+      toobitStore.connectWebSockets()
     ]);
-    
-    // 立即更新数据，不等待节流
-    const data = multiSymbolDepthComparisonData.value;
-    throttledTableData.value = data.map(item => ({
-      symbol: item.symbol,
-      binanceValue: item.binanceValue,
-      toobitValue: item.toobitValue,
-      score: item.score
-    }));
-    lastUpdateTime.value = new Date().toLocaleTimeString();
-    
-    // 重置节流状态
-    if (updateTimer.value) {
-      clearTimeout(updateTimer.value);
-      updateTimer.value = null;
-    }
-    pendingUpdate.value = false;
   } catch (error) {
-    console.error('刷新数据失败:', error);
-  } finally {
-    isRefreshing.value = false;
+    console.error('WebSocket连接失败:', error);
   }
-};
-
-// 获取深度值
-const getDepthValue = (symbol, exchange) => {
-  const comparisonData = multiSymbolDepthComparisonData.value;
-  const symbolData = comparisonData.find(item => item.symbol === symbol);
-  
-  if (!symbolData) return 0;
-  
-  if (exchange === 'binance') {
-    return symbolData.binanceValue;
-  } else if (exchange === 'toobit') {
-    return symbolData.toobitValue;
-  }
-  
-  return 0;
-};
-
-// 获取分数
-const getScore = symbol => {
-  const comparisonData = multiSymbolDepthComparisonData.value;
-  const symbolData = comparisonData.find(item => item.symbol === symbol);
-  
-  if (!symbolData) return '0';
-  
-  const score = symbolData.score;
-  if (score > 0) return '+1';
-  if (score < 0) return '-1';
-  return '0';
-};
-
-// 获取分数文本
-const getScoreText = score => {
-  if (score > 0) return '+1';
-  if (score < 0) return '-1';
-  return '0';
-};
-
-// 获取值标签类型
-const getValueTagType = (value, otherValue) => {
-  if (value > otherValue) return 'success';
-  if (value < otherValue) return 'danger';
-  return 'warning';
-};
-
-// 获取分数标签类型
-const getScoreTagType = score => {
-  if (score > 0) return 'success';
-  if (score < 0) return 'danger';
-  return 'info';
-};
-
-// 获取单元格样式
-const getCellStyle = ({ row, column, rowIndex, columnIndex }) => {
-  if (columnIndex === 0) {
-    return { backgroundColor: '#f5f7fa', fontWeight: 'bold' };
-  }
-  return {};
-};
-
-// 获取表头样式
-const getHeaderCellStyle = () => {
-  return { 
-    backgroundColor: '#f5f7fa', 
-    color: '#303133', 
-    fontWeight: 'bold',
-    textAlign: 'center'
-  };
-};
-
-// 格式化数量
-const formatQuantity = quantity => {
-  if (!quantity || quantity === 0) return '--';
-  
-  if (quantity >= 1000000) {
-    return `${(quantity / 1000000).toFixed(1)}M`;
-  } else if (quantity >= 1000) {
-    return `${(quantity / 1000).toFixed(1)}K`;
-  } else {
-    return quantity.toFixed(1);
-  }
-};
-
-// 获取连接状态
-const getConnectionStatus = exchange => {
-  if (exchange === 'binance') {
-    const statuses = symbols.map(symbol => 
-      binanceStore.getConnectionStatus(symbol)
-    );
-    
-    if (statuses.every(status => status === 'connected')) return 'connected';
-    if (statuses.some(status => status === 'connecting')) return 'connecting';
-    if (statuses.some(status => status === 'error')) return 'error';
-    return 'disconnected';
-  } else if (exchange === 'toobit') {
-    const statuses = symbols.map(symbol => 
-      toobitStore.getConnectionStatus(symbol)
-    );
-    
-    if (statuses.every(status => status === 'connected')) return 'connected';
-    if (statuses.some(status => status === 'connecting')) return 'connecting';
-    if (statuses.some(status => status === 'error')) return 'error';
-    return 'disconnected';
-  }
-  
-  return 'disconnected';
-};
-
-// 获取连接状态文本
-const getConnectionStatusText = exchange => {
-  const status = getConnectionStatus(exchange);
-  const statusMap = {
-    connected: '已连接',
-    connecting: '连接中',
-    error: '错误',
-    disconnected: '未连接'
-  };
-  return statusMap[status] || '未知';
-};
-
-// 获取状态颜色
-const getStatusColor = exchange => {
-  const status = getConnectionStatus(exchange);
-  const colorMap = {
-    connected: '#67C23A',
-    connecting: '#E6A23C',
-    error: '#F56C6C',
-    disconnected: '#909399'
-  };
-  return colorMap[status] || '#909399';
-};
-
-// 获取状态样式
-const getStatusStyle = exchange => {
-  const color = getStatusColor(exchange);
-  return {
-    color: color,
-    fontSize: '14px',
-    fontWeight: 'bold'
-  };
-};
-
-// 获取状态图标
-const getStatusIcon = exchange => {
-  const status = getConnectionStatus(exchange);
-  const iconMap = {
-    connected: CircleCheckIcon,
-    connecting: ConnectionIcon,
-    error: CircleCloseIcon,
-    disconnected: WarningIcon
-  };
-  return iconMap[status] || WarningIcon;
-};
-
-// 监听配置变化
-watch([assetType, depthPercentage, orderSide], () => {
-  // 配置变化时立即更新数据
-  const data = multiSymbolDepthComparisonData.value;
-  throttledTableData.value = data.map(item => ({
-    symbol: item.symbol,
-    binanceValue: item.binanceValue,
-    toobitValue: item.toobitValue,
-    score: item.score
-  }));
-  lastUpdateTime.value = new Date().toLocaleTimeString();
-  
-  // 重置节流状态
-  if (updateTimer.value) {
-    clearTimeout(updateTimer.value);
-    updateTimer.value = null;
-  }
-  pendingUpdate.value = false;
-}, { deep: true });
-
-// 组件挂载时连接WebSocket
-onMounted(async() => {
-  binanceStore.updateConfig({
-    exchangeType: assetType.value,
-    depthLevels: 250
-  });
-  
-  await Promise.all([
-    binanceStore.connectWebSockets(),
-    toobitStore.connectWebSockets()
-  ]);
-  
-  // 初始化表格数据
-  const data = multiSymbolDepthComparisonData.value;
-  throttledTableData.value = data.map(item => ({
-    symbol: item.symbol,
-    binanceValue: item.binanceValue,
-    toobitValue: item.toobitValue,
-    score: item.score
-  }));
-  lastUpdateTime.value = new Date().toLocaleTimeString();
-  
-  // 启动自动刷新
-  startAutoRefresh();
 });
 
-// 组件卸载时断开连接
 onUnmounted(() => {
-  // 停止自动刷新
-  stopAutoRefresh();
-  
-  // 清理定时器
-  if (updateTimer.value) {
-    clearTimeout(updateTimer.value);
-    updateTimer.value = null;
-  }
-  
-  // 断开WebSocket连接
   binanceStore.disconnectAll();
   toobitStore.disconnectAll();
 });
 </script>
 
 <style scoped>
-.depth-comparison-container {
-  padding: 20px;
+/* 简约现代化样式 */
+.minimal-container {
   max-width: 1200px;
   margin: 0 auto;
-  background: var(--el-bg-color-page);
+  padding: 24px;
+  background: #fafafa;
   min-height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
-/* 卡片样式 */
-.filter-card,
-.table-card,
-.status-card {
-  margin-bottom: 20px;
-  border-radius: 8px;
-}
-
-.card-header {
+/* 控制面板 */
+.controls {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  gap: 32px;
+  margin-bottom: 32px;
+  padding: 24px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  border: 1px solid #e5e7eb;
 }
 
-.card-title {
-  font-size: 16px;
-  font-weight: bold;
-  color: var(--el-text-color-primary);
+.control-group {
+  flex: 1;
 }
 
-.header-actions {
-  display: flex;
-  gap: 10px;
-}
-
-/* 单选按钮组样式 */
-.filter-group,
-.depth-group,
-.side-group {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.depth-group {
-  flex-wrap: wrap;
-}
-
-.depth-group .el-radio-button {
+.control-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
   margin-bottom: 8px;
 }
 
-/* 表格样式 */
-.comparison-table {
-  width: 100%;
+.toggle-group {
+  display: flex;
+  background: #f3f4f6;
+  border-radius: 8px;
+  padding: 2px;
 }
 
-.comparison-table :deep(.el-table__header) {
-  background-color: var(--el-fill-color-light);
+.toggle-btn {
+  flex: 1;
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  color: #6b7280;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-.comparison-table :deep(.el-table__header th) {
-  background-color: var(--el-fill-color-light);
-  color: var(--el-text-color-primary);
-  font-weight: bold;
+.toggle-btn:hover {
+  color: #374151;
+}
+
+.toggle-btn.active {
+  background: white;
+  color: #111827;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.depth-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.depth-btn {
+  padding: 6px 12px;
+  border: 1px solid #d1d5db;
+  background: white;
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.depth-btn:hover {
+  border-color: #9ca3af;
+  color: #374151;
+}
+
+.depth-btn.active {
+  background: #111827;
+  color: white;
+  border-color: #111827;
+}
+
+/* 数据表格 */
+.data-table {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+
+.table-header {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.header-cell {
+  padding: 16px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
   text-align: center;
 }
 
-.comparison-table :deep(.el-table__body tr:hover > td) {
-  background-color: var(--el-fill-color-lighter);
+.table-body {
+  background: white;
 }
 
-/* 标签样式 */
-.el-tag {
-  font-weight: 500;
+.table-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  border-bottom: 1px solid #f3f4f6;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
 }
 
-/* 状态项样式 */
+.table-row:hover {
+  background: #f9fafb;
+}
+
+.table-row:last-child {
+  border-bottom: none;
+}
+
+.table-cell {
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.table-cell.asset {
+  justify-content: flex-start;
+}
+
+.asset-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 2px;
+}
+
+.asset-type {
+  font-size: 12px;
+  color: #6b7280;
+  background: #f3f4f6;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.value-text {
+  font-size: 16px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 6px;
+}
+
+.value-text.binance {
+  color: #dc2626;
+  background: #fef2f2;
+}
+
+.value-text.toobit {
+  color: #059669;
+  background: #f0fdf4;
+}
+
+.score {
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  min-width: 40px;
+  text-align: center;
+}
+
+.score.positive {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.score.negative {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.score.neutral {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+/* 状态栏 */
+.status-bar {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  padding: 16px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  border: 1px solid #e5e7eb;
+}
+
 .status-item {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 15px;
-  border-radius: 8px;
-  background: var(--el-fill-color-lighter);
-  transition: all 0.3s ease;
-}
-
-.status-item:hover {
-  background: var(--el-fill-color-light);
-  transform: translateY(-2px);
-}
-
-.status-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.status-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-}
-
-.status-title {
-  color: var(--el-text-color-regular);
+  gap: 8px;
   font-size: 14px;
-  font-weight: 500;
+  color: #6b7280;
 }
 
-.status-value {
-  font-size: 16px;
-  font-weight: bold;
-  text-align: center;
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+}
+
+.status-dot.binance {
+  background: #3b82f6;
+}
+
+.status-dot.toobit {
+  background: #8b5cf6;
+}
+
+/* 暗色模式 */
+@media (prefers-color-scheme: dark) {
+  .minimal-container {
+    background: #111827;
+  }
+  
+  .controls,
+  .data-table,
+  .status-bar {
+    background: #1f2937;
+    border-color: #374151;
+  }
+  
+  .control-label {
+    color: #d1d5db;
+  }
+  
+  .toggle-group {
+    background: #374151;
+  }
+  
+  .toggle-btn {
+    color: #9ca3af;
+  }
+  
+  .toggle-btn:hover {
+    color: #d1d5db;
+  }
+  
+  .toggle-btn.active {
+    background: #111827;
+    color: #f9fafb;
+  }
+  
+  .depth-btn {
+    background: #1f2937;
+    color: #9ca3af;
+    border-color: #374151;
+  }
+  
+  .depth-btn:hover {
+    border-color: #6b7280;
+    color: #d1d5db;
+  }
+  
+  .depth-btn.active {
+    background: #111827;
+    color: #f9fafb;
+    border-color: #111827;
+  }
+  
+  .table-header {
+    background: #111827;
+    border-bottom-color: #374151;
+  }
+  
+  .header-cell {
+    color: #d1d5db;
+  }
+  
+  .table-row {
+    border-bottom-color: #374151;
+  }
+  
+  .table-row:hover {
+    background: #111827;
+  }
+  
+  .asset-name {
+    color: #f9fafb;
+  }
+  
+  .asset-type {
+    background: #374151;
+    color: #9ca3af;
+  }
+  
+  .value-text.binance {
+    background: #7f1d1d;
+    color: #fca5a5;
+  }
+  
+  .value-text.toobit {
+    background: #14532d;
+    color: #86efac;
+  }
+  
+  .score.positive {
+    background: #14532d;
+    color: #86efac;
+  }
+  
+  .score.negative {
+    background: #7f1d1d;
+    color: #fca5a5;
+  }
+  
+  .score.neutral {
+    background: #374151;
+    color: #9ca3af;
+  }
+  
+  .status-item {
+    color: #9ca3af;
+  }
 }
 
 /* 响应式设计 */
 @media (max-width: 768px) {
-  .depth-comparison-container {
-    padding: 10px;
+  .minimal-container {
+    padding: 16px;
   }
   
-  .filter-group,
-  .depth-group,
-  .side-group {
+  .controls {
     flex-direction: column;
+    gap: 20px;
   }
   
-  .depth-group .el-radio-button {
-    width: 100%;
+  .table-header,
+  .table-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
   }
   
-  .comparison-table {
-    font-size: 12px;
+  .header-cell,
+  .table-cell {
+    text-align: left;
+    padding: 12px 16px;
   }
   
-  .card-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
+  .depth-selector {
+    justify-content: flex-start;
   }
-  
-  .header-actions {
-    width: 100%;
-    justify-content: flex-end;
-  }
-}
-
-@media (max-width: 480px) {
-  .depth-comparison-container {
-    padding: 5px;
-  }
-  
-  .filter-card,
-  .table-card,
-  .status-card {
-    margin-bottom: 15px;
-  }
-  
-  .comparison-table :deep(.el-table__cell) {
-    padding: 8px 4px;
-  }
-}
-
-/* 暗色主题适配 */
-html.dark .depth-comparison-container {
-  background: var(--el-bg-color-page);
-}
-
-html.dark .comparison-table :deep(.el-table__header) {
-  background-color: var(--el-fill-color-darker);
-}
-
-html.dark .comparison-table :deep(.el-table__header th) {
-  background-color: var(--el-fill-color-darker);
-  color: var(--el-text-color-primary);
-}
-
-html.dark .comparison-table :deep(.el-table__body tr:hover > td) {
-  background-color: var(--el-fill-color-dark);
-}
-
-/* 动画效果 */
-.filter-card,
-.table-card,
-.status-card {
-  transition: all 0.3s ease;
-}
-
-.filter-card:hover,
-.table-card:hover,
-.status-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--el-box-shadow-light);
-}
-
-/* 加载状态 */
-.el-button.is-loading {
-  pointer-events: none;
-}
-
-/* 自定义滚动条 */
-.comparison-table :deep(.el-table__body-wrapper)::-webkit-scrollbar {
-  height: 8px;
-}
-
-.comparison-table :deep(.el-table__body-wrapper)::-webkit-scrollbar-track {
-  background: var(--el-fill-color-lighter);
-  border-radius: 4px;
-}
-
-.comparison-table :deep(.el-table__body-wrapper)::-webkit-scrollbar-thumb {
-  background: var(--el-fill-color-dark);
-  border-radius: 4px;
-}
-
-.comparison-table :deep(.el-table__body-wrapper)::-webkit-scrollbar-thumb:hover {
-  background: var(--el-fill-color-darker);
 }
 </style>

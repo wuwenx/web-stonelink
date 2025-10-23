@@ -134,14 +134,13 @@ import {
 } from '@element-plus/icons-vue';
 import { onMounted, onUnmounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { useBinanceStore, useBitunixStore, useOKXStore, useToobitStore } from '../stores/index.js';
+import { useBinanceStore, useOKXStore, useToobitStore } from '../stores/index.js';
 
 const route = useRoute();
 const router = useRouter();
 const binanceStore = useBinanceStore();
 const okxStore = useOKXStore();
 const toobitStore = useToobitStore();
-const bitunixStore = useBitunixStore();
 
 // 响应式数据
 const symbol = ref('');
@@ -163,7 +162,7 @@ const depthLevels = [
 ];
 
 // 支持的交易所
-const exchanges = ['Binance', 'OKX', 'Bitunix', 'Toobit'];
+const exchanges = ['Binance', 'OKX', 'Toobit'];
 
 // 计算价差和价差比例
 const calculateSpread = (exchange, symbol) => {
@@ -178,9 +177,6 @@ const calculateSpread = (exchange, symbol) => {
     break;
   case 'toobit':
     data = toobitStore.getDepthDataBySymbol(symbol);
-    break;
-  case 'bitunix':
-    data = bitunixStore.getDepthDataBySymbol(symbol);
     break;
   default:
     return { spread: 0, spreadPercent: 0 };
@@ -209,9 +205,6 @@ const calculateLiquidity = (exchange, symbol, percentage) => {
     break;
   case 'toobit':
     data = toobitStore.getDepthDataBySymbol(symbol);
-    break;
-  case 'bitunix':
-    data = bitunixStore.getDepthDataBySymbol(symbol);
     break;
   default:
     return 0;
@@ -295,8 +288,7 @@ const refreshData = async() => {
     await Promise.all([
       binanceStore.reconnectWebSockets(),
       okxStore.reconnectWebSockets(),
-      toobitStore.reconnectWebSockets(),
-      bitunixStore.reconnectWebSockets()
+      toobitStore.reconnectWebSockets()
     ]);
     updateTableData();
   } catch (error) {
@@ -316,7 +308,6 @@ const getExchangeTagType = exchange => {
   const typeMap = {
     'Binance': 'success',
     'OKX': 'warning',
-    'Bitunix': 'info',
     'Toobit': 'primary'
   };
   return typeMap[exchange] || 'info';
@@ -385,9 +376,6 @@ const getConnectionStatus = exchange => {
   case 'toobit':
     store = toobitStore;
     break;
-  case 'bitunix':
-    store = bitunixStore;
-    break;
   default:
     return 'disconnected';
   }
@@ -449,8 +437,7 @@ onMounted(async() => {
   await Promise.all([
     binanceStore.connectWebSockets(),
     okxStore.connectWebSockets(),
-    toobitStore.connectWebSockets(),
-    bitunixStore.connectWebSockets()
+    toobitStore.connectWebSockets()
   ]);
   
   // 初始化数据
@@ -466,7 +453,6 @@ onMounted(async() => {
     binanceStore.disconnectAll();
     okxStore.disconnectAll();
     toobitStore.disconnectAll();
-    bitunixStore.disconnectAll();
   });
 });
 </script>
