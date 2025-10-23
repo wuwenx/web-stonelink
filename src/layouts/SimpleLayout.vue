@@ -20,25 +20,30 @@
               <router-link to="/depth" class="text-gray-500 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200">
                 深度对比
               </router-link>
-              <router-link to="/order-book" class="text-gray-500 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200">
-                盘口展示
+              <router-link to="/depth-aggregator" class="text-gray-500 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200">
+                深度聚合器
+              </router-link>
+              <router-link to="/multi-symbol" class="text-gray-500 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200">
+                多币对示例
               </router-link>
             </nav>
 
             <!-- WebSocket连接状态 -->
             <div class="flex items-center space-x-2">
-              <div class="text-xs text-gray-500 dark:text-gray-400">连接状态:</div>
+              <div class="text-xs text-gray-500 dark:text-gray-400">
+                连接状态:
+              </div>
               <div class="flex items-center space-x-1">
                 <div class="flex items-center space-x-1">
-                  <div :class="getStatusClass(depthStore.getConnectionStatus('binance'))" class="w-2 h-2 rounded-full" />
+                  <div :class="getStatusClass(depthStore.getExchangeConnectionStatus('binance'))" class="w-2 h-2 rounded-full" />
                   <span class="text-xs text-gray-600 dark:text-gray-300">币安</span>
                 </div>
                 <div class="flex items-center space-x-1">
-                  <div :class="getStatusClass(depthStore.getConnectionStatus('okx'))" class="w-2 h-2 rounded-full" />
+                  <div :class="getStatusClass(depthStore.getExchangeConnectionStatus('okx'))" class="w-2 h-2 rounded-full" />
                   <span class="text-xs text-gray-600 dark:text-gray-300">OKX</span>
                 </div>
                 <div class="flex items-center space-x-1">
-                  <div :class="getStatusClass(depthStore.getConnectionStatus('toobit'))" class="w-2 h-2 rounded-full" />
+                  <div :class="getStatusClass(depthStore.getExchangeConnectionStatus('toobit'))" class="w-2 h-2 rounded-full" />
                   <span class="text-xs text-gray-600 dark:text-gray-300">Toobit</span>
                 </div>
               </div>

@@ -3,10 +3,10 @@
     <!-- 页面标题 -->
     <div class="text-center mb-8 bg-gradient-to-r from-primary-500 to-purple-600 text-white p-8 rounded-lg shadow-lg">
       <h1 class="text-4xl font-light mb-2">
-        深度聚合 - 实时对比
+        深度聚合器 - 多币对实时对比
       </h1>
       <p class="text-lg opacity-90">
-        实时展示交易所深度数据对比
+        支持多币对订阅的交易所深度数据对比
       </p>
     </div>
 
@@ -71,6 +71,31 @@
           <el-option label="200档" :value="200" />
           <el-option label="250档" :value="250" />
         </el-select>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <label class="font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">订阅币对：</label>
+        <el-select
+          v-model="selectedSymbol"
+          placeholder="请选择交易对"
+          size="default"
+          class="min-w-32"
+          @change="onSymbolChange"
+        >
+          <el-option 
+            v-for="symbol in subscribedSymbols" 
+            :key="symbol" 
+            :label="symbol" 
+            :value="symbol" 
+          />
+        </el-select>
+        <el-button 
+          type="primary" 
+          size="small" 
+          @click="showSymbolManager = true"
+        >
+          管理币对
+        </el-button>
       </div>
 
       <div class="flex gap-8">
@@ -495,16 +520,92 @@
         <span class="font-mono font-semibold text-gray-800 dark:text-gray-200">{{ formatPrice(priceDifference) }}</span>
       </div>
     </div>
+
+    <!-- 币对管理对话框 -->
+    <el-dialog
+      v-model="showSymbolManager"
+      title="管理订阅币对"
+      width="500px"
+      :before-close="() => showSymbolManager = false"
+    >
+      <div class="space-y-4">
+        <!-- 添加新币对 -->
+        <div class="flex gap-2">
+          <el-input
+            v-model="newSymbol"
+            placeholder="输入币对名称，如：BTCUSDT"
+            @keyup.enter="addSymbol"
+          />
+          <el-button type="primary" @click="addSymbol">
+            添加
+          </el-button>
+        </div>
+
+        <!-- 已订阅币对列表 -->
+        <div>
+          <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+            已订阅币对 ({{ subscribedSymbols.length }})
+          </h4>
+          <div class="space-y-2">
+            <div 
+              v-for="symbol in subscribedSymbols" 
+              :key="symbol"
+              class="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"
+            >
+              <span class="font-mono text-sm">{{ symbol }}</span>
+              <div class="flex items-center gap-2">
+                <!-- 连接状态 -->
+                <div class="flex items-center gap-1">
+                  <div 
+                    :class="getStatusClass(depthStore.getConnectionStatus('binance', symbol))" 
+                    class="w-2 h-2 rounded-full" 
+                  />
+                  <div 
+                    :class="getStatusClass(depthStore.getConnectionStatus('okx', symbol))" 
+                    class="w-2 h-2 rounded-full" 
+                  />
+                  <div 
+                    :class="getStatusClass(depthStore.getConnectionStatus('toobit', symbol))" 
+                    class="w-2 h-2 rounded-full" 
+                  />
+                </div>
+                <!-- 删除按钮 -->
+                <el-button 
+                  v-if="subscribedSymbols.length > 1"
+                  type="danger" 
+                  size="small" 
+                  @click="removeSymbol(symbol)"
+                >
+                  删除
+                </el-button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 说明 -->
+        <div class="text-xs text-gray-500 dark:text-gray-400">
+          <p>• 添加币对后会自动连接所有交易所</p>
+          <p>• 至少需要保留一个币对</p>
+          <p>• 连接状态：绿色=已连接，黄色=连接中，红色=未连接</p>
+        </div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { DepthDataProcessor } from '../services/WebSocketService.js';
 import { useDepthStore } from '../stores/depth.js';
 
 // 使用深度store
 const depthStore = useDepthStore();
+
+// 多币对管理
+const showSymbolManager = ref(false);
+const newSymbol = ref('');
+const subscribedSymbols = computed(() => depthStore.subscribedSymbolsList);
 
 // 响应式数据 - 现在从store获取
 const selectedSymbol = computed({
@@ -532,15 +633,15 @@ const depthPercentage = computed({
   set: value => depthStore.updateConfig({ depthPercentage: value })
 });
 
-// 从store获取状态和数据
-const selectedExchangeStatus = computed(() => depthStore.getConnectionStatus(depthStore.config.selectedExchange));
-const toobitStatus = computed(() => depthStore.getConnectionStatus('toobit'));
-const selectedExchangeMarkPriceStatus = computed(() => depthStore.getConnectionStatus(depthStore.config.selectedExchange));
+// 从store获取状态和数据 - 支持多币对
+const selectedExchangeStatus = computed(() => depthStore.getConnectionStatus(depthStore.config.selectedExchange, depthStore.config.selectedSymbol));
+const toobitStatus = computed(() => depthStore.getConnectionStatus('toobit', depthStore.config.selectedSymbol));
+const selectedExchangeMarkPriceStatus = computed(() => depthStore.getConnectionStatus(depthStore.config.selectedExchange, depthStore.config.selectedSymbol));
 const isLoadingData = computed(() => depthStore.isLoading);
 
-// 从store获取深度数据
-const selectedExchangeDepthData = computed(() => depthStore.getDepthDataByExchange(depthStore.config.selectedExchange));
-const toobitDepthData = computed(() => depthStore.getDepthDataByExchange('toobit'));
+// 从store获取深度数据 - 支持多币对
+const selectedExchangeDepthData = computed(() => depthStore.getDepthDataByExchangeAndSymbol(depthStore.config.selectedExchange, depthStore.config.selectedSymbol));
+const toobitDepthData = computed(() => depthStore.getDepthDataByExchangeAndSymbol('toobit', depthStore.config.selectedSymbol));
 
 // 计算属性 - 从store数据中提取
 const selectedExchangeLastUpdate = computed(() => selectedExchangeDepthData.value.lastUpdate);
@@ -712,6 +813,24 @@ const onDepthLevelsChange = () => {
 
 const onDepthPercentageChange = () => {
   console.log('深度百分比变更:', depthPercentage.value);
+};
+
+// 多币对管理方法
+const addSymbol = () => {
+  if (newSymbol.value && !subscribedSymbols.value.includes(newSymbol.value)) {
+    depthStore.addSymbolSubscription(newSymbol.value);
+    newSymbol.value = '';
+  }
+};
+
+const removeSymbol = symbol => {
+  if (subscribedSymbols.value.length > 1) {
+    depthStore.removeSymbolSubscription(symbol);
+  }
+};
+
+const updateSubscribedSymbols = symbols => {
+  depthStore.updateSubscribedSymbols(symbols);
 };
 
 // 生命周期

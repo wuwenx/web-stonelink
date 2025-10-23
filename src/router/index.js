@@ -1,5 +1,4 @@
 import { createRouter, createWebHashHistory } from 'vue-router';
-import DepthAggregator from '../pages/DepthAggregator.vue';
 // import BaseLayout from '../layouts/BaseLayout.vue';
 import SimpleLayout from '../layouts/SimpleLayout.vue';
 // import AuthLayout from '../layouts/AuthLayout.vue'
@@ -19,15 +18,27 @@ const routes = [
       },
       {
         path: 'depth',
-        name: 'DepthAggregator',
-        component: DepthAggregator,
-        meta: { title: '深度聚合器' },
+        name: 'Depth',
+        component: () => import('../pages/Depth.vue'),
+        meta: { title: '深度对比' },
+      },
+      // {
+      //   path: 'depth-aggregator',
+      //   name: 'DepthAggregator',
+      //   component: () => import('../pages/OrderBook.vue'),
+      //   meta: { title: '深度聚合器' },
+      // },
+      {
+        path: 'multi-symbol',
+        name: 'MultiSymbolExample',
+        component: () => import('../views/MultiSymbolExample.vue'),
+        meta: { title: '多币对示例' },
       },
       {
-        path: 'order-book',
-        name: 'OrderBook',
-        component: () => import('../pages/OrderBook.vue'),
-        meta: { title: '盘口展示' },
+        path: 'symbol/:symbol',
+        name: 'SymbolDetail',
+        component: () => import('../pages/SymbolDetail.vue'),
+        meta: { title: '币对详情' },
       },
       // {
       //   path: 'analytics',

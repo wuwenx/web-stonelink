@@ -3,42 +3,22 @@ import { DepthDataProcessor, WebSocketService } from '../services/WebSocketServi
 
 export const useDepthStore = defineStore('depth', {
   state: () => ({
-    // 连接状态
+    // 连接状态 - 按交易所和币对分组
     connections: {
-      binance: 'disconnected',
-      okx: 'disconnected',
-      toobit: 'disconnected',
+      binance: {},
+      okx: {},
+      toobit: {},
     },
     
-    // 深度数据
+    // 深度数据 - 按交易所和币对分组
     depthData: {
-      binance: {
-        asks: [],
-        bids: [],
-        bestBid: 0,
-        bestAsk: 0,
-        lastUpdate: '--',
-        markPrice: 0,
-        indexPrice: 0,
-        fundingRate: 0,
-        nextFundingTime: 0,
-        markPriceLastUpdate: '--',
-      },
-      okx: {
-        asks: [],
-        bids: [],
-        bestBid: 0,
-        bestAsk: 0,
-        lastUpdate: '--',
-      },
-      toobit: {
-        asks: [],
-        bids: [],
-        bestBid: 0,
-        bestAsk: 0,
-        lastUpdate: '--',
-      },
+      binance: {},
+      okx: {},
+      toobit: {},
     },
+    
+    // 订阅的币对列表
+    subscribedSymbols: ['BTCUSDT', 'ETHUSDT'],
     
     // 配置
     config: {
@@ -47,6 +27,7 @@ export const useDepthStore = defineStore('depth', {
       exchangeType: 'futures',
       depthLevels: 250,
       depthPercentage: '0.01',
+      orderSide: 'buy', // 新增：订单方向 buy/sell
     },
     
     // 加载状态
@@ -57,43 +38,105 @@ export const useDepthStore = defineStore('depth', {
   }),
 
   getters: {
-    // 获取指定交易所的深度数据
-    getDepthDataByExchange: state => exchange => {
-      return state.depthData[exchange] || {
+    // 获取指定交易所和币对的深度数据
+    getDepthDataByExchangeAndSymbol: state => (exchange, symbol) => {
+      return state.depthData[exchange]?.[symbol] || {
         asks: [],
         bids: [],
         bestBid: 0,
         bestAsk: 0,
         lastUpdate: '--',
+        ...(exchange === 'binance' && {
+          markPrice: 0,
+          indexPrice: 0,
+          fundingRate: 0,
+          nextFundingTime: 0,
+          markPriceLastUpdate: '--',
+        }),
       };
     },
 
-    // 获取当前选择交易所的深度数据
-    currentExchangeDepthData: state => {
-      return state.depthData[state.config.selectedExchange];
+    // 获取指定交易所所有币对的深度数据
+    getDepthDataByExchange: state => exchange => {
+      return state.depthData[exchange] || {};
     },
 
-    // 获取所有交易所的深度数据
+    // 获取指定币对在所有交易所的深度数据
+    getDepthDataBySymbol: state => symbol => {
+      const result = {};
+      Object.keys(state.depthData).forEach(exchange => {
+        result[exchange] = state.depthData[exchange]?.[symbol] || {
+          asks: [],
+          bids: [],
+          bestBid: 0,
+          bestAsk: 0,
+          lastUpdate: '--',
+          ...(exchange === 'binance' && {
+            markPrice: 0,
+            indexPrice: 0,
+            fundingRate: 0,
+            nextFundingTime: 0,
+            markPriceLastUpdate: '--',
+          }),
+        };
+      });
+      return result;
+    },
+
+    // 获取当前选择交易所和币对的深度数据
+    currentExchangeDepthData: state => {
+      return state.depthData[state.config.selectedExchange]?.[state.config.selectedSymbol] || {
+        asks: [],
+        bids: [],
+        bestBid: 0,
+        bestAsk: 0,
+        lastUpdate: '--',
+        ...(state.config.selectedExchange === 'binance' && {
+          markPrice: 0,
+          indexPrice: 0,
+          fundingRate: 0,
+          nextFundingTime: 0,
+          markPriceLastUpdate: '--',
+        }),
+      };
+    },
+
+    // 获取所有深度数据
     allDepthData: state => state.depthData,
 
-    // 获取连接状态
-    getConnectionStatus: state => exchange => {
-      return state.connections[exchange] || 'disconnected';
+    // 获取指定交易所和币对的连接状态
+    getConnectionStatus: state => (exchange, symbol) => {
+      return state.connections[exchange]?.[symbol] || 'disconnected';
     },
 
-    // 获取当前选择交易所的连接状态
+    // 获取指定交易所的连接状态（所有币对）
+    getExchangeConnectionStatus: state => exchange => {
+      const exchangeConnections = state.connections[exchange] || {};
+      const statuses = Object.values(exchangeConnections);
+      if (statuses.length === 0) return 'disconnected';
+      if (statuses.every(status => status === 'connected')) return 'connected';
+      if (statuses.some(status => status === 'connecting')) return 'connecting';
+      if (statuses.some(status => status === 'error')) return 'error';
+      return 'disconnected';
+    },
+
+    // 获取当前选择交易所和币对的连接状态
     currentExchangeStatus: state => {
-      return state.connections[state.config.selectedExchange];
+      return state.connections[state.config.selectedExchange]?.[state.config.selectedSymbol] || 'disconnected';
     },
 
     // 获取所有连接状态
     allConnectionStatus: state => state.connections,
 
+    // 获取订阅的币对列表
+    subscribedSymbolsList: state => state.subscribedSymbols,
+
     // 计算价差
     priceDifference: state => {
       const currentExchange = state.config.selectedExchange;
-      const currentData = state.depthData[currentExchange];
-      const toobitData = state.depthData.toobit;
+      const currentSymbol = state.config.selectedSymbol;
+      const currentData = state.depthData[currentExchange]?.[currentSymbol];
+      const toobitData = state.depthData.toobit?.[currentSymbol];
       
       if (!currentData || !toobitData) return 0;
       return currentData.bestBid - toobitData.bestBid;
@@ -103,29 +146,87 @@ export const useDepthStore = defineStore('depth', {
     depthComparisonData: state => {
       const percentage = parseFloat(state.config.depthPercentage) / 100;
       const currentExchange = state.config.selectedExchange;
-      const currentData = state.depthData[currentExchange];
-      const toobitData = state.depthData.toobit;
+      const currentSymbol = state.config.selectedSymbol;
+      const currentData = state.depthData[currentExchange]?.[currentSymbol];
+      const toobitData = state.depthData.toobit?.[currentSymbol];
       
       if (!currentData || !toobitData) {
         return [{
-          symbol: state.config.selectedSymbol,
+          symbol: currentSymbol,
           selectedExchangeValue: 0,
           toobitValue: 0,
         }];
       }
 
+      const isBuySide = state.config.orderSide === 'buy';
+      let selectedExchangeValue, toobitValue;
+
+      if (isBuySide) {
+        // 买盘：从最优买入价开始，向下跌价指定百分比内的累积数量
+        selectedExchangeValue = calculateBuyDepth(currentData.bids, currentData.bestBid, percentage);
+        toobitValue = calculateBuyDepth(toobitData.bids, toobitData.bestBid, percentage);
+      } else {
+        // 卖盘：从最优卖出价开始，向上涨价指定百分比内的累积数量
+        selectedExchangeValue = calculateSellDepth(currentData.asks, currentData.bestAsk, percentage);
+        toobitValue = calculateSellDepth(toobitData.asks, toobitData.bestAsk, percentage);
+      }
+
       return [{
-        symbol: state.config.selectedSymbol,
-        selectedExchangeValue: calculateDepthValue(currentData.bids, currentData.bestBid, percentage),
-        toobitValue: calculateDepthValue(toobitData.bids, toobitData.bestBid, percentage),
+        symbol: currentSymbol,
+        selectedExchangeValue,
+        toobitValue,
       }];
+    },
+
+    // 多币对深度对比数据
+    multiSymbolDepthComparisonData: state => {
+      const percentage = parseFloat(state.config.depthPercentage) / 100;
+      const isBuySide = state.config.orderSide === 'buy';
+      
+      return state.subscribedSymbols.map(symbol => {
+        const binanceData = state.depthData.binance?.[symbol];
+        const toobitData = state.depthData.toobit?.[symbol];
+        
+        if (!binanceData || !toobitData) {
+          return {
+            symbol,
+            binanceValue: 0,
+            toobitValue: 0,
+            score: 0
+          };
+        }
+
+        let binanceValue, toobitValue;
+
+        if (isBuySide) {
+          // 买盘深度
+          binanceValue = calculateBuyDepth(binanceData.bids, binanceData.bestBid, percentage);
+          toobitValue = calculateBuyDepth(toobitData.bids, toobitData.bestBid, percentage);
+        } else {
+          // 卖盘深度
+          binanceValue = calculateSellDepth(binanceData.asks, binanceData.bestAsk, percentage);
+          toobitValue = calculateSellDepth(toobitData.asks, toobitData.bestAsk, percentage);
+        }
+
+        // 计算分数：toobit - binance，>0为1，<0为-1
+        const diff = toobitValue - binanceValue;
+        const score = diff > 0 ? 1 : (diff < 0 ? -1 : 0);
+
+        return {
+          symbol,
+          binanceValue,
+          toobitValue,
+          score
+        };
+      });
     },
 
     // 获取最佳价格对比
     bestPricesComparison: state => {
       const currentExchange = state.config.selectedExchange;
-      const currentData = state.depthData[currentExchange];
-      const toobitData = state.depthData.toobit;
+      const currentSymbol = state.config.selectedSymbol;
+      const currentData = state.depthData[currentExchange]?.[currentSymbol];
+      const toobitData = state.depthData.toobit?.[currentSymbol];
       
       return {
         currentExchange: {
@@ -141,21 +242,23 @@ export const useDepthStore = defineStore('depth', {
 
     // 获取标记价格信息（仅币安支持）
     markPriceInfo: state => {
-      const binanceData = state.depthData.binance;
+      const currentSymbol = state.config.selectedSymbol;
+      const binanceData = state.depthData.binance?.[currentSymbol];
       return {
-        markPrice: binanceData.markPrice,
-        indexPrice: binanceData.indexPrice,
-        fundingRate: binanceData.fundingRate,
-        nextFundingTime: binanceData.nextFundingTime,
-        lastUpdate: binanceData.markPriceLastUpdate,
+        markPrice: binanceData?.markPrice || 0,
+        indexPrice: binanceData?.indexPrice || 0,
+        fundingRate: binanceData?.fundingRate || 0,
+        nextFundingTime: binanceData?.nextFundingTime || 0,
+        lastUpdate: binanceData?.markPriceLastUpdate || '--',
       };
     },
 
     // 检查是否有数据
     hasData: state => {
       const currentExchange = state.config.selectedExchange;
-      const currentData = state.depthData[currentExchange];
-      const toobitData = state.depthData.toobit;
+      const currentSymbol = state.config.selectedSymbol;
+      const currentData = state.depthData[currentExchange]?.[currentSymbol];
+      const toobitData = state.depthData.toobit?.[currentSymbol];
       
       return (currentData?.bids?.length > 0 || currentData?.asks?.length > 0) &&
              (toobitData?.bids?.length > 0 || toobitData?.asks?.length > 0);
@@ -170,6 +273,29 @@ export const useDepthStore = defineStore('depth', {
     initializeWebSocketService() {
       if (!this.wsService) {
         this.wsService = new WebSocketService();
+      }
+    },
+
+    // 更新订阅的币对列表
+    updateSubscribedSymbols(symbols) {
+      this.subscribedSymbols = symbols;
+      this.reconnectWebSockets();
+    },
+
+    // 添加币对订阅
+    addSymbolSubscription(symbol) {
+      if (!this.subscribedSymbols.includes(symbol)) {
+        this.subscribedSymbols.push(symbol);
+        this.connectSymbolToAllExchanges(symbol);
+      }
+    },
+
+    // 移除币对订阅
+    removeSymbolSubscription(symbol) {
+      const index = this.subscribedSymbols.indexOf(symbol);
+      if (index > -1) {
+        this.subscribedSymbols.splice(index, 1);
+        this.disconnectSymbolFromAllExchanges(symbol);
       }
     },
 
@@ -192,18 +318,43 @@ export const useDepthStore = defineStore('depth', {
       return reconnectKeys.some(key => oldConfig[key] !== newConfig[key]);
     },
 
-    // 连接WebSocket
+    // 连接WebSocket - 支持多币对
     async connectWebSockets() {
       this.initializeWebSocketService();
       this.isLoading = true;
       
       try {
-        await this.connectSelectedExchange();
-        this.connectToobit();
+        // 为每个币对连接所有交易所
+        for (const symbol of this.subscribedSymbols) {
+          await this.connectSymbolToAllExchanges(symbol);
+        }
       } catch (error) {
         console.error('连接WebSocket失败:', error);
         this.isLoading = false;
       }
+    },
+
+    // 为指定币对连接所有交易所
+    async connectSymbolToAllExchanges(symbol) {
+      try {
+        await this.connectBinance(symbol, this.config.exchangeType, this.config.depthLevels);
+        this.connectOKX(symbol);
+        this.connectToobit(symbol);
+      } catch (error) {
+        console.error(`连接币对 ${symbol} 失败:`, error);
+      }
+    },
+
+    // 断开指定币对的所有连接
+    disconnectSymbolFromAllExchanges(symbol) {
+      Object.keys(this.connections).forEach(exchange => {
+        if (this.connections[exchange][symbol]) {
+          const connectionId = `${exchange}_${symbol}`;
+          this.wsService?.disconnect(connectionId);
+          delete this.connections[exchange][symbol];
+          delete this.depthData[exchange][symbol];
+        }
+      });
     },
 
     // 连接选择的交易所
@@ -222,10 +373,10 @@ export const useDepthStore = defineStore('depth', {
       if (exchangeType === 'futures') {
         await this.wsService.connectBinanceFuturesWithMarkPrice(
           symbol,
-          this.handleBinanceDepthData.bind(this),
-          this.handleBinanceMarkPriceData.bind(this),
+          data => this.handleBinanceDepthData(data, symbol),
+          data => this.handleBinanceMarkPriceData(data, symbol),
           status => {
-            this.connections.binance = status;
+            this.connections.binance[symbol] = status;
             if (status === 'connected') {
               setTimeout(() => {
                 this.isLoading = false;
@@ -237,9 +388,9 @@ export const useDepthStore = defineStore('depth', {
       } else {
         this.wsService.connectBinance(
           symbol,
-          this.handleBinanceDepthData.bind(this),
+          data => this.handleBinanceDepthData(data, symbol),
           status => {
-            this.connections.binance = status;
+            this.connections.binance[symbol] = status;
             if (status === 'connected') {
               setTimeout(() => {
                 this.isLoading = false;
@@ -254,9 +405,9 @@ export const useDepthStore = defineStore('depth', {
     connectOKX(symbol) {
       this.wsService.connectOKX(
         symbol,
-        this.handleOKXData.bind(this),
+        data => this.handleOKXData(data, symbol),
         status => {
-          this.connections.okx = status;
+          this.connections.okx[symbol] = status;
           if (status === 'connected') {
             setTimeout(() => {
               this.isLoading = false;
@@ -267,77 +418,130 @@ export const useDepthStore = defineStore('depth', {
     },
 
     // 连接Toobit
-    connectToobit() {
-      const { selectedSymbol } = this.config;
+    connectToobit(symbol) {
       this.wsService.connectToobit(
-        selectedSymbol,
-        this.handleToobitData.bind(this),
+        symbol,
+        data => this.handleToobitData(data, symbol),
         status => {
-          this.connections.toobit = status;
+          this.connections.toobit[symbol] = status;
         }
       );
     },
 
     // 处理币安深度数据
-    handleBinanceDepthData(data) {
+    handleBinanceDepthData(data, symbol) {
       if (data.e === 'depthUpdate' || (data.a && data.b)) {
         const processedAsks = DepthDataProcessor.processDepthData(data.a, 'asks', this.config.depthLevels);
         const processedBids = DepthDataProcessor.processDepthData(data.b, 'bids', this.config.depthLevels);
 
-        this.depthData.binance.asks = processedAsks;
-        this.depthData.binance.bids = processedBids;
+        // 初始化币对数据
+        if (!this.depthData.binance[symbol]) {
+          this.depthData.binance[symbol] = {
+            asks: [],
+            bids: [],
+            bestBid: 0,
+            bestAsk: 0,
+            lastUpdate: '--',
+            markPrice: 0,
+            indexPrice: 0,
+            fundingRate: 0,
+            nextFundingTime: 0,
+            markPriceLastUpdate: '--',
+          };
+        }
+
+        this.depthData.binance[symbol].asks = processedAsks;
+        this.depthData.binance[symbol].bids = processedBids;
 
         const bestPrices = DepthDataProcessor.calculateBestPrices(processedBids, processedAsks);
-        this.depthData.binance.bestBid = bestPrices.bestBid;
-        this.depthData.binance.bestAsk = bestPrices.bestAsk;
-        this.depthData.binance.lastUpdate = new Date().toLocaleTimeString();
+        this.depthData.binance[symbol].bestBid = bestPrices.bestBid;
+        this.depthData.binance[symbol].bestAsk = bestPrices.bestAsk;
+        this.depthData.binance[symbol].lastUpdate = new Date().toLocaleTimeString();
         
         this.isLoading = false;
       }
     },
 
     // 处理币安标记价格数据
-    handleBinanceMarkPriceData(data) {
+    handleBinanceMarkPriceData(data, symbol) {
       const processedData = DepthDataProcessor.processMarkPriceData(data);
       
-      this.depthData.binance.markPrice = processedData.markPrice;
-      this.depthData.binance.indexPrice = processedData.indexPrice;
-      this.depthData.binance.fundingRate = processedData.lastFundingRate;
-      this.depthData.binance.nextFundingTime = processedData.nextFundingTime;
-      this.depthData.binance.markPriceLastUpdate = new Date().toLocaleTimeString();
+      // 确保币对数据存在
+      if (!this.depthData.binance[symbol]) {
+        this.depthData.binance[symbol] = {
+          asks: [],
+          bids: [],
+          bestBid: 0,
+          bestAsk: 0,
+          lastUpdate: '--',
+          markPrice: 0,
+          indexPrice: 0,
+          fundingRate: 0,
+          nextFundingTime: 0,
+          markPriceLastUpdate: '--',
+        };
+      }
+      
+      this.depthData.binance[symbol].markPrice = processedData.markPrice;
+      this.depthData.binance[symbol].indexPrice = processedData.indexPrice;
+      this.depthData.binance[symbol].fundingRate = processedData.lastFundingRate;
+      this.depthData.binance[symbol].nextFundingTime = processedData.nextFundingTime;
+      this.depthData.binance[symbol].markPriceLastUpdate = new Date().toLocaleTimeString();
     },
 
     // 处理OKX数据
-    handleOKXData(data) {
+    handleOKXData(data, symbol) {
       if (data.a && data.b) {
         const processedAsks = DepthDataProcessor.processDepthData(data.a, 'asks', this.config.depthLevels);
         const processedBids = DepthDataProcessor.processDepthData(data.b, 'bids', this.config.depthLevels);
 
-        this.depthData.okx.asks = processedAsks;
-        this.depthData.okx.bids = processedBids;
+        // 初始化币对数据
+        if (!this.depthData.okx[symbol]) {
+          this.depthData.okx[symbol] = {
+            asks: [],
+            bids: [],
+            bestBid: 0,
+            bestAsk: 0,
+            lastUpdate: '--',
+          };
+        }
+
+        this.depthData.okx[symbol].asks = processedAsks;
+        this.depthData.okx[symbol].bids = processedBids;
 
         const bestPrices = DepthDataProcessor.calculateBestPrices(processedBids, processedAsks);
-        this.depthData.okx.bestBid = bestPrices.bestBid;
-        this.depthData.okx.bestAsk = bestPrices.bestAsk;
-        this.depthData.okx.lastUpdate = new Date().toLocaleTimeString();
+        this.depthData.okx[symbol].bestBid = bestPrices.bestBid;
+        this.depthData.okx[symbol].bestAsk = bestPrices.bestAsk;
+        this.depthData.okx[symbol].lastUpdate = new Date().toLocaleTimeString();
         
         this.isLoading = false;
       }
     },
 
     // 处理Toobit数据
-    handleToobitData(data) {
+    handleToobitData(data, symbol) {
       if (data.a && data.b) {
         const processedAsks = DepthDataProcessor.processDepthData(data.a, 'asks', this.config.depthLevels, '0.001');
         const processedBids = DepthDataProcessor.processDepthData(data.b, 'bids', this.config.depthLevels, '0.001');
 
-        this.depthData.toobit.asks = processedAsks;
-        this.depthData.toobit.bids = processedBids;
+        // 初始化币对数据
+        if (!this.depthData.toobit[symbol]) {
+          this.depthData.toobit[symbol] = {
+            asks: [],
+            bids: [],
+            bestBid: 0,
+            bestAsk: 0,
+            lastUpdate: '--',
+          };
+        }
+
+        this.depthData.toobit[symbol].asks = processedAsks;
+        this.depthData.toobit[symbol].bids = processedBids;
 
         const bestPrices = DepthDataProcessor.calculateBestPrices(processedBids, processedAsks);
-        this.depthData.toobit.bestBid = bestPrices.bestBid;
-        this.depthData.toobit.bestAsk = bestPrices.bestAsk;
-        this.depthData.toobit.lastUpdate = new Date().toLocaleTimeString();
+        this.depthData.toobit[symbol].bestBid = bestPrices.bestBid;
+        this.depthData.toobit[symbol].bestAsk = bestPrices.bestAsk;
+        this.depthData.toobit[symbol].lastUpdate = new Date().toLocaleTimeString();
       }
     },
 
@@ -363,25 +567,12 @@ export const useDepthStore = defineStore('depth', {
     clearAllData() {
       // 重置深度数据
       Object.keys(this.depthData).forEach(exchange => {
-        this.depthData[exchange] = {
-          asks: [],
-          bids: [],
-          bestBid: 0,
-          bestAsk: 0,
-          lastUpdate: '--',
-          ...(exchange === 'binance' && {
-            markPrice: 0,
-            indexPrice: 0,
-            fundingRate: 0,
-            nextFundingTime: 0,
-            markPriceLastUpdate: '--',
-          }),
-        };
+        this.depthData[exchange] = {};
       });
 
       // 重置连接状态
       Object.keys(this.connections).forEach(exchange => {
-        this.connections[exchange] = 'disconnected';
+        this.connections[exchange] = {};
       });
     },
 
@@ -400,18 +591,36 @@ export const useDepthStore = defineStore('depth', {
   },
 });
 
-// 辅助函数：计算深度值
-function calculateDepthValue(bids, bestBid, percentage) {
+// 辅助函数：计算买盘深度值
+function calculateBuyDepth(bids, bestBid, percentage) {
   if (!bids || bids.length === 0 || !bestBid || bestBid === 0) {
     return 0;
   }
  
-  const targetPrice = bestBid * (1 + percentage);
+  const targetPrice = bestBid * (1 - percentage); // 向下跌价
   let totalQuantity = 0;
   
   for (const bid of bids) {
-    if (bid.price <= targetPrice && bid.price >= bestBid) {
+    if (bid.price <= bestBid && bid.price >= targetPrice) {
       totalQuantity += bid.quantity;
+    }
+  }
+  
+  return totalQuantity;
+}
+
+// 辅助函数：计算卖盘深度值
+function calculateSellDepth(asks, bestAsk, percentage) {
+  if (!asks || asks.length === 0 || !bestAsk || bestAsk === 0) {
+    return 0;
+  }
+ 
+  const targetPrice = bestAsk * (1 + percentage); // 向上涨价
+  let totalQuantity = 0;
+  
+  for (const ask of asks) {
+    if (ask.price >= bestAsk && ask.price <= targetPrice) {
+      totalQuantity += ask.quantity;
     }
   }
   
