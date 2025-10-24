@@ -134,6 +134,69 @@
       </el-table>
     </el-card>
 
+    <!-- 价差详情对比 -->
+    <el-card class="spread-card" shadow="hover">
+      <template #header>
+        <div class="card-header">
+          <span class="card-title">价差详情对比</span>
+        </div>
+      </template>
+      
+      <el-table 
+        :data="spreadData" 
+        stripe 
+        border 
+        class="spread-table"
+        :cell-style="getCellStyle"
+        :header-cell-style="getHeaderCellStyle"
+      >
+        <el-table-column prop="symbol" label="资产" width="200" align="center">
+          <template #default="{ row }">
+            <el-button 
+              type="primary" 
+              size="small" 
+              @click="goToSymbolDetail(row.symbol)"
+            >
+              {{ row.symbol }} {{ assetType.toUpperCase() }}
+            </el-button>
+          </template>
+        </el-table-column>
+        
+        <el-table-column prop="binanceSpread" label="BINANCE" width="200" align="center">
+          <template #default="{ row }">
+            <el-tag 
+              :type="getSpreadTagType(row.binanceSpreadPercent)"
+              size="large"
+            >
+              {{ formatSpread(row.binanceSpreadPercent) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        
+        <el-table-column prop="toobitSpread" label="TOOBIT" width="200" align="center">
+          <template #default="{ row }">
+            <el-tag 
+              :type="getSpreadTagType(row.toobitSpreadPercent)"
+              size="large"
+            >
+              {{ formatSpread(row.toobitSpreadPercent) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        
+        <el-table-column prop="score" label="分数 ↑" width="100" align="center">
+          <template #default="{ row }">
+            <el-tag 
+              :type="getScoreTagType(row.score)"
+              size="large"
+            >
+              {{ row.score > 0 ? '+' : '' }}{{ row.score }}
+            </el-tag>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
     <!-- 连接状态 -->
     <el-card class="status-card" shadow="hover">
       <template #header>
@@ -254,6 +317,46 @@ const multiSymbolDepthComparisonData = computed(() => {
 // 表格数据 - 直接使用计算属性，无节流
 const tableData = computed(() => multiSymbolDepthComparisonData.value);
 
+// 计算价差详情对比数据
+const spreadData = computed(() => {
+  return symbols.map(symbol => {
+    const binanceData = binanceStore.getDepthDataBySymbol(symbol);
+    const toobitData = toobitStore.getDepthDataBySymbol(symbol);
+    
+    let binanceSpread = 0;
+    let binanceSpreadPercent = 0;
+    let toobitSpread = 0;
+    let toobitSpreadPercent = 0;
+    
+    // 计算币安价差
+    if (binanceData && binanceData.bestBid && binanceData.bestAsk) {
+      binanceSpread = binanceData.bestAsk - binanceData.bestBid;
+      binanceSpreadPercent = (binanceSpread / binanceData.bestBid) * 100;
+    }
+    
+    // 计算Toobit价差
+    if (toobitData && toobitData.bestBid && toobitData.bestAsk) {
+      toobitSpread = toobitData.bestAsk - toobitData.bestBid;
+      toobitSpreadPercent = (toobitSpread / toobitData.bestBid) * 100;
+    }
+    
+    // 计算分数：Toobit价差比例 - 币安价差比例
+    // 分数 > 0 表示Toobit价差更大（不利），分数 < 0 表示币安价差更大（不利）
+    let score = 0;
+    if (toobitSpreadPercent > binanceSpreadPercent) score = 1;
+    else if (toobitSpreadPercent < binanceSpreadPercent) score = -1;
+    
+    return {
+      symbol,
+      binanceSpread,
+      binanceSpreadPercent,
+      toobitSpread,
+      toobitSpreadPercent,
+      score
+    };
+  });
+});
+
 // 计算买盘深度
 const calculateBuyDepth = (bids, bestBid, percentage) => {
   if (!bids || bids.length === 0 || !bestBid) return 0;
@@ -318,6 +421,19 @@ const getScoreTagType = score => {
   if (score > 0) return 'success';
   if (score < 0) return 'danger';
   return 'info';
+};
+
+// 格式化价差显示
+const formatSpread = spreadPercent => {
+  if (!spreadPercent || spreadPercent === 0) return '0.0000 %';
+  return `${spreadPercent.toFixed(4)} %`;
+};
+
+// 获取价差标签类型
+const getSpreadTagType = spreadPercent => {
+  if (spreadPercent < 0.05) return 'success'; // 小于0.05%为绿色（优秀）
+  if (spreadPercent < 0.1) return 'warning';   // 0.05%-0.1%为黄色（良好）
+  return 'danger'; // 大于0.1%为红色（较差）
 };
 
 // 获取连接状态
@@ -439,6 +555,7 @@ onUnmounted(() => {
 .header-card,
 .control-card,
 .table-card,
+.spread-card,
 .status-card {
   margin-bottom: 20px;
   border-radius: 8px;
@@ -529,6 +646,33 @@ onUnmounted(() => {
   color: var(--el-text-color-primary);
 }
 
+/* 价差表格样式 */
+.spread-table {
+  width: 100%;
+}
+
+.spread-table :deep(.el-table__header) {
+  background-color: var(--el-bg-color);
+}
+
+.spread-table :deep(.el-table__header th) {
+  background-color: var(--el-bg-color);
+  color: var(--el-text-color-primary);
+  font-weight: bold;
+}
+
+.spread-table :deep(.el-table__body tr) {
+  background-color: var(--el-bg-color);
+}
+
+.spread-table :deep(.el-table__body tr:hover) {
+  background-color: var(--el-bg-color-page);
+}
+
+.spread-table :deep(.el-table__body td) {
+  color: var(--el-text-color-primary);
+}
+
 /* 确保按钮文字颜色清晰 */
 .comparison-table :deep(.el-button--primary) {
   color: #ffffff !important;
@@ -537,6 +681,18 @@ onUnmounted(() => {
 }
 
 .comparison-table :deep(.el-button--primary:hover) {
+  background-color: #66b1ff !important;
+  border-color: #66b1ff !important;
+}
+
+/* 价差表格按钮样式 */
+.spread-table :deep(.el-button--primary) {
+  color: #ffffff !important;
+  background-color: #409eff !important;
+  border-color: #409eff !important;
+}
+
+.spread-table :deep(.el-button--primary:hover) {
   background-color: #66b1ff !important;
   border-color: #66b1ff !important;
 }
@@ -555,6 +711,25 @@ onUnmounted(() => {
 }
 
 .comparison-table :deep(.el-tag--warning) {
+  background-color: #fffbeb !important;
+  color: #d97706 !important;
+  border-color: #fed7aa !important;
+}
+
+/* 价差表格标签样式 */
+.spread-table :deep(.el-tag--success) {
+  background-color: #f0f9ff !important;
+  color: #0369a1 !important;
+  border-color: #bae6fd !important;
+}
+
+.spread-table :deep(.el-tag--danger) {
+  background-color: #fef2f2 !important;
+  color: #dc2626 !important;
+  border-color: #fecaca !important;
+}
+
+.spread-table :deep(.el-tag--warning) {
   background-color: #fffbeb !important;
   color: #d97706 !important;
   border-color: #fed7aa !important;
@@ -610,6 +785,25 @@ onUnmounted(() => {
   }
 
   .comparison-table :deep(.el-tag--warning) {
+    background-color: #78350f !important;
+    color: #fbbf24 !important;
+    border-color: #f59e0b !important;
+  }
+
+  /* 价差表格深色模式标签颜色 */
+  .spread-table :deep(.el-tag--success) {
+    background-color: #14532d !important;
+    color: #86efac !important;
+    border-color: #22c55e !important;
+  }
+
+  .spread-table :deep(.el-tag--danger) {
+    background-color: #7f1d1d !important;
+    color: #fca5a5 !important;
+    border-color: #ef4444 !important;
+  }
+
+  .spread-table :deep(.el-tag--warning) {
     background-color: #78350f !important;
     color: #fbbf24 !important;
     border-color: #f59e0b !important;
