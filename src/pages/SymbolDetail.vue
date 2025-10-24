@@ -68,9 +68,6 @@
               <el-radio-button label="sell">
                 卖盘
               </el-radio-button>
-              <el-radio-button label="both">
-                全部
-              </el-radio-button>
             </el-radio-group>
           </div>
         </el-col>
@@ -268,7 +265,7 @@ const toobitStore = useToobitStore();
 // 响应式数据
 const symbol = ref('');
 const selectedSymbol = ref('');
-const orderSide = ref('both'); // 'buy', 'sell', 'both'
+const orderSide = ref('buy'); // 'buy', 'sell', 'both'
 const isLoading = ref(false);
 const isRefreshing = ref(false);
 const lastUpdateTime = ref('--');
@@ -355,12 +352,7 @@ const calculateLiquidity = (exchange, symbol, percentage) => {
     return calculateBuyDepth(data.bids, data.bestBid, percentageValue);
   } else if (orderSide.value === 'sell') {
     return calculateSellDepth(data.asks, data.bestAsk, percentageValue);
-  } else {
-    // 全部：买盘 + 卖盘
-    const buyLiquidity = calculateBuyDepth(data.bids, data.bestBid, percentageValue);
-    const sellLiquidity = calculateSellDepth(data.asks, data.bestAsk, percentageValue);
-    return buyLiquidity + sellLiquidity;
-  }
+  } 
 };
 
 // 计算买盘深度
