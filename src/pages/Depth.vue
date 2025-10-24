@@ -25,12 +25,9 @@
       </template>
       
       <el-row :gutter="20">
-        <el-col :span="12">
+        <el-col :span="4">
           <!-- 使用 el-space 优化标签与单选组的对齐和间距 -->
-          <el-space class="control-group" alignment="center">
-            <!-- 使用 el-text 提升标签的视觉突出性，并添加冒号 -->
-            <el-text class="control-label" tag="b" size="large">资产类型:</el-text> 
-            <el-radio-group v-model="assetType" size="large" @change="updateAssetType" disabled>
+          <el-radio-group v-model="assetType" size="large" @change="updateAssetType" disabled>
               <el-radio-button label="futures">
                 合约
               </el-radio-button>
@@ -38,16 +35,10 @@
                 现货
               </el-radio-button>
             </el-radio-group>
-          </el-space>
         </el-col>
         
-        <el-col :span="12">
-          <!-- 使用 el-space 优化标签与单选组的对齐和间距 -->
-          <el-space class="control-group" alignment="center">
-            <!-- 使用 el-text 提升标签的视觉突出性，并添加冒号 -->
-            <el-text class="control-label" tag="b" size="large">订单方向:</el-text>
-            <!-- 统一单选组的尺寸为 large -->
-            <el-radio-group v-model="orderSide" size="large" @change="updateOrderSide">
+        <el-col :span="6">
+          <el-radio-group v-model="orderSide" size="large" @change="updateOrderSide">
               <el-radio-button label="buy">
                 买盘
               </el-radio-button>
@@ -55,7 +46,6 @@
                 卖盘
               </el-radio-button>
             </el-radio-group>
-          </el-space>
         </el-col>
       </el-row>
     </el-card>
@@ -86,13 +76,11 @@
       
       <el-table 
         :data="tableData" 
-        stripe 
-        border 
         class="comparison-table"
         :cell-style="getCellStyle"
         :header-cell-style="getHeaderCellStyle"
       >
-        <el-table-column prop="symbol" label="资产" width="200" align="center">
+        <el-table-column prop="symbol" label="资产" align="center">
           <template #default="{ row }">
             <el-button 
               type="primary" 
@@ -104,7 +92,7 @@
           </template>
         </el-table-column>
         
-        <el-table-column prop="binanceValue" label="BINANCE" width="200" align="center">
+        <el-table-column prop="binanceValue" label="BINANCE"  align="center">
           <template #default="{ row }">
             <el-tag 
               :type="getValueTagType(row.binanceValue, row.toobitValue)"
@@ -115,7 +103,7 @@
           </template>
         </el-table-column>
         
-        <el-table-column prop="toobitValue" label="TOOBIT" width="200" align="center">
+        <el-table-column prop="toobitValue" label="TOOBIT" align="center">
           <template #default="{ row }">
             <el-tag 
               :type="getValueTagType(row.toobitValue, row.binanceValue)"
@@ -126,7 +114,7 @@
           </template>
         </el-table-column>
         
-        <el-table-column prop="score" label="分数" width="100" align="center">
+        <el-table-column prop="score" label="分数" align="center">
           <template #default="{ row }">
             <el-tag 
               :type="getScoreTagType(row.score)"
@@ -149,13 +137,11 @@
       
       <el-table 
         :data="spreadData" 
-        stripe 
-        border 
         class="spread-table"
         :cell-style="getCellStyle"
         :header-cell-style="getHeaderCellStyle"
       >
-        <el-table-column prop="symbol" label="资产" width="200" align="center">
+        <el-table-column prop="symbol" label="资产" align="center">
           <template #default="{ row }">
             <el-button 
               type="primary" 
@@ -167,7 +153,7 @@
           </template>
         </el-table-column>
         
-        <el-table-column prop="binanceSpread" label="BINANCE" width="200" align="center">
+        <el-table-column prop="binanceSpread" label="BINANCE" align="center">
           <template #default="{ row }">
             <el-tag 
               :type="getSpreadTagType(row.binanceSpreadPercent)"
@@ -178,7 +164,7 @@
           </template>
         </el-table-column>
         
-        <el-table-column prop="toobitSpread" label="TOOBIT" width="200" align="center">
+        <el-table-column prop="toobitSpread" label="TOOBIT" align="center">
           <template #default="{ row }">
             <el-tag 
               :type="getSpreadTagType(row.toobitSpreadPercent)"
@@ -189,7 +175,7 @@
           </template>
         </el-table-column>
         
-        <el-table-column prop="score" label="分数 ↑" width="100" align="center">
+        <el-table-column prop="score" label="分数 ↑" align="center">
           <template #default="{ row }">
             <el-tag 
               :type="getScoreTagType(row.score)"
@@ -294,8 +280,6 @@ const multiSymbolDepthComparisonData = computed(() => {
         binanceValue = calculateBuyDepth(binanceData.bids, binanceData.bestBid, depthPercentage.value);
       } else {
         binanceValue = calculateSellDepth(binanceData.asks, binanceData.bestAsk, depthPercentage.value);
-        console.log(binanceValue);
-
       }
     }
     
