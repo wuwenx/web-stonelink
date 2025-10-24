@@ -1,5 +1,5 @@
 <template>
-  <footer class="bg-white border-t border-gray-200">
+  <footer class="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 transition-colors duration-300">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="py-6">
         <div class="flex flex-col md:flex-row justify-between items-center">
@@ -7,19 +7,19 @@
           <div class="flex items-center space-x-4 mb-4 md:mb-0">
             <div class="flex items-center">
               <img class="h-6 w-6" src="@/assets/logo.png" alt="Logo">
-              <span class="ml-2 text-sm text-gray-600"> StoneLink </span>
+              <span class="ml-2 text-sm text-gray-600 dark:text-gray-300"> StoneLink </span>
             </div>
-            <div class="text-sm text-gray-500">
+            <div class="text-sm text-gray-500 dark:text-gray-400">
               © {{ currentYear }} StoneLink. All rights reserved.
             </div>
           </div>
 
           <!-- 中间：快速链接 -->
           <div class="flex items-center space-x-6 mb-4 md:mb-0">
-            <a href="#" class="text-sm text-gray-500 hover:text-gray-900 transition-colors"> 帮助中心 </a>
-            <a href="#" class="text-sm text-gray-500 hover:text-gray-900 transition-colors"> 隐私政策 </a>
-            <a href="#" class="text-sm text-gray-500 hover:text-gray-900 transition-colors"> 服务条款 </a>
-            <a href="#" class="text-sm text-gray-500 hover:text-gray-900 transition-colors"> 联系我们 </a>
+            <a href="#" class="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"> 帮助中心 </a>
+            <a href="#" class="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"> 隐私政策 </a>
+            <a href="#" class="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"> 服务条款 </a>
+            <a href="#" class="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"> 联系我们 </a>
           </div>
 
           <!-- 右侧：状态信息 -->
@@ -28,13 +28,13 @@
             <div class="flex items-center space-x-2">
               <div class="flex items-center">
                 <div class="h-2 w-2 bg-green-400 rounded-full animate-pulse" />
-                <span class="ml-2 text-xs text-gray-500">系统正常</span>
+                <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">系统正常</span>
               </div>
             </div>
 
             <!-- 语言切换 -->
             <div class="relative">
-              <button class="flex items-center text-sm text-gray-500 hover:text-gray-900 transition-colors" @click="showLanguageMenu = !showLanguageMenu">
+              <button class="flex items-center text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors" @click="showLanguageMenu = !showLanguageMenu">
                 <svg class="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
                     stroke-linecap="round"
@@ -47,12 +47,12 @@
               </button>
 
               <!-- 语言下拉菜单 -->
-              <div v-show="showLanguageMenu" class="origin-bottom-right absolute bottom-full right-0 mb-2 w-32 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
+              <div v-show="showLanguageMenu" class="origin-bottom-right absolute bottom-full right-0 mb-2 w-32 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black dark:ring-gray-700 ring-opacity-5 focus:outline-none z-50">
                 <div class="py-1">
                   <button
                     v-for="lang in languages"
                     :key="lang.code"
-                    :class="['block w-full text-left px-4 py-2 text-sm transition-colors', appStore.language === lang.code ? 'bg-blue-100 text-blue-900' : 'text-gray-700 hover:bg-gray-100']"
+                    :class="['block w-full text-left px-4 py-2 text-sm transition-colors', appStore.language === lang.code ? 'bg-blue-100 dark:bg-blue-900 text-blue-900 dark:text-blue-100' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700']"
                     @click="changeLanguage(lang.code)"
                   >
                     {{ lang.name }}
@@ -64,8 +64,8 @@
         </div>
 
         <!-- 底部信息 -->
-        <div class="mt-4 pt-4 border-t border-gray-200">
-          <div class="flex flex-col md:flex-row justify-between items-center text-xs text-gray-500">
+        <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+          <div class="flex flex-col md:flex-row justify-between items-center text-xs text-gray-500 dark:text-gray-400">
             <div class="mb-2 md:mb-0">
               版本: {{ appStore.systemInfo.version }} | 构建时间: {{ formatDate(appStore.systemInfo.buildTime) }}
             </div>
@@ -81,8 +81,8 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useAppStore } from '@/stores/app';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 
 export default {
   name: 'AppFooter',

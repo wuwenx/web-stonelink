@@ -3,7 +3,7 @@ import { defineStore } from 'pinia';
 export const useAppStore = defineStore('app', {
   state: () => ({
     // 应用配置
-    theme: localStorage.getItem('theme') || 'light',
+    theme: localStorage.getItem('theme') || 'dark', // 默认使用黑色模式
     language: localStorage.getItem('language') || 'zh-CN',
 
     // 应用状态

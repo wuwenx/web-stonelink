@@ -26,9 +26,11 @@
       
       <el-row :gutter="20">
         <el-col :span="12">
-          <div class="control-group">
-            <label class="control-label">资产类型</label>
-            <el-radio-group v-model="assetType" @change="updateAssetType">
+          <!-- 使用 el-space 优化标签与单选组的对齐和间距 -->
+          <el-space class="control-group" alignment="center">
+            <!-- 使用 el-text 提升标签的视觉突出性，并添加冒号 -->
+            <el-text class="control-label" tag="b" size="large">资产类型:</el-text> 
+            <el-radio-group v-model="assetType" size="large" @change="updateAssetType" disabled>
               <el-radio-button label="futures">
                 合约
               </el-radio-button>
@@ -36,13 +38,16 @@
                 现货
               </el-radio-button>
             </el-radio-group>
-          </div>
+          </el-space>
         </el-col>
         
         <el-col :span="12">
-          <div class="control-group">
-            <label class="control-label">订单方向</label>
-            <el-radio-group v-model="orderSide" @change="updateOrderSide">
+          <!-- 使用 el-space 优化标签与单选组的对齐和间距 -->
+          <el-space class="control-group" alignment="center">
+            <!-- 使用 el-text 提升标签的视觉突出性，并添加冒号 -->
+            <el-text class="control-label" tag="b" size="large">订单方向:</el-text>
+            <!-- 统一单选组的尺寸为 large -->
+            <el-radio-group v-model="orderSide" size="large" @change="updateOrderSide">
               <el-radio-button label="buy">
                 买盘
               </el-radio-button>
@@ -50,7 +55,7 @@
                 卖盘
               </el-radio-button>
             </el-radio-group>
-          </div>
+          </el-space>
         </el-col>
       </el-row>
     </el-card>
@@ -289,6 +294,8 @@ const multiSymbolDepthComparisonData = computed(() => {
         binanceValue = calculateBuyDepth(binanceData.bids, binanceData.bestBid, depthPercentage.value);
       } else {
         binanceValue = calculateSellDepth(binanceData.asks, binanceData.bestAsk, depthPercentage.value);
+        console.log(binanceValue);
+
       }
     }
     

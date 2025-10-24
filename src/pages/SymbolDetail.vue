@@ -295,7 +295,7 @@ const depthLevels = [
 ];
 
 // 支持的交易所
-const exchanges = ['Binance', 'OKX', 'Toobit'];
+const exchanges = ['Binance', 'Toobit'];
 
 // 计算价差和价差比例
 const calculateSpread = (exchange, symbol) => {

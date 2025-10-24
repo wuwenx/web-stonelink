@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-gray-50 flex flex-col">
+  <div class="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col transition-colors duration-300">
     <!-- 头部 -->
     <AppHeader />
 
@@ -22,9 +22,9 @@
 
 <script>
 import { useAppStore } from '@/stores/app';
+import AppFooter from './components/AppFooter.vue';
 import AppHeader from './components/AppHeader.vue';
 import AppSidebar from './components/AppSidebar.vue';
-import AppFooter from './components/AppFooter.vue';
 
 export default {
   name: 'BaseLayout',

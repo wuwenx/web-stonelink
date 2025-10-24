@@ -1,12 +1,12 @@
 <template>
-  <aside :class="['bg-white shadow-sm border-r border-gray-200 transition-all duration-300 ease-in-out', collapsed ? 'w-16' : 'w-64']">
+  <aside :class="['bg-white dark:bg-gray-800 shadow-sm border-r border-gray-200 dark:border-gray-700 transition-all duration-300 ease-in-out', collapsed ? 'w-16' : 'w-64']">
     <div class="flex flex-col h-full">
       <!-- 侧边栏头部 -->
-      <div class="flex items-center justify-between p-4 border-b border-gray-200">
-        <div v-if="!collapsed" class="text-lg font-semibold text-gray-900">
+      <div class="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+        <div v-if="!collapsed" class="text-lg font-semibold text-gray-900 dark:text-white">
           导航菜单
         </div>
-        <button class="p-1 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500" @click="$emit('toggle')">
+        <button class="p-1 rounded-md text-gray-400 dark:text-gray-500 hover:text-gray-500 dark:hover:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500" @click="$emit('toggle')">
           <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path v-if="collapsed" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
             <path v-else stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -22,22 +22,22 @@
           :to="item.href"
           :class="[
             'group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors duration-200',
-            $route.path === item.href ? 'bg-blue-100 text-blue-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900',
+            $route.path === item.href ? 'bg-blue-100 dark:bg-blue-900 text-blue-900 dark:text-blue-100' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white',
           ]"
         >
-          <component :is="item.icon" :class="['mr-3 flex-shrink-0 h-5 w-5', $route.path === item.href ? 'text-blue-500' : 'text-gray-400 group-hover:text-gray-500']" />
+          <component :is="item.icon" :class="['mr-3 flex-shrink-0 h-5 w-5', $route.path === item.href ? 'text-blue-500 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-500 dark:group-hover:text-gray-400']" />
           <span v-if="!collapsed">{{ item.name }}</span>
         </router-link>
       </nav>
 
       <!-- 侧边栏底部 -->
-      <div class="p-4 border-t border-gray-200">
-        <div v-if="!collapsed" class="text-xs text-gray-500">
+      <div class="p-4 border-t border-gray-200 dark:border-gray-700">
+        <div v-if="!collapsed" class="text-xs text-gray-500 dark:text-gray-400">
           <div>版本: {{ appStore.systemInfo.version }}</div>
           <div>构建时间: {{ formatDate(appStore.systemInfo.buildTime) }}</div>
         </div>
         <div v-else class="text-center">
-          <div class="text-xs text-gray-400">
+          <div class="text-xs text-gray-400 dark:text-gray-500">
             v{{ appStore.systemInfo.version }}
           </div>
         </div>

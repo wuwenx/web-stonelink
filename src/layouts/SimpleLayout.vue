@@ -97,14 +97,17 @@ export default {
       
       console.log('初始化主题 - 保存的主题:', savedTheme, '系统偏好暗色:', prefersDark);
       
-      if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
-        isDark.value = true;
-        document.documentElement.classList.add('dark');
-        console.log('初始化: 设置为暗色模式');
-      } else {
+      // 默认使用黑色模式，除非用户明确选择了浅色模式
+      if (savedTheme === 'light') {
         isDark.value = false;
         document.documentElement.classList.remove('dark');
         console.log('初始化: 设置为浅色模式');
+      } else {
+        // 默认使用黑色模式
+        isDark.value = true;
+        document.documentElement.classList.add('dark');
+        localStorage.setItem('theme', 'dark');
+        console.log('初始化: 设置为暗色模式（默认）');
       }
     };
 
