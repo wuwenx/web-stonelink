@@ -35,6 +35,8 @@ export class WebSocketService {
           const callbackKey = `${exchange}_${symbol}`;
           const callbacks = this.workerCallbacks.get(callbackKey);
           
+          console.log(`Worker返回: exchange=${exchange}, symbol=${symbol}, callbackKey=${callbackKey}, hasCallbacks=${!!callbacks}`);
+          
           if (callbacks) {
             switch (result.type) {
             case 'ping':
@@ -62,6 +64,8 @@ export class WebSocketService {
               console.error(`Worker处理错误 (${exchange}_${symbol}):`, result.message);
               break;
             }
+          } else {
+            console.warn(`未找到回调函数: ${callbackKey}`);
           }
         }
       };
@@ -180,9 +184,9 @@ export class WebSocketService {
         firstUpdateId = snapshot.lastUpdateId;
         
         // 步骤2: 初始化Worker中的orderbook
-        // 使用 connectionId 作为唯一标识，区分现货和合约
-        this.sendToWorker('initBinanceOrderBook', 'binance', connectionId, snapshot);
-        console.log(`初始化Worker orderbook完成: ${connectionId}, lastUpdateId: ${snapshot.lastUpdateId}`);
+        // 使用 symbol 作为 key，与消息处理保持一致
+        this.sendToWorker('initBinanceOrderBook', 'binance', symbol, snapshot);
+        console.log(`初始化Worker orderbook完成: ${symbol}, lastUpdateId: ${snapshot.lastUpdateId}`);
         
         // 步骤2.5: 发送初始快照数据
         const initialData = {
@@ -226,8 +230,8 @@ export class WebSocketService {
         ws.send(JSON.stringify(subscribeMessage));
       };
 
-      // 注册Worker回调
-      this.registerWorkerCallbacks('binance', connectionId, {
+      // 注册Worker回调 - 使用 symbol 而不是 connectionId
+      this.registerWorkerCallbacks('binance', symbol, {
         onPing: pingData => {
           ws.send(JSON.stringify({ pong: pingData }));
         },
@@ -245,6 +249,7 @@ export class WebSocketService {
           }
 
           const data = JSON.parse(event.data);
+          console.log('币安现货收到消息:', data);
           
           // 处理ping消息 - 必须回复pong
           if (data.ping) {
@@ -260,8 +265,9 @@ export class WebSocketService {
               return;
             }
             
-            // 发送到Worker处理
-            this.sendToWorker('processBinanceMessage', 'binance', connectionId, data);
+            // 发送到Worker处理 - 使用 symbol 保持与初始化和回调一致
+            this.sendToWorker('processBinanceMessage', 'binance', symbol, data);
+            console.log(`币安现货发送到Worker: symbol=${symbol}`);
           } else if (data.result === null && data.id) {
             // 处理订阅确认
             console.log('订阅确认成功');
@@ -339,9 +345,9 @@ export class WebSocketService {
         hasSnapshot = true;
         
         // 步骤2: 初始化Worker中的orderbook
-        // 使用 connectionId 作为唯一标识
-        this.sendToWorker('initBinanceOrderBook', 'binance', connectionId, snapshot);
-        console.log(`初始化Worker orderbook完成: ${connectionId}, lastUpdateId: ${snapshot.lastUpdateId}`);
+        // 使用 symbol 作为 key，与消息处理保持一致
+        this.sendToWorker('initBinanceOrderBook', 'binance', symbol, snapshot);
+        console.log(`初始化Worker orderbook完成: ${symbol}, lastUpdateId: ${snapshot.lastUpdateId}`);
         
         // 步骤2.5: 发送初始快照数据
         const initialData = {
@@ -385,8 +391,8 @@ export class WebSocketService {
         ws.send(JSON.stringify(subscribeMessage));
       };
 
-      // 注册Worker回调
-      this.registerWorkerCallbacks('binance', connectionId, {
+      // 注册Worker回调 - 使用 symbol 而不是 connectionId
+      this.registerWorkerCallbacks('binance', symbol, {
         onPing: pingData => {
           ws.send(JSON.stringify({ pong: pingData }));
         },
@@ -413,8 +419,9 @@ export class WebSocketService {
 
           // 处理深度数据流
           if (data.e && data.e === 'depthUpdate') {
-            // 发送到Worker处理
-            this.sendToWorker('processBinanceMessage', 'binance', connectionId, data);
+            // 发送到Worker处理 - 使用 symbol 而不是 connectionId
+            this.sendToWorker('processBinanceMessage', 'binance', symbol, data);
+            console.log(`币安合约发送到Worker: symbol=${symbol}, connectionId=${connectionId}`);
           } else if (data.e && data.e === 'markPriceUpdate') {
             // 处理标记价格流
             onMarkPriceMessage(data);
