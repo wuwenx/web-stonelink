@@ -16,6 +16,7 @@ export const useToobitStore = defineStore('toobit', {
     config: {
       depthLevels: 250,
       depthPercentage: '0.001',
+      exchangeType: 'futures', // 默认合约，与币安保持一致
     },
     
     // 加载状态
@@ -108,7 +109,7 @@ export const useToobitStore = defineStore('toobit', {
 
     // 检查是否需要重新连接
     checkIfReconnectNeeded(oldConfig, newConfig) {
-      const reconnectKeys = ['depthLevels'];
+      const reconnectKeys = ['depthLevels', 'exchangeType'];
       return reconnectKeys.some(key => oldConfig[key] !== newConfig[key]);
     },
 
@@ -171,7 +172,8 @@ export const useToobitStore = defineStore('toobit', {
               this.isLoading = false;
             }, 1000);
           }
-        }
+        },
+        this.config.exchangeType
       );
     },
 

@@ -40,7 +40,8 @@ function mapSymbol(symbol, exchange) {
 
   switch (exchange.toLowerCase()) {
   case 'toobit':
-    // Toobit 格式: BTCUSDT -> BTC-SWAP-USDT, BTCUSDC -> BTC-SWAP-USDC
+    // Toobit 格式: BTCUSDT -> BTC-SWAP-USDT (合约), BTCUSDT -> BTCUSDT (现货)
+    // 如果没有传入 exchangeType 参数，默认使用原始格式（合约格式）
     return `${baseCurrency}-SWAP-${quoteCurrency}`;
 
   case 'binance':
@@ -60,10 +61,17 @@ function mapSymbol(symbol, exchange) {
 /**
  * 获取 Toobit 格式的币对
  * @param {string} symbol - 标准币对格式
+ * @param {string} exchangeType - 交易类型 'spot' 或 'futures'
  * @returns {string} Toobit 格式的币对
  */
-function toobitSymbol(symbol) {
-  return mapSymbol(symbol, 'toobit');
+function toobitSymbol(symbol, exchangeType = 'futures') {
+  if (exchangeType === 'spot') {
+    // 现货格式: BTCUSDT -> BTCUSDT
+    return symbol;
+  } else {
+    // 合约格式: BTCUSDT -> BTC-SWAP-USDT
+    return mapSymbol(symbol, 'toobit');
+  }
 }
 
 /**

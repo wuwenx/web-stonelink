@@ -581,8 +581,9 @@ export class WebSocketService {
    * @param {string} symbol - 交易对符号
    * @param {Function} onMessage - 消息处理回调
    * @param {Function} onStatusChange - 状态变更回调
+   * @param {string} exchangeType - 交易类型 'spot' 或 'futures'
    */
-  connectToobit(symbol, onMessage, onStatusChange) {
+  connectToobit(symbol, onMessage, onStatusChange, exchangeType = 'futures') {
     const connectionId = `toobit_${symbol}`;
 
     // 如果已存在连接且状态正常，直接返回
@@ -598,13 +599,13 @@ export class WebSocketService {
         this.disconnect(connectionId);
         // 延迟重连，确保旧连接完全关闭
         setTimeout(() => {
-          this.createToobitConnection(symbol, onMessage, onStatusChange);
+          this.createToobitConnection(symbol, onMessage, onStatusChange, exchangeType);
         }, 100);
         return;
       }
     }
 
-    this.createToobitConnection(symbol, onMessage, onStatusChange);
+    this.createToobitConnection(symbol, onMessage, onStatusChange, exchangeType);
   }
 
   /**
@@ -612,8 +613,9 @@ export class WebSocketService {
    * @param {string} symbol - 交易对符号
    * @param {Function} onMessage - 消息处理回调
    * @param {Function} onStatusChange - 状态变更回调
+   * @param {string} exchangeType - 交易类型 'spot' 或 'futures'
    */
-  createToobitConnection(symbol, onMessage, onStatusChange) {
+  createToobitConnection(symbol, onMessage, onStatusChange, exchangeType = 'futures') {
     const connectionId = `toobit_${symbol}`;
     
     // 确保完全清理现有连接
@@ -633,7 +635,7 @@ export class WebSocketService {
 
         // 订阅深度数据
         const subscribeMessage = {
-          symbol: toobitSymbol(symbol),
+          symbol: toobitSymbol(symbol, exchangeType),
           topic: 'diffDepth',
           event: 'sub',
         };
@@ -671,7 +673,7 @@ export class WebSocketService {
         onStatusChange('disconnected');
         this.stopHeartbeat(connectionId);
         this.scheduleReconnect(connectionId, () => {
-          this.connectToobit(symbol, onMessage, onStatusChange);
+          this.connectToobit(symbol, onMessage, onStatusChange, exchangeType);
         });
       };
 

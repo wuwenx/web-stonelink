@@ -376,7 +376,9 @@ const goToSymbolDetail = symbol => {
 // 更新资产类型
 const updateAssetType = type => {
   assetType.value = type;
+  // 同时更新币安和 Toobit 的 exchangeType
   binanceStore.updateConfig({ exchangeType: type });
+  toobitStore.updateConfig({ exchangeType: type });
 };
 
 // 更新深度百分比
