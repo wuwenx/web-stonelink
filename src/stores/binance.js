@@ -142,10 +142,41 @@ export const useBinanceStore = defineStore('binance', {
       }
     },
 
+    // 单独连接现货（不使用增量更新，使用20档深度）
+    async connectSpotSymbol(symbol) {
+      const connectionId = `binance_spot_${symbol}`;
+      
+      if (this.connections[connectionId] === 'connected') {
+        console.log(`币安现货 ${symbol} 已连接，跳过重复连接`);
+        return;
+      }
+      
+      try {
+        await this.wsService.connectBinanceSpot(
+          symbol,
+          data => this.handleBinanceDepthData(data, symbol),
+          status => {
+            this.connections[connectionId] = status;
+            if (status === 'connected') {
+              setTimeout(() => {
+                this.isLoading = false;
+              }, 1000);
+            }
+          },
+          this.config.depthLevels
+        );
+      } catch (error) {
+        console.error(`连接币对 ${symbol} 失败:`, error);
+      }
+    },
+
     // 断开指定币对的连接
     disconnectSymbol(symbol) {
+      // 断开合约连接
       if (this.connections[symbol]) {
-        const connectionId = `binance_futures_combined_${symbol}`;
+        const connectionId = this.config.exchangeType === 'futures' 
+          ? `binance_futures_combined_${symbol}` 
+          : `binance_spot_${symbol}`;
         this.wsService?.disconnect(connectionId);
         delete this.connections[symbol];
         delete this.depthData[symbol];
@@ -155,6 +186,7 @@ export const useBinanceStore = defineStore('binance', {
     // 连接Binance
     async connectBinance(symbol, exchangeType, depthLevels) {
       if (exchangeType === 'futures') {
+        // 连接合约
         await this.wsService.connectBinanceFuturesWithMarkPrice(
           symbol,
           data => this.handleBinanceDepthData(data, symbol),
@@ -170,7 +202,8 @@ export const useBinanceStore = defineStore('binance', {
           depthLevels
         );
       } else {
-        this.wsService.connectBinance(
+        // 连接现货
+        await this.wsService.connectBinanceSpot(
           symbol,
           data => this.handleBinanceDepthData(data, symbol),
           status => {
@@ -180,7 +213,8 @@ export const useBinanceStore = defineStore('binance', {
                 this.isLoading = false;
               }, 1000);
             }
-          }
+          },
+          depthLevels
         );
       }
     },

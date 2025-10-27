@@ -104,6 +104,9 @@ export class WebSocketService {
       });
     }
   }
+  /**
+   * 获取币安合约深度快照
+   */
   async getBinanceDepthSnapshot(symbol, limit = 1000) {
     try {
       const response = await axios.get('https://fapi.binance.com/fapi/v1/depth', {
@@ -114,18 +117,37 @@ export class WebSocketService {
       });
       return response.data;
     } catch (error) {
-      console.error('获取Binance深度快照失败:', error);
+      console.error('获取Binance合约深度快照失败:', error);
       throw error;
     }
   }
 
   /**
-   * 连接Binance现货WebSocket
-   * @param {string} symbol - 交易对符号
-   * @param {Function} onMessage - 消息处理回调
-   * @param {Function} onStatusChange - 状态变更回调
+   * 获取币安现货深度快照
    */
-  connectBinance(symbol, onMessage, onStatusChange) {
+  async getBinanceSpotDepthSnapshot(symbol, limit = 5000) {
+    try {
+      const response = await axios.get('https://api.binance.com/api/v3/depth', {
+        params: {
+          symbol: binanceSymbol(symbol).toUpperCase(),
+          limit: limit
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('获取Binance现货深度快照失败:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 连接Binance现货WebSocket（包含深度数据）
+   * @param {string} symbol - 交易对符号
+   * @param {Function} onDepthMessage - 深度数据消息处理回调
+   * @param {Function} onStatusChange - 状态变更回调
+   * @param {number} depthLevels - 深度档位数，默认20
+   */
+  async connectBinanceSpot(symbol, onDepthMessage, onStatusChange, depthLevels = 20) {
     const connectionId = `binance_spot_${symbol}`;
 
     // 如果已存在连接且状态正常，直接返回
@@ -143,27 +165,109 @@ export class WebSocketService {
     }
 
     try {
-      const stream = `${symbol.toLowerCase()}@depth20@100ms`;
-      const wsUrl = binanceSpotWebSocketUrl + stream;
-
+      // 步骤1: 尝试获取深度快照
+      onStatusChange('connecting');
+      console.log('正在获取Binance现货深度快照...');
+      
+      let snapshot = null;
+      let hasSnapshot = false;
+      let firstUpdateId = 0;
+      
+      try {
+        snapshot = await this.getBinanceSpotDepthSnapshot(symbol, 5000);
+        console.log('深度快照获取成功，lastUpdateId:', snapshot.lastUpdateId);
+        hasSnapshot = true;
+        firstUpdateId = snapshot.lastUpdateId;
+        
+        // 步骤2: 初始化Worker中的orderbook
+        this.sendToWorker('initBinanceOrderBook', 'binance', symbol, snapshot);
+        console.log(`初始化Worker orderbook完成: ${symbol}, lastUpdateId: ${snapshot.lastUpdateId}`);
+        
+        // 步骤2.5: 发送初始快照数据
+        const initialData = {
+          e: 'depthUpdate',
+          a: snapshot.asks,
+          b: snapshot.bids,
+          lastUpdateId: snapshot.lastUpdateId
+        };
+        console.log(`发送初始快照数据: bids=${snapshot.bids.length}, asks=${snapshot.asks.length}`);
+        onDepthMessage(initialData);
+      } catch (snapshotError) {
+        console.warn('深度快照获取失败，将直接使用WebSocket连接:', snapshotError.message);
+        hasSnapshot = false;
+        // 不中断流程，继续建立WebSocket连接
+      }
+      
+      // 步骤3: 建立WebSocket连接
+      const wsUrl = binanceSpotWebSocketUrl;
+      
       // 确保完全清理现有连接
       this.forceDisconnect(connectionId);
-
+      
       const ws = new WebSocket(wsUrl);
       this.connections.set(connectionId, ws);
       this.reconnectAttempts.set(connectionId, 0);
 
       ws.onopen = () => {
-        onStatusChange('connected');
+        console.log('WebSocket连接已建立');
         this.reconnectAttempts.set(connectionId, 0);
         this.startHeartbeat(connectionId);
+
+        // 订阅深度数据流
+        // 如果有快照，使用增量更新流；否则使用20档深度流
+        const subscribeMessage = {
+          method: 'SUBSCRIBE',
+          params: [
+            hasSnapshot ? `${symbol.toLowerCase()}@depth` : `${symbol.toLowerCase()}@depth20@100ms`
+          ],
+          id: Date.now(),
+        };
+        ws.send(JSON.stringify(subscribeMessage));
       };
+
+      // 注册Worker回调
+      this.registerWorkerCallbacks('binance', symbol, {
+        onPing: pingData => {
+          ws.send(JSON.stringify({ pong: pingData }));
+        },
+        onDepthMessage: formattedData => {
+          onDepthMessage(formattedData);
+        }
+      });
 
       ws.onmessage = event => {
         try {
+          // 检查连接状态，如果已关闭则不处理消息
+          if (ws.readyState !== WebSocket.OPEN) {
+            console.warn(`Binance现货WebSocket连接已关闭，忽略消息: ${connectionId}`);
+            return;
+          }
+
           const data = JSON.parse(event.data);
-          onMessage(data);
+          
+          // 处理ping消息 - 必须回复pong
+          if (data.ping) {
+            ws.send(JSON.stringify({ pong: data.ping }));
+            return;
+          }
+
+          // 处理深度数据流
+          if (data.e && data.e === 'depthUpdate') {
+            // 过滤掉在快照之前的更新
+            if (hasSnapshot && data.u <= firstUpdateId) {
+              console.log(`跳过旧的更新: u=${data.u}, firstUpdateId=${firstUpdateId}`);
+              return;
+            }
+            
+            // 发送到Worker处理
+            this.sendToWorker('processBinanceMessage', 'binance', symbol, data);
+          } else if (data.result === null && data.id) {
+            // 处理订阅确认
+            console.log('订阅确认成功');
+            onStatusChange('connected');
+          }
         } catch (error) {
+          console.error('处理WebSocket消息时出错:', error);
         }
       };
 
@@ -171,7 +275,7 @@ export class WebSocketService {
         onStatusChange('disconnected');
         this.stopHeartbeat(connectionId);
         this.scheduleReconnect(connectionId, () => {
-          this.connectBinance(symbol, onMessage, onStatusChange);
+          this.connectBinanceSpot(symbol, onDepthMessage, onStatusChange, depthLevels);
         });
       };
 
@@ -179,10 +283,20 @@ export class WebSocketService {
         onStatusChange('error');
       };
 
-      onStatusChange('connecting');
     } catch (error) {
+      console.error('连接Binance现货失败:', error);
       onStatusChange('error');
     }
+  }
+
+  /**
+   * 连接Binance现货WebSocket (旧方法，保留兼容性)
+   * @param {string} symbol - 交易对符号
+   * @param {Function} onMessage - 消息处理回调
+   * @param {Function} onStatusChange - 状态变更回调
+   */
+  connectBinance(symbol, onMessage, onStatusChange) {
+    return this.connectBinanceSpot(symbol, onMessage, onStatusChange, 20);
   }
 
   /**

@@ -27,7 +27,7 @@
       <el-row :gutter="20">
         <el-col :span="4">
           <!-- 使用 el-space 优化标签与单选组的对齐和间距 -->
-          <el-radio-group v-model="assetType" size="large" @change="updateAssetType" disabled>
+          <el-radio-group v-model="assetType" size="large" @change="updateAssetType">
               <el-radio-button label="futures">
                 合约
               </el-radio-button>
@@ -246,8 +246,8 @@ const binanceStore = useBinanceStore();
 const toobitStore = useToobitStore();
 const router = useRouter();
 
-// 响应式数据
-const assetType = ref('futures');
+// 响应式数据 - 从 store 中初始化
+const assetType = ref(binanceStore.config.exchangeType || 'futures');
 const depthPercentage = ref(0.0001); // 万1
 const orderSide = ref('buy');
 
@@ -525,6 +525,9 @@ const getScoreClass = score => {
 onMounted(() => {
   // WebSocket连接由SimpleLayout管理，这里不需要连接
   console.log('Depth页面已挂载，WebSocket连接由SimpleLayout管理');
+  
+  // 同步 store 中的 exchangeType 到本地 state
+  assetType.value = binanceStore.config.exchangeType || 'futures';
 });
 
 onUnmounted(() => {
