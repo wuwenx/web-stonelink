@@ -184,9 +184,9 @@ export class WebSocketService {
         firstUpdateId = snapshot.lastUpdateId;
         
         // 步骤2: 初始化Worker中的orderbook
-        // 使用 symbol 作为 key，与消息处理保持一致
-        this.sendToWorker('initBinanceOrderBook', 'binance', symbol, snapshot);
-        console.log(`初始化Worker orderbook完成: ${symbol}, lastUpdateId: ${snapshot.lastUpdateId}`);
+        // 使用 connectionId 作为 key，区分现货和合约
+        this.sendToWorker('initBinanceOrderBook', 'binance', connectionId, snapshot);
+        console.log(`初始化Worker orderbook完成: ${connectionId}, lastUpdateId: ${snapshot.lastUpdateId}`);
         
         // 步骤2.5: 发送初始快照数据
         const initialData = {
@@ -230,8 +230,8 @@ export class WebSocketService {
         ws.send(JSON.stringify(subscribeMessage));
       };
 
-      // 注册Worker回调 - 使用 symbol 而不是 connectionId
-      this.registerWorkerCallbacks('binance', symbol, {
+      // 注册Worker回调 - 使用 connectionId 与Worker处理一致
+      this.registerWorkerCallbacks('binance', connectionId, {
         onPing: pingData => {
           ws.send(JSON.stringify({ pong: pingData }));
         },
@@ -265,9 +265,9 @@ export class WebSocketService {
               return;
             }
             
-            // 发送到Worker处理 - 使用 symbol 保持与初始化和回调一致
-            this.sendToWorker('processBinanceMessage', 'binance', symbol, data);
-            console.log(`币安现货发送到Worker: symbol=${symbol}`);
+            // 发送到Worker处理 - 使用 connectionId 保持与初始化一致
+            this.sendToWorker('processBinanceMessage', 'binance', connectionId, data);
+            console.log(`币安现货发送到Worker: connectionId=${connectionId}`);
           } else if (data.result === null && data.id) {
             // 处理订阅确认
             console.log('订阅确认成功');
@@ -345,9 +345,9 @@ export class WebSocketService {
         hasSnapshot = true;
         
         // 步骤2: 初始化Worker中的orderbook
-        // 使用 symbol 作为 key，与消息处理保持一致
-        this.sendToWorker('initBinanceOrderBook', 'binance', symbol, snapshot);
-        console.log(`初始化Worker orderbook完成: ${symbol}, lastUpdateId: ${snapshot.lastUpdateId}`);
+        // 使用 connectionId 作为 key，区分现货和合约
+        this.sendToWorker('initBinanceOrderBook', 'binance', connectionId, snapshot);
+        console.log(`初始化Worker orderbook完成: ${connectionId}, lastUpdateId: ${snapshot.lastUpdateId}`);
         
         // 步骤2.5: 发送初始快照数据
         const initialData = {
@@ -391,8 +391,8 @@ export class WebSocketService {
         ws.send(JSON.stringify(subscribeMessage));
       };
 
-      // 注册Worker回调 - 使用 symbol 而不是 connectionId
-      this.registerWorkerCallbacks('binance', symbol, {
+      // 注册Worker回调 - 使用 connectionId 与Worker处理一致
+      this.registerWorkerCallbacks('binance', connectionId, {
         onPing: pingData => {
           ws.send(JSON.stringify({ pong: pingData }));
         },
@@ -419,9 +419,9 @@ export class WebSocketService {
 
           // 处理深度数据流
           if (data.e && data.e === 'depthUpdate') {
-            // 发送到Worker处理 - 使用 symbol 而不是 connectionId
-            this.sendToWorker('processBinanceMessage', 'binance', symbol, data);
-            console.log(`币安合约发送到Worker: symbol=${symbol}, connectionId=${connectionId}`);
+            // 发送到Worker处理 - 使用 connectionId 保持与初始化一致
+            this.sendToWorker('processBinanceMessage', 'binance', connectionId, data);
+            console.log(`币安合约发送到Worker: connectionId=${connectionId}`);
           } else if (data.e && data.e === 'markPriceUpdate') {
             // 处理标记价格流
             onMarkPriceMessage(data);
@@ -801,8 +801,8 @@ export class WebSocketService {
     this.connections.clear();
     this.reconnectAttempts.clear();
     
-    // 清理Worker回调
-    this.workerCallbacks.clear();
+    // 不要清理Worker回调，重连时需要保留
+    console.log('保留Worker回调，准备重连');
     
     // 停止所有心跳定时器
     for (const [connectionId] of this.heartbeatTimers) {
@@ -810,13 +810,11 @@ export class WebSocketService {
     }
     this.heartbeatTimers.clear();
     
-    // 清理Worker
-    if (this.worker) {
-      this.worker.terminate();
-      this.worker = null;
-    }
-
-    console.log('所有WebSocket连接已断开，资源已清理');
+    // 不要终止Worker，保留以供重连使用
+    // 只清理回调映射，避免旧回调干扰
+    this.workerCallbacks.clear();
+    
+    console.log('所有WebSocket连接已断开，保留Worker');
   }
 
   /**
