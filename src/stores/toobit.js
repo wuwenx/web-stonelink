@@ -209,18 +209,18 @@ export const useToobitStore = defineStore('toobit', {
     async reconnectWebSockets() {
       this.isLoading = true;
       
-      // 关闭现有连接
+      // 强制关闭所有 Toobit 连接
       if (this.wsService) {
-        this.wsService.disconnectAll();
+        this.wsService.disconnectAllToobit();
       }
 
       // 清空数据
       this.clearAllData();
 
-      // 延迟重新连接
+      // 延迟重新连接，确保旧连接完全关闭
       setTimeout(async() => {
         await this.connectWebSockets();
-      }, 1500);
+      }, 500);
     },
 
     // 清空所有数据

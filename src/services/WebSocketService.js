@@ -180,8 +180,9 @@ export class WebSocketService {
         firstUpdateId = snapshot.lastUpdateId;
         
         // 步骤2: 初始化Worker中的orderbook
-        this.sendToWorker('initBinanceOrderBook', 'binance', symbol, snapshot);
-        console.log(`初始化Worker orderbook完成: ${symbol}, lastUpdateId: ${snapshot.lastUpdateId}`);
+        // 使用 connectionId 作为唯一标识，区分现货和合约
+        this.sendToWorker('initBinanceOrderBook', 'binance', connectionId, snapshot);
+        console.log(`初始化Worker orderbook完成: ${connectionId}, lastUpdateId: ${snapshot.lastUpdateId}`);
         
         // 步骤2.5: 发送初始快照数据
         const initialData = {
@@ -226,7 +227,7 @@ export class WebSocketService {
       };
 
       // 注册Worker回调
-      this.registerWorkerCallbacks('binance', symbol, {
+      this.registerWorkerCallbacks('binance', connectionId, {
         onPing: pingData => {
           ws.send(JSON.stringify({ pong: pingData }));
         },
@@ -260,7 +261,7 @@ export class WebSocketService {
             }
             
             // 发送到Worker处理
-            this.sendToWorker('processBinanceMessage', 'binance', symbol, data);
+            this.sendToWorker('processBinanceMessage', 'binance', connectionId, data);
           } else if (data.result === null && data.id) {
             // 处理订阅确认
             console.log('订阅确认成功');
@@ -338,8 +339,9 @@ export class WebSocketService {
         hasSnapshot = true;
         
         // 步骤2: 初始化Worker中的orderbook
-        this.sendToWorker('initBinanceOrderBook', 'binance', symbol, snapshot);
-        console.log(`初始化Worker orderbook完成: ${symbol}, lastUpdateId: ${snapshot.lastUpdateId}`);
+        // 使用 connectionId 作为唯一标识
+        this.sendToWorker('initBinanceOrderBook', 'binance', connectionId, snapshot);
+        console.log(`初始化Worker orderbook完成: ${connectionId}, lastUpdateId: ${snapshot.lastUpdateId}`);
         
         // 步骤2.5: 发送初始快照数据
         const initialData = {
@@ -384,7 +386,7 @@ export class WebSocketService {
       };
 
       // 注册Worker回调
-      this.registerWorkerCallbacks('binance', symbol, {
+      this.registerWorkerCallbacks('binance', connectionId, {
         onPing: pingData => {
           ws.send(JSON.stringify({ pong: pingData }));
         },
@@ -412,7 +414,7 @@ export class WebSocketService {
           // 处理深度数据流
           if (data.e && data.e === 'depthUpdate') {
             // 发送到Worker处理
-            this.sendToWorker('processBinanceMessage', 'binance', symbol, data);
+            this.sendToWorker('processBinanceMessage', 'binance', connectionId, data);
           } else if (data.e && data.e === 'markPriceUpdate') {
             // 处理标记价格流
             onMarkPriceMessage(data);
@@ -586,26 +588,16 @@ export class WebSocketService {
   connectToobit(symbol, onMessage, onStatusChange, exchangeType = 'futures') {
     const connectionId = `toobit_${symbol}`;
 
-    // 如果已存在连接且状态正常，直接返回
+    // 总是先清理旧连接
     if (this.connections.has(connectionId)) {
-      const existingWs = this.connections.get(connectionId);
-      if (existingWs && existingWs.readyState === WebSocket.OPEN) {
-        console.log(`连接 ${connectionId} 已存在且状态正常，复用现有连接`);
-        onStatusChange('connected');
-        return;
-      } else {
-        // 连接存在但状态异常，先关闭
-        console.log(`连接 ${connectionId} 存在但状态异常，关闭后重新创建`);
-        this.disconnect(connectionId);
-        // 延迟重连，确保旧连接完全关闭
-        setTimeout(() => {
-          this.createToobitConnection(symbol, onMessage, onStatusChange, exchangeType);
-        }, 100);
-        return;
-      }
+      console.log(`清理旧连接: ${connectionId}`);
+      this.disconnect(connectionId);
     }
 
-    this.createToobitConnection(symbol, onMessage, onStatusChange, exchangeType);
+    // 等待旧连接完全清理后再创建新连接
+    setTimeout(() => {
+      this.createToobitConnection(symbol, onMessage, onStatusChange, exchangeType);
+    }, 100);
   }
 
   /**
@@ -618,8 +610,11 @@ export class WebSocketService {
   createToobitConnection(symbol, onMessage, onStatusChange, exchangeType = 'futures') {
     const connectionId = `toobit_${symbol}`;
     
-    // 确保完全清理现有连接
-    this.forceDisconnect(connectionId);
+    // 再次确认旧连接已清理（防止重复调用）
+    if (this.connections.has(connectionId)) {
+      console.warn(`连接 ${connectionId} 仍然存在，强制清理`);
+      this.forceDisconnect(connectionId);
+    }
     
     try {
       const wsUrl = toobitFuturesWebSocketUrl;
@@ -627,6 +622,8 @@ export class WebSocketService {
       const ws = new WebSocket(wsUrl);
       this.connections.set(connectionId, ws);
       this.reconnectAttempts.set(connectionId, 0);
+      
+      console.log(`正在创建新的Toobit连接: ${connectionId}`);
 
       ws.onopen = () => {
         onStatusChange('connected');
@@ -639,6 +636,7 @@ export class WebSocketService {
           topic: 'diffDepth',
           event: 'sub',
         };
+        console.log(`Toobit订阅消息:`, JSON.stringify(subscribeMessage));
         ws.send(JSON.stringify(subscribeMessage));
       };
 
@@ -658,11 +656,21 @@ export class WebSocketService {
           }
 
           const data = JSON.parse(event.data);
+          console.log('Toobit收到原始消息:', data);
 
           // 处理深度数据
           if (data.topic && data.topic === 'diffDepth' && data.data && Array.isArray(data.data)) {
+            const depthData = data.data[0];
+            
+            // 如果是全量数据（首次），初始化 orderbook
+            if (data.f === true && depthData && (depthData.b || depthData.a)) {
+              console.log(`Toobit初始化orderbook: symbol=${toobitSymbol(symbol, exchangeType)}`);
+              this.sendToWorker('initToobitOrderBook', 'toobit', symbol, depthData);
+            }
+            
             // 发送到Worker处理
             this.sendToWorker('processToobitMessage', 'toobit', symbol, data);
+            console.log(`Toobit处理消息: symbol=${toobitSymbol(symbol, exchangeType)}, f=${data.f}`);
           }
         } catch (error) {
           console.error('处理Toobit WebSocket消息时出错:', error);
@@ -716,11 +724,19 @@ export class WebSocketService {
     if (ws) {
       console.log(`正在关闭连接: ${connectionId}`);
 
-      // 移除事件监听器，防止在关闭过程中触发回调
-      ws.onopen = null;
-      ws.onmessage = null;
-      ws.onclose = null;
-      ws.onerror = null;
+      // 清理事件监听器，防止数据帧在关闭后处理
+      const noop = () => {};
+      ws.onopen = noop;
+      ws.onmessage = noop;
+      ws.onerror = noop;
+      ws.onclose = () => {
+        console.log(`连接已关闭: ${connectionId}`);
+        // 在 onclose 回调中清理状态
+        this.connections.delete(connectionId);
+        this.stopHeartbeat(connectionId);
+        this.reconnecting.delete(connectionId);
+        this.reconnectAttempts.delete(connectionId);
+      };
 
       // 关闭连接
       if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
@@ -728,21 +744,39 @@ export class WebSocketService {
           ws.close(1000, 'Connection closed by user');
         } catch (error) {
           console.warn(`关闭WebSocket连接时出错: ${error.message}`);
+          // 即使出错也要清理
+          this.connections.delete(connectionId);
+          this.stopHeartbeat(connectionId);
+          this.reconnecting.delete(connectionId);
+          this.reconnectAttempts.delete(connectionId);
         }
+      } else {
+        // 如果连接已经是关闭状态，立即清理
+        this.connections.delete(connectionId);
+        this.stopHeartbeat(connectionId);
+        this.reconnecting.delete(connectionId);
+        this.reconnectAttempts.delete(connectionId);
       }
-
-      // 立即从连接映射中移除，防止重复处理
-      this.connections.delete(connectionId);
-      
-      // 停止心跳
-      this.stopHeartbeat(connectionId);
-      
-      // 清理重连状态
-      this.reconnecting.delete(connectionId);
-      this.reconnectAttempts.delete(connectionId);
-      
-      console.log(`连接已关闭: ${connectionId}`);
     }
+  }
+
+  /**
+   * 断开所有Toobit连接
+   */
+  disconnectAllToobit() {
+    console.log('开始断开所有Toobit WebSocket连接');
+    const connectionIds = Array.from(this.connections.keys());
+    
+    // 找出所有 Toobit 连接
+    const toobitConnections = connectionIds.filter(id => id.startsWith('toobit_'));
+    
+    console.log(`找到 ${toobitConnections.length} 个Toobit连接需要关闭:`, toobitConnections);
+    
+    for (const connectionId of toobitConnections) {
+      this.disconnect(connectionId);
+    }
+    
+    console.log('所有Toobit连接已关闭');
   }
 
   /**
