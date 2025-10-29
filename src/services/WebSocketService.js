@@ -35,8 +35,6 @@ export class WebSocketService {
           const callbackKey = `${exchange}_${symbol}`;
           const callbacks = this.workerCallbacks.get(callbackKey);
           
-          console.log(`Worker返回: exchange=${exchange}, symbol=${symbol}, callbackKey=${callbackKey}, hasCallbacks=${!!callbacks}`);
-          
           if (callbacks) {
             switch (result.type) {
             case 'ping':
@@ -171,7 +169,6 @@ export class WebSocketService {
     try {
       // 步骤1: 尝试获取深度快照
       onStatusChange('connecting');
-      console.log('正在获取Binance现货深度快照...');
       
       let snapshot = null;
       let hasSnapshot = false;
@@ -179,14 +176,12 @@ export class WebSocketService {
       
       try {
         snapshot = await this.getBinanceSpotDepthSnapshot(symbol, 5000);
-        console.log('深度快照获取成功，lastUpdateId:', snapshot.lastUpdateId);
         hasSnapshot = true;
         firstUpdateId = snapshot.lastUpdateId;
         
         // 步骤2: 初始化Worker中的orderbook
         // 使用 connectionId 作为 key，区分现货和合约
         this.sendToWorker('initBinanceOrderBook', 'binance', connectionId, snapshot);
-        console.log(`初始化Worker orderbook完成: ${connectionId}, lastUpdateId: ${snapshot.lastUpdateId}`);
         
         // 步骤2.5: 发送初始快照数据
         const initialData = {
@@ -195,7 +190,6 @@ export class WebSocketService {
           b: snapshot.bids,
           lastUpdateId: snapshot.lastUpdateId
         };
-        console.log(`发送初始快照数据: bids=${snapshot.bids.length}, asks=${snapshot.asks.length}`);
         onDepthMessage(initialData);
       } catch (snapshotError) {
         console.warn('深度快照获取失败，将直接使用WebSocket连接:', snapshotError.message);
@@ -214,7 +208,6 @@ export class WebSocketService {
       this.reconnectAttempts.set(connectionId, 0);
 
       ws.onopen = () => {
-        console.log('WebSocket连接已建立');
         this.reconnectAttempts.set(connectionId, 0);
         this.startHeartbeat(connectionId);
 
@@ -249,7 +242,6 @@ export class WebSocketService {
           }
 
           const data = JSON.parse(event.data);
-          console.log('币安现货收到消息:', data);
           
           // 处理ping消息 - 必须回复pong
           if (data.ping) {
@@ -261,16 +253,13 @@ export class WebSocketService {
           if (data.e && data.e === 'depthUpdate') {
             // 过滤掉在快照之前的更新
             if (hasSnapshot && data.u <= firstUpdateId) {
-              console.log(`跳过旧的更新: u=${data.u}, firstUpdateId=${firstUpdateId}`);
               return;
             }
             
             // 发送到Worker处理 - 使用 connectionId 保持与初始化一致
             this.sendToWorker('processBinanceMessage', 'binance', connectionId, data);
-            console.log(`币安现货发送到Worker: connectionId=${connectionId}`);
           } else if (data.result === null && data.id) {
             // 处理订阅确认
-            console.log('订阅确认成功');
             onStatusChange('connected');
           }
         } catch (error) {
@@ -334,20 +323,17 @@ export class WebSocketService {
     try {
       // 步骤1: 尝试获取深度快照
       onStatusChange('connecting');
-      console.log('正在获取Binance深度快照...');
       
       let snapshot = null;
       let hasSnapshot = false;
       
       try {
         snapshot = await this.getBinanceDepthSnapshot(symbol, 1000);
-        console.log('深度快照获取成功，lastUpdateId:', snapshot.lastUpdateId);
         hasSnapshot = true;
         
         // 步骤2: 初始化Worker中的orderbook
         // 使用 connectionId 作为 key，区分现货和合约
         this.sendToWorker('initBinanceOrderBook', 'binance', connectionId, snapshot);
-        console.log(`初始化Worker orderbook完成: ${connectionId}, lastUpdateId: ${snapshot.lastUpdateId}`);
         
         // 步骤2.5: 发送初始快照数据
         const initialData = {
@@ -356,7 +342,6 @@ export class WebSocketService {
           b: snapshot.bids,
           lastUpdateId: snapshot.lastUpdateId
         };
-        console.log(`发送初始快照数据: bids=${snapshot.bids.length}, asks=${snapshot.asks.length}`);
         onDepthMessage(initialData);
       } catch (snapshotError) {
         console.warn('深度快照获取失败，将直接使用WebSocket连接:', snapshotError.message);
@@ -375,7 +360,6 @@ export class WebSocketService {
       this.reconnectAttempts.set(connectionId, 0);
 
       ws.onopen = () => {
-        console.log('WebSocket连接已建立');
         this.reconnectAttempts.set(connectionId, 0);
         this.startHeartbeat(connectionId);
 
@@ -421,13 +405,11 @@ export class WebSocketService {
           if (data.e && data.e === 'depthUpdate') {
             // 发送到Worker处理 - 使用 connectionId 保持与初始化一致
             this.sendToWorker('processBinanceMessage', 'binance', connectionId, data);
-            console.log(`币安合约发送到Worker: connectionId=${connectionId}`);
           } else if (data.e && data.e === 'markPriceUpdate') {
             // 处理标记价格流
             onMarkPriceMessage(data);
           } else if (data.result === null && data.id) {
             // 处理订阅确认
-            console.log('订阅确认成功');
             onStatusChange('connected');
           }
         } catch (error) {
@@ -461,19 +443,16 @@ export class WebSocketService {
     
     // 检查是否已经在重连中，避免重复重连
     if (this.reconnecting.has(connectionId)) {
-      console.log(`连接 ${connectionId} 正在重连中，跳过重复重连`);
       return;
     }
     
     // 检查重连次数限制
     const attempts = this.reconnectAttempts.get(connectionId) || 0;
     if (attempts >= 3) {
-      console.error(`连接 ${connectionId} 重连次数已达上限，停止重连`);
       onStatusChange('error');
       return;
     }
     
-    console.log(`重新初始化Binance连接... (第${attempts + 1}次尝试)`);
     this.reconnecting.add(connectionId);
     this.reconnectAttempts.set(connectionId, attempts + 1);
     
@@ -630,8 +609,6 @@ export class WebSocketService {
       this.connections.set(connectionId, ws);
       this.reconnectAttempts.set(connectionId, 0);
       
-      console.log(`正在创建新的Toobit连接: ${connectionId}`);
-
       ws.onopen = () => {
         onStatusChange('connected');
         this.reconnectAttempts.set(connectionId, 0);
@@ -643,7 +620,6 @@ export class WebSocketService {
           topic: 'diffDepth',
           event: 'sub',
         };
-        console.log(`Toobit订阅消息:`, JSON.stringify(subscribeMessage));
         ws.send(JSON.stringify(subscribeMessage));
       };
 
@@ -663,7 +639,6 @@ export class WebSocketService {
           }
 
           const data = JSON.parse(event.data);
-          console.log('Toobit收到原始消息:', data);
 
           // 处理深度数据
           if (data.topic && data.topic === 'diffDepth' && data.data && Array.isArray(data.data)) {
@@ -671,13 +646,11 @@ export class WebSocketService {
             
             // 如果是全量数据（首次），初始化 orderbook
             if (data.f === true && depthData && (depthData.b || depthData.a)) {
-              console.log(`Toobit初始化orderbook: symbol=${toobitSymbol(symbol, exchangeType)}`);
               this.sendToWorker('initToobitOrderBook', 'toobit', symbol, depthData);
             }
             
             // 发送到Worker处理
             this.sendToWorker('processToobitMessage', 'toobit', symbol, data);
-            console.log(`Toobit处理消息: symbol=${toobitSymbol(symbol, exchangeType)}, f=${data.f}`);
           }
         } catch (error) {
           console.error('处理Toobit WebSocket消息时出错:', error);
@@ -771,26 +744,45 @@ export class WebSocketService {
    * 断开所有Toobit连接
    */
   disconnectAllToobit() {
-    console.log('开始断开所有Toobit WebSocket连接');
     const connectionIds = Array.from(this.connections.keys());
     
     // 找出所有 Toobit 连接
     const toobitConnections = connectionIds.filter(id => id.startsWith('toobit_'));
     
-    console.log(`找到 ${toobitConnections.length} 个Toobit连接需要关闭:`, toobitConnections);
-    
     for (const connectionId of toobitConnections) {
-      this.disconnect(connectionId);
+      const ws = this.connections.get(connectionId);
+      if (ws) {
+        // 立即清理事件监听器，防止数据帧在关闭后处理
+        const noop = () => {};
+        ws.onopen = noop;
+        ws.onmessage = noop;
+        ws.onerror = noop;
+        ws.onclose = () => {
+        };
+        
+        // 关闭连接
+        if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+          try {
+            ws.close(1000, 'Connection closed by user');
+          } catch (error) {
+            console.warn(`关闭Toobit连接时出错: ${error.message}`);
+          }
+        }
+        
+        // 立即清理
+        this.connections.delete(connectionId);
+        this.reconnectAttempts.delete(connectionId);
+        this.reconnecting.delete(connectionId);
+        this.stopHeartbeat(connectionId);
+      }
     }
     
-    console.log('所有Toobit连接已关闭');
   }
 
   /**
    * 断开所有连接
    */
-  disconnectAll() {
-    console.log('开始断开所有WebSocket连接');
+  disconnectAll() { 
     const connectionIds = Array.from(this.connections.keys());
 
     for (const connectionId of connectionIds) {
@@ -802,7 +794,6 @@ export class WebSocketService {
     this.reconnectAttempts.clear();
     
     // 不要清理Worker回调，重连时需要保留
-    console.log('保留Worker回调，准备重连');
     
     // 停止所有心跳定时器
     for (const [connectionId] of this.heartbeatTimers) {
@@ -814,7 +805,6 @@ export class WebSocketService {
     // 只清理回调映射，避免旧回调干扰
     this.workerCallbacks.clear();
     
-    console.log('所有WebSocket连接已断开，保留Worker');
   }
 
   /**
@@ -827,13 +817,11 @@ export class WebSocketService {
 
     if (attempts < this.maxReconnectAttempts) {
       this.reconnectAttempts.set(connectionId, attempts + 1);
-      console.log(`${connectionId} 准备重连，第${attempts + 1}次尝试`);
 
       setTimeout(() => {
         reconnectFn();
       }, this.reconnectDelay);
     } else {
-      console.error(`${connectionId} 重连次数已达上限`);
     }
   }
 
@@ -850,9 +838,7 @@ export class WebSocketService {
       const ws = this.connections.get(connectionId);
       if (ws && ws.readyState === WebSocket.OPEN) {
         // 连接正常，不需要发送ping
-        console.log(`连接 ${connectionId} 状态正常`);
       } else {
-        console.log(`连接 ${connectionId} 状态异常，停止心跳`);
         this.stopHeartbeat(connectionId);
       }
     }, this.heartbeatInterval);

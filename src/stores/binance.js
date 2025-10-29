@@ -147,7 +147,6 @@ export const useBinanceStore = defineStore('binance', {
       const connectionId = `binance_spot_${symbol}`;
       
       if (this.connections[connectionId] === 'connected') {
-        console.log(`币安现货 ${symbol} 已连接，跳过重复连接`);
         return;
       }
       
@@ -221,9 +220,7 @@ export const useBinanceStore = defineStore('binance', {
 
     // 处理币安深度数据
     handleBinanceDepthData(data, symbol) {
-      console.log(`handleBinanceDepthData 被调用: symbol=${symbol}`, data);
       if (data.e === 'depthUpdate' || (data.a && data.b)) {
-        console.log(`处理深度数据: symbol=${symbol}, asks长度=${data.a?.length || 0}, bids长度=${data.b?.length || 0}`);
         const processedAsks = DepthDataProcessor.processDepthData(data.a, 'asks', this.config.depthLevels);
         const processedBids = DepthDataProcessor.processDepthData(data.b, 'bids', this.config.depthLevels);
 
@@ -251,10 +248,8 @@ export const useBinanceStore = defineStore('binance', {
         this.depthData[symbol].bestAsk = bestPrices.bestAsk;
         this.depthData[symbol].lastUpdate = new Date().toLocaleTimeString();
         
-        console.log(`币安数据更新完成: symbol=${symbol}, bestBid=${bestPrices.bestBid}, bestAsk=${bestPrices.bestAsk}`);
         this.isLoading = false;
       } else {
-        console.log(`数据格式不匹配: symbol=${symbol}`, data);
       }
     },
 
