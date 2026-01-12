@@ -8,7 +8,7 @@ export const useToobitStore = defineStore('toobit', {
     
     // 深度数据 - 按币对分组
     depthData: {},
-    
+     
     // 订阅的币对列表
     subscribedSymbols: ['BTCUSDT', 'ETHUSDT'],
     
