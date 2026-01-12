@@ -22,13 +22,12 @@ const routes = [
         component: () => import('../pages/Depth.vue'),
         meta: { title: '深度对比' },
       },
-      // {
-      //   path: 'depth-aggregator',
-      //   name: 'DepthAggregator',
-      //   component: () => import('../pages/OrderBook.vue'),
-      //   meta: { title: '深度聚合器' },
-      // },
-
+      {
+        path: 'multi-depth',
+        name: 'MultiExchangeDepth',
+        component: () => import('../pages/MultiExchangeDepth.vue'),
+        meta: { title: '多交易所深度对比' },
+      },
       {
         path: 'symbol/:symbol',
         name: 'SymbolDetail',
