@@ -146,6 +146,26 @@
             </svg>
           </div>
         </router-link>
+
+        <router-link to="/orderbook" class="feature-card">
+          <div class="feature-icon orderbook-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+            </svg>
+          </div>
+          <h3 class="feature-title">实时订单簿</h3>
+          <p class="feature-desc">可视化买卖深度图表、市场压力分析、大单追踪与实时订单簿监控</p>
+          <div class="feature-tags">
+            <span class="tag">深度图表</span>
+            <span class="tag">大单追踪</span>
+            <span class="tag">压力分析</span>
+          </div>
+          <div class="feature-arrow">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+            </svg>
+          </div>
+        </router-link>
       </div>
     </section>
 
@@ -699,7 +719,7 @@ onUnmounted(() => {
 
 .features-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 30px;
 }
 
@@ -778,6 +798,14 @@ onUnmounted(() => {
 
 .liquidity-icon svg {
   stroke: #00ff88;
+}
+
+.orderbook-icon {
+  background: linear-gradient(135deg, rgba(255, 165, 0, 0.2), rgba(255, 165, 0, 0.1));
+}
+
+.orderbook-icon svg {
+  stroke: #ffa500;
 }
 
 .feature-icon svg {
