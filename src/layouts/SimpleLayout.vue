@@ -1,61 +1,81 @@
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
-    <!-- 简单头部 -->
-    <header class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 transition-colors duration-300">
-      <div class="max-w-10xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between items-center h-16">
-          <!-- Logo -->
-          <div class="flex items-center">
-            <img class="h-8 w-8" src="@/assets/logo.png" alt="Logo">
-            <span class="ml-2 text-xl font-semibold text-gray-900 dark:text-white"> StoneLink </span>
+  <div class="layout-container">
+    <!-- 金融科技风格头部 -->
+    <header class="fintech-header">
+      <div class="header-inner">
+        <!-- Logo -->
+        <router-link to="/" class="logo-link">
+          <div class="logo-icon">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M12 2L2 7l10 5 10-5-10-5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="M2 17l10 5 10-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="M2 12l10 5 10-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
           </div>
+          <span class="logo-text">StoneLink</span>
+        </router-link>
 
-          <!-- 导航和主题切换 -->
-          <div class="flex items-center space-x-8">
-            <!-- 导航链接 -->
-            <nav class="flex space-x-8">
-              <router-link to="/" class="text-gray-500 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200">
-                首页
-              </router-link>
-              <router-link to="/multi-depth" class="text-gray-500 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200">
-                多交易所深度
-              </router-link>
-              <router-link to="/symbol/BTCUSDT" class="text-gray-500 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200">
-                单币对详情
-              </router-link>
-            </nav>
+        <!-- 导航和主题切换 -->
+        <div class="header-right">
+          <!-- 导航链接 -->
+          <nav class="nav-links">
+            <router-link to="/" class="nav-link" exact-active-class="nav-link-active">
+              <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+              </svg>
+              <span>首页</span>
+            </router-link>
+            <router-link to="/multi-depth" class="nav-link" active-class="nav-link-active">
+              <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              <span>多交易所深度</span>
+            </router-link>
+            <router-link to="/symbol/BTCUSDT" class="nav-link" active-class="nav-link-active">
+              <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              </svg>
+              <span>单币对详情</span>
+            </router-link>
+          </nav>
 
-            <!-- 主题切换按钮 -->
-            <button
-              class="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200"
-              :title="isDark ? '切换到浅色模式' : '切换到暗色模式'"
-              type="button"
-              @click="toggleTheme"
-            >
-              <!-- 太阳图标 (浅色模式) -->
-              <svg v-if="isDark" class="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd" />
-              </svg>
-              <!-- 月亮图标 (暗色模式) -->
-              <svg v-else class="w-5 h-5 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
-              </svg>
-            </button>
+          <!-- 连接状态指示器 -->
+          <div class="connection-indicator" :class="connectionClass">
+            <span class="indicator-dot" />
+            <span class="indicator-text">{{ connectionStatus }}</span>
           </div>
         </div>
       </div>
     </header>
 
-    <!-- 主内容 -->
-    <main class="max-w-10xl mx-auto py-6 sm:px-6 lg:px-8">
+    <!-- 主内容区域 - 无间距限制 -->
+    <main class="main-content">
       <router-view />
     </main>
 
-    <!-- 简单尾部 -->
-    <footer class="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 mt-12 transition-colors duration-300">
-      <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        <div class="text-center text-sm text-gray-500 dark:text-gray-400">
+    <!-- 金融科技风格尾部 -->
+    <footer class="fintech-footer">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <div class="footer-logo">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M12 2L2 7l10 5 10-5-10-5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="M2 17l10 5 10-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="M2 12l10 5 10-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </div>
+          <span class="footer-name">StoneLink</span>
+        </div>
+        <div class="footer-divider" />
+        <div class="footer-copyright">
           © {{ currentYear }} StoneLink. All rights reserved.
+        </div>
+        <div class="footer-links">
+          <a href="#" class="footer-link">关于我们</a>
+          <span class="footer-link-divider">·</span>
+          <a href="#" class="footer-link">使用条款</a>
+          <span class="footer-link-divider">·</span>
+          <a href="#" class="footer-link">隐私政策</a>
         </div>
       </div>
     </footer>
@@ -63,62 +83,31 @@
 </template>
 
 <script>
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted } from 'vue';
 import { useDepthStore } from '../stores/index.js';
 
 export default {
   name: 'SimpleLayout',
   setup() {
     const currentYear = computed(() => new Date().getFullYear());
-    const isDark = ref(false);
     
     // 使用统一的深度 store
     const depthStore = useDepthStore();
 
-    // 切换主题
-    const toggleTheme = () => {
-      isDark.value = !isDark.value;
-      
-      if (isDark.value) {
-        document.documentElement.classList.add('dark');
-        localStorage.setItem('theme', 'dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-        localStorage.setItem('theme', 'light');
-      }
-    };
+    // 连接状态
+    const connectionStatus = computed(() => {
+      const statusMap = {
+        connected: '已连接',
+        connecting: '连接中',
+        disconnected: '未连接',
+        error: '错误',
+      };
+      return statusMap[depthStore.connectionStatus] || '未知';
+    });
 
-    // 初始化主题
-    const initTheme = () => {
-      const savedTheme = localStorage.getItem('theme');
-      
-      // 默认使用黑色模式，除非用户明确选择了浅色模式
-      if (savedTheme === 'light') {
-        isDark.value = false;
-        document.documentElement.classList.remove('dark');
-      } else {
-        // 默认使用黑色模式
-        isDark.value = true;
-        document.documentElement.classList.add('dark');
-        localStorage.setItem('theme', 'dark');
-      }
-    };
-
-    // 监听系统主题变化
-    const watchSystemTheme = () => {
-      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-      mediaQuery.addEventListener('change', e => {
-        if (!localStorage.getItem('theme')) {
-          if (e.matches) {
-            isDark.value = true;
-            document.documentElement.classList.add('dark');
-          } else {
-            isDark.value = false;
-            document.documentElement.classList.remove('dark');
-          }
-        }
-      });
-    };
+    const connectionClass = computed(() => {
+      return depthStore.connectionStatus === 'connected' ? 'connected' : 'disconnected';
+    });
 
     // 初始化 WebSocket 连接
     const initializeWebSockets = async() => {
@@ -132,21 +121,298 @@ export default {
     };
 
     onMounted(async() => {
-      initTheme();
-      watchSystemTheme();
+      // 默认设置为黑色模式
+      document.documentElement.classList.add('dark');
       // 初始化 WebSocket 连接
       await initializeWebSockets();
     });
 
     return {
       currentYear,
-      isDark,
-      toggleTheme
+      connectionStatus,
+      connectionClass,
     };
   },
 };
 </script>
 
 <style scoped>
-  /* 简单布局样式 */
+/* ============================================
+   金融科技风格布局
+   ============================================ */
+
+.layout-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(135deg, #0a0e17 0%, #1a1f2e 50%, #0d1117 100%);
+}
+
+/* 头部样式 */
+.fintech-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(10, 14, 23, 0.85);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(0, 212, 255, 0.1);
+}
+
+.header-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 64px;
+  padding: 0 32px;
+  max-width: 1920px;
+  margin: 0 auto;
+}
+
+/* Logo */
+.logo-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  transition: all 0.3s ease;
+}
+
+.logo-link:hover {
+  transform: translateY(-1px);
+}
+
+.logo-icon {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, rgba(0, 212, 255, 0.2), rgba(138, 43, 226, 0.2));
+  border-radius: 10px;
+  color: #00d4ff;
+}
+
+.logo-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.logo-text {
+  font-size: 20px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #00d4ff, #8a2be2);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* 头部右侧 */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+/* 导航链接 */
+.nav-links {
+  display: flex;
+  gap: 8px;
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #a0aec0;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  border: 1px solid transparent;
+}
+
+.nav-link:hover {
+  color: #00d4ff;
+  background: rgba(0, 212, 255, 0.1);
+  border-color: rgba(0, 212, 255, 0.2);
+}
+
+.nav-link-active {
+  color: #00d4ff;
+  background: rgba(0, 212, 255, 0.15);
+  border-color: rgba(0, 212, 255, 0.3);
+}
+
+.nav-icon {
+  width: 18px;
+  height: 18px;
+}
+
+/* 连接状态指示器 */
+.connection-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.indicator-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.connection-indicator.connected .indicator-dot {
+  background: #00ff88;
+  box-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+}
+
+.connection-indicator.connected .indicator-text {
+  color: #00ff88;
+}
+
+.connection-indicator.disconnected .indicator-dot {
+  background: #ff4757;
+  box-shadow: 0 0 10px rgba(255, 71, 87, 0.5);
+}
+
+.connection-indicator.disconnected .indicator-text {
+  color: #ff4757;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.1); }
+}
+
+/* 主内容区域 */
+.main-content {
+  flex: 1;
+  width: 100%;
+}
+
+/* 尾部样式 */
+.fintech-footer {
+  background: rgba(10, 14, 23, 0.9);
+  border-top: 1px solid rgba(0, 212, 255, 0.1);
+  padding: 24px 32px;
+}
+
+.footer-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  max-width: 1920px;
+  margin: 0 auto;
+  flex-wrap: wrap;
+}
+
+.footer-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.footer-logo {
+  width: 24px;
+  height: 24px;
+  color: #00d4ff;
+}
+
+.footer-logo svg {
+  width: 100%;
+  height: 100%;
+}
+
+.footer-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #a0aec0;
+}
+
+.footer-divider {
+  width: 1px;
+  height: 16px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.footer-copyright {
+  font-size: 13px;
+  color: #718096;
+}
+
+.footer-links {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.footer-link {
+  font-size: 13px;
+  color: #718096;
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+
+.footer-link:hover {
+  color: #00d4ff;
+}
+
+.footer-link-divider {
+  color: #4a5568;
+}
+
+/* 响应式 */
+@media (max-width: 1024px) {
+  .header-inner {
+    padding: 0 20px;
+  }
+
+  .nav-link span {
+    display: none;
+  }
+
+  .nav-link {
+    padding: 10px 12px;
+  }
+
+  .connection-indicator .indicator-text {
+    display: none;
+  }
+
+  .connection-indicator {
+    padding: 8px;
+  }
+}
+
+@media (max-width: 768px) {
+  .header-inner {
+    padding: 0 16px;
+  }
+
+  .nav-links {
+    gap: 4px;
+  }
+
+  .header-right {
+    gap: 12px;
+  }
+
+  .footer-inner {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .footer-divider {
+    display: none;
+  }
+}
 </style>

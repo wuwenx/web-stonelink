@@ -35,7 +35,7 @@
       </template>
       
       <el-row :gutter="20">
-        <el-col :span="12">
+        <el-col :span="4">
           <div class="control-group">
             <label class="control-label">交易对</label>
             <el-select v-model="selectedSymbol" placeholder="选择交易对" @change="updateSymbol">
@@ -98,7 +98,6 @@
       <el-table 
         v-loading="isCalculating" 
         :data="slippageData" 
-        stripe
         border
         class="slippage-table"
       >
@@ -157,7 +156,6 @@
       <el-table 
         v-loading="isLoading" 
         :data="liquidityTableData" 
-        stripe 
         border
         class="liquidity-table"
         :cell-style="getCellStyle"
@@ -557,12 +555,14 @@ watch(() => depthStore.depthData, () => {
 </script>
 
 <style scoped>
+/* ============================================
+   金融科技风格 - 单币对详情
+   ============================================ */
+
 .symbol-detail-container {
-  padding: 20px;
+  padding: 32px 40px;
   max-width: 1600px;
   margin: 0 auto;
-  background: var(--el-bg-color-page);
-  min-height: 100vh;
 }
 
 /* 卡片样式 */
@@ -571,8 +571,30 @@ watch(() => depthStore.depthData, () => {
 .slippage-card,
 .table-card,
 .status-card {
-  margin-bottom: 20px;
-  border-radius: 8px;
+  margin-bottom: 24px;
+  background: rgba(26, 31, 46, 0.6) !important;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(0, 212, 255, 0.15) !important;
+  border-radius: 16px !important;
+  transition: all 0.3s ease;
+}
+
+.header-card:hover,
+.control-card:hover,
+.slippage-card:hover,
+.table-card:hover,
+.status-card:hover {
+  border-color: rgba(0, 212, 255, 0.3) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+:deep(.el-card__header) {
+  border-bottom: 1px solid rgba(0, 212, 255, 0.1) !important;
+  padding: 16px 24px !important;
+}
+
+:deep(.el-card__body) {
+  padding: 20px 24px !important;
 }
 
 .card-header {
@@ -589,9 +611,12 @@ watch(() => depthStore.depthData, () => {
 
 .page-title {
   margin: 0;
-  font-size: 20px;
-  font-weight: bold;
-  color: var(--el-text-color-primary);
+  font-size: 24px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #00d4ff, #8a2be2);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .header-right {
@@ -602,8 +627,8 @@ watch(() => depthStore.depthData, () => {
 
 .card-title {
   font-size: 16px;
-  font-weight: bold;
-  color: var(--el-text-color-primary);
+  font-weight: 600;
+  color: #e4e8f0;
 }
 
 /* 控制面板样式 */
@@ -615,8 +640,39 @@ watch(() => depthStore.depthData, () => {
   display: block;
   font-size: 14px;
   font-weight: 500;
-  color: var(--el-text-color-regular);
+  color: #a0aec0;
   margin-bottom: 8px;
+}
+
+/* Radio Button 金融科技风格 */
+:deep(.el-radio-button__inner) {
+  background: rgba(0, 0, 0, 0.3) !important;
+  border-color: rgba(0, 212, 255, 0.2) !important;
+  color: #a0aec0 !important;
+  transition: all 0.3s ease;
+}
+
+:deep(.el-radio-button__inner:hover) {
+  color: #00d4ff !important;
+  border-color: rgba(0, 212, 255, 0.4) !important;
+}
+
+:deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) {
+  background: linear-gradient(135deg, #00d4ff, #0099cc) !important;
+  border-color: #00d4ff !important;
+  color: #0a0e17 !important;
+  box-shadow: 0 4px 15px rgba(0, 212, 255, 0.3);
+}
+
+/* Select 样式 */
+:deep(.el-select .el-input__wrapper) {
+  background: rgba(0, 0, 0, 0.3) !important;
+  border-color: rgba(0, 212, 255, 0.2) !important;
+  box-shadow: none !important;
+}
+
+:deep(.el-select .el-input__inner) {
+  color: #e4e8f0 !important;
 }
 
 /* 滑点控制面板样式 */
@@ -635,14 +691,34 @@ watch(() => depthStore.depthData, () => {
   display: block;
   font-size: 14px;
   font-weight: 500;
-  color: var(--el-text-color-regular);
+  color: #a0aec0;
   margin-bottom: 8px;
 }
 
+/* Input Number 样式 */
+:deep(.el-input-number) {
+  --el-input-bg-color: rgba(0, 0, 0, 0.3);
+  --el-input-border-color: rgba(0, 212, 255, 0.2);
+  --el-input-text-color: #e4e8f0;
+}
+
+:deep(.el-input-number .el-input__wrapper) {
+  background: rgba(0, 0, 0, 0.3) !important;
+  border-color: rgba(0, 212, 255, 0.2) !important;
+  box-shadow: none !important;
+}
+
+:deep(.el-input-number__decrease),
+:deep(.el-input-number__increase) {
+  background: rgba(0, 212, 255, 0.1) !important;
+  border-color: rgba(0, 212, 255, 0.2) !important;
+  color: #00d4ff !important;
+}
+
 .price-text {
-  font-family: 'Courier New', monospace;
-  font-weight: bold;
-  color: var(--el-text-color-primary);
+  font-family: 'JetBrains Mono', 'SF Mono', monospace;
+  font-weight: 700;
+  color: #00d4ff;
 }
 
 /* 表格样式 */
@@ -651,36 +727,86 @@ watch(() => depthStore.depthData, () => {
   width: 100%;
 }
 
-.liquidity-table :deep(.el-table__header) {
-  background-color: var(--el-fill-color-light);
+:deep(.el-table) {
+  background: transparent !important;
+  --el-table-border-color: rgba(0, 212, 255, 0.1);
+  --el-table-header-bg-color: rgba(0, 0, 0, 0.3);
+  --el-table-tr-bg-color: transparent;
+  --el-table-row-hover-bg-color: rgba(0, 212, 255, 0.05);
 }
 
-.liquidity-table :deep(.el-table__header th) {
-  background-color: var(--el-fill-color-light);
-  color: var(--el-text-color-primary);
-  font-weight: bold;
-  text-align: center;
+:deep(.el-table__header-wrapper) {
+  background: rgba(0, 0, 0, 0.3);
 }
 
-.liquidity-table :deep(.el-table__body tr:hover > td) {
-  background-color: var(--el-fill-color-lighter);
+:deep(.el-table th.el-table__cell) {
+  background: rgba(0, 0, 0, 0.3) !important;
+  color: #a0aec0 !important;
+  font-weight: 600;
+  border-bottom: 1px solid rgba(0, 212, 255, 0.1) !important;
 }
 
-/* 标签样式 */
-.el-tag {
-  font-weight: 500;
+:deep(.el-table td.el-table__cell) {
+  border-bottom: 1px solid rgba(0, 212, 255, 0.05) !important;
+}
+
+:deep(.el-table__body tr:hover > td.el-table__cell) {
+  background: rgba(0, 212, 255, 0.08) !important;
+}
+
+:deep(.el-table__inner-wrapper::before) {
+  display: none;
+}
+
+/* Tag 样式优化 */
+:deep(.el-tag) {
+  border: none !important;
+}
+
+:deep(.el-tag--info) {
+  background: rgba(0, 212, 255, 0.15) !important;
+  color: #00d4ff !important;
+}
+
+:deep(.el-tag--success) {
+  background: rgba(0, 255, 136, 0.15) !important;
+  color: #00ff88 !important;
+}
+
+:deep(.el-tag--warning) {
+  background: rgba(251, 191, 36, 0.15) !important;
+  color: #fbbf24 !important;
+}
+
+:deep(.el-tag--danger) {
+  background: rgba(255, 71, 87, 0.15) !important;
+  color: #ff4757 !important;
+}
+
+/* 按钮样式 */
+:deep(.el-button--primary) {
+  background: linear-gradient(135deg, #00d4ff, #0099cc) !important;
+  border: none !important;
+  color: #0a0e17 !important;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+:deep(.el-button--primary:hover) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 212, 255, 0.4);
 }
 
 /* 连接状态样式 */
 .status-display {
   text-align: center;
-  padding: 10px;
+  padding: 16px;
 }
 
 /* 响应式设计 */
 @media (max-width: 768px) {
   .symbol-detail-container {
-    padding: 10px;
+    padding: 16px;
   }
   
   .card-header {
@@ -695,40 +821,9 @@ watch(() => depthStore.depthData, () => {
     justify-content: space-between;
   }
   
-  .liquidity-table {
-    font-size: 12px;
+  .slippage-controls {
+    flex-direction: column;
+    align-items: stretch;
   }
-  
-  .liquidity-table :deep(.el-table__cell) {
-    padding: 8px 4px;
-  }
-}
-
-/* 暗色主题适配 */
-html.dark .liquidity-table :deep(.el-table__header) {
-  background-color: var(--el-fill-color-darker);
-}
-
-html.dark .liquidity-table :deep(.el-table__header th) {
-  background-color: var(--el-fill-color-darker);
-  color: var(--el-text-color-primary);
-}
-
-html.dark .liquidity-table :deep(.el-table__body tr:hover > td) {
-  background-color: var(--el-fill-color-dark);
-}
-
-/* 动画效果 */
-.header-card,
-.table-card,
-.status-card {
-  transition: all 0.3s ease;
-}
-
-.header-card:hover,
-.table-card:hover,
-.status-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--el-box-shadow-light);
 }
 </style>

@@ -286,20 +286,41 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* ============================================
+   金融科技风格 - 多交易所深度对比
+   ============================================ */
+
 .multi-exchange-depth {
-  padding: 20px;
-  max-width: 1200px;
+  padding: 32px 40px;
+  max-width: 1400px;
   margin: 0 auto;
-  background: var(--el-bg-color-page);
-  min-height: 100vh;
 }
 
 /* 卡片样式 */
 .header-card,
 .control-card,
 .table-card {
-  margin-bottom: 20px;
-  border-radius: 8px;
+  margin-bottom: 24px;
+  background: rgba(26, 31, 46, 0.6) !important;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(0, 212, 255, 0.15) !important;
+  border-radius: 16px !important;
+}
+
+.header-card:hover,
+.control-card:hover,
+.table-card:hover {
+  border-color: rgba(0, 212, 255, 0.3) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+:deep(.el-card__header) {
+  border-bottom: 1px solid rgba(0, 212, 255, 0.1) !important;
+  padding: 16px 24px !important;
+}
+
+:deep(.el-card__body) {
+  padding: 20px 24px !important;
 }
 
 .card-header {
@@ -310,15 +331,18 @@ onUnmounted(() => {
 
 .page-title {
   margin: 0;
-  font-size: 20px;
-  font-weight: bold;
-  color: var(--el-text-color-primary);
+  font-size: 24px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #00d4ff, #8a2be2);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .card-title {
   font-size: 16px;
-  font-weight: bold;
-  color: var(--el-text-color-primary);
+  font-weight: 600;
+  color: #e4e8f0;
 }
 
 /* 深度选择器 */
@@ -330,7 +354,7 @@ onUnmounted(() => {
 
 .depth-label {
   font-size: 14px;
-  color: var(--el-text-color-regular);
+  color: #a0aec0;
   white-space: nowrap;
 }
 
@@ -344,8 +368,32 @@ onUnmounted(() => {
 .control-label {
   font-size: 14px;
   font-weight: 500;
-  color: var(--el-text-color-regular);
+  color: #a0aec0;
   white-space: nowrap;
+}
+
+/* Radio Button 金融科技风格 */
+:deep(.el-radio-group) {
+  --el-radio-button-checked-bg-color: linear-gradient(135deg, #00d4ff, #0099cc);
+}
+
+:deep(.el-radio-button__inner) {
+  background: rgba(0, 0, 0, 0.3) !important;
+  border-color: rgba(0, 212, 255, 0.2) !important;
+  color: #a0aec0 !important;
+  transition: all 0.3s ease;
+}
+
+:deep(.el-radio-button__inner:hover) {
+  color: #00d4ff !important;
+  border-color: rgba(0, 212, 255, 0.4) !important;
+}
+
+:deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) {
+  background: linear-gradient(135deg, #00d4ff, #0099cc) !important;
+  border-color: #00d4ff !important;
+  color: #0a0e17 !important;
+  box-shadow: 0 4px 15px rgba(0, 212, 255, 0.3);
 }
 
 /* 表格样式 */
@@ -353,15 +401,75 @@ onUnmounted(() => {
   width: 100%;
 }
 
-.comparison-table :deep(.el-table__header th) {
-  background-color: var(--el-bg-color);
-  font-weight: bold;
+:deep(.el-table) {
+  background: transparent !important;
+  --el-table-border-color: rgba(0, 212, 255, 0.1);
+  --el-table-header-bg-color: rgba(0, 0, 0, 0.3);
+  --el-table-tr-bg-color: transparent;
+  --el-table-row-hover-bg-color: rgba(0, 212, 255, 0.05);
+}
+
+:deep(.el-table__header-wrapper) {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+:deep(.el-table th.el-table__cell) {
+  background: rgba(0, 0, 0, 0.3) !important;
+  color: #a0aec0 !important;
+  font-weight: 600;
+  border-bottom: 1px solid rgba(0, 212, 255, 0.1) !important;
+}
+
+:deep(.el-table td.el-table__cell) {
+  border-bottom: 1px solid rgba(0, 212, 255, 0.05) !important;
+}
+
+:deep(.el-table__body tr:hover > td.el-table__cell) {
+  background: rgba(0, 212, 255, 0.08) !important;
+}
+
+:deep(.el-table__inner-wrapper::before) {
+  display: none;
+}
+
+/* Tag 样式优化 */
+:deep(.el-tag) {
+  border: none !important;
+}
+
+:deep(.el-tag--info) {
+  background: rgba(0, 212, 255, 0.15) !important;
+  color: #00d4ff !important;
+}
+
+:deep(.el-tag--success) {
+  background: rgba(0, 255, 136, 0.15) !important;
+  color: #00ff88 !important;
+}
+
+:deep(.el-tag--danger) {
+  background: rgba(255, 71, 87, 0.15) !important;
+  color: #ff4757 !important;
+}
+
+/* 按钮样式 */
+:deep(.el-button--primary) {
+  background: linear-gradient(135deg, #00d4ff, #0099cc) !important;
+  border: none !important;
+  color: #0a0e17 !important;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+:deep(.el-button--primary:hover) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 212, 255, 0.4);
 }
 
 /* 响应式 */
 @media (max-width: 768px) {
   .multi-exchange-depth {
-    padding: 12px;
+    padding: 16px;
   }
 
   .card-header {
