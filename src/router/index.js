@@ -17,22 +17,10 @@ const routes = [
         meta: { title: '首页' },
       },
       {
-        path: 'depth',
-        name: 'Depth',
-        component: () => import('../pages/Depth.vue'),
-        meta: { title: '深度对比' },
-      },
-      {
         path: 'multi-depth',
         name: 'MultiExchangeDepth',
         component: () => import('../pages/MultiExchangeDepth.vue'),
         meta: { title: '多交易所深度对比' },
-      },
-      {
-        path: 'symbol/:symbol',
-        name: 'SymbolDetail',
-        component: () => import('../pages/SymbolDetail.vue'),
-        meta: { title: '币对详情' },
       },
     ],
   },

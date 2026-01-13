@@ -17,8 +17,8 @@
               <router-link to="/" class="text-gray-500 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200">
                 首页
               </router-link>
-              <router-link to="/depth" class="text-gray-500 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200">
-                深度对比
+              <router-link to="/multi-depth" class="text-gray-500 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200">
+                多交易所深度
               </router-link>
             </nav>
 
@@ -61,7 +61,7 @@
 
 <script>
 import { computed, onMounted, ref } from 'vue';
-import { useBinanceStore, useToobitStore } from '../stores/index.js';
+import { useDepthStore } from '../stores/index.js';
 
 export default {
   name: 'SimpleLayout',
@@ -69,45 +69,35 @@ export default {
     const currentYear = computed(() => new Date().getFullYear());
     const isDark = ref(false);
     
-    // 使用stores
-    const binanceStore = useBinanceStore();
-    const toobitStore = useToobitStore();
+    // 使用统一的深度 store
+    const depthStore = useDepthStore();
 
     // 切换主题
     const toggleTheme = () => {
-      console.log('切换主题被点击，当前状态:', isDark.value);
       isDark.value = !isDark.value;
-      console.log('切换后状态:', isDark.value);
       
       if (isDark.value) {
         document.documentElement.classList.add('dark');
         localStorage.setItem('theme', 'dark');
-        console.log('已切换到暗色模式');
       } else {
         document.documentElement.classList.remove('dark');
         localStorage.setItem('theme', 'light');
-        console.log('已切换到浅色模式');
       }
     };
 
     // 初始化主题
     const initTheme = () => {
       const savedTheme = localStorage.getItem('theme');
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      
-      console.log('初始化主题 - 保存的主题:', savedTheme, '系统偏好暗色:', prefersDark);
       
       // 默认使用黑色模式，除非用户明确选择了浅色模式
       if (savedTheme === 'light') {
         isDark.value = false;
         document.documentElement.classList.remove('dark');
-        console.log('初始化: 设置为浅色模式');
       } else {
         // 默认使用黑色模式
         isDark.value = true;
         document.documentElement.classList.add('dark');
         localStorage.setItem('theme', 'dark');
-        console.log('初始化: 设置为暗色模式（默认）');
       }
     };
 
@@ -127,24 +117,21 @@ export default {
       });
     };
 
-    // 初始化WebSocket连接
+    // 初始化 WebSocket 连接
     const initializeWebSockets = async() => {
       try {
-        console.log('SimpleLayout: 初始化WebSocket连接');
-        await Promise.all([
-          binanceStore.connectWebSockets(),
-          toobitStore.connectWebSockets()
-        ]);
-        console.log('SimpleLayout: WebSocket连接初始化完成');
+        console.log('SimpleLayout: 初始化统一 WebSocket 连接');
+        await depthStore.connect();
+        console.log('SimpleLayout: WebSocket 连接初始化完成');
       } catch (error) {
-        console.error('SimpleLayout: WebSocket连接失败:', error);
+        console.error('SimpleLayout: WebSocket 连接失败:', error);
       }
     };
 
     onMounted(async() => {
       initTheme();
       watchSystemTheme();
-      // 初始化WebSocket连接
+      // 初始化 WebSocket 连接
       await initializeWebSockets();
     });
 

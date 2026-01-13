@@ -51,6 +51,15 @@ function handleUpdateConfig(newConfig) {
 }
 
 /**
+ * 判断是否为 Toobit 交易所
+ * @param {string} exchange - 交易所 ID
+ * @returns {boolean}
+ */
+function isToobitExchange(exchange) {
+  return exchange && (exchange.startsWith('toobit') || exchange === 'toobitUM' || exchange === 'toobitSpot');
+}
+
+/**
  * 处理深度数据
  * @param {Object} data - 原始深度数据
  */
@@ -62,9 +71,12 @@ function handleProcessDepth(data) {
       return;
     }
 
+    // 判断是否需要对数量进行转换（Toobit 需要除以 1000）
+    const quantityDivisor = isToobitExchange(exchange) ? 1000 : 1;
+
     // 处理买盘和卖盘数据
-    const processedBids = processDepthData(bids, 'bids');
-    const processedAsks = processDepthData(asks, 'asks');
+    const processedBids = processDepthData(bids, 'bids', quantityDivisor);
+    const processedAsks = processDepthData(asks, 'asks', quantityDivisor);
 
     // 计算最佳买卖价
     const bestBid = processedBids.length > 0 ? processedBids[0].price : 0;
@@ -117,18 +129,19 @@ function handleProcessDepth(data) {
  * 处理深度数据
  * @param {Array} rawData - 原始数据 [{ px, qty }, ...]
  * @param {string} type - 'bids' 或 'asks'
+ * @param {number} quantityDivisor - 数量除数（Toobit 为 1000，其他为 1）
  * @returns {Array} 处理后的数据
  */
-function processDepthData(rawData, type) {
+function processDepthData(rawData, type, quantityDivisor = 1) {
   if (!rawData || !Array.isArray(rawData)) {
     return [];
   }
 
-  // 转换并过滤数据
+  // 转换并过滤数据（Toobit 的数量需要除以 1000）
   const processed = rawData
     .map(item => ({
       price: parseFloat(item.px),
-      quantity: parseFloat(item.qty),
+      quantity: parseFloat(item.qty) / quantityDivisor,
     }))
     .filter(item => item.quantity > 0 && !isNaN(item.price) && !isNaN(item.quantity))
     .slice(0, config.depthLevels);
