@@ -20,6 +20,9 @@
               <router-link to="/multi-depth" class="text-gray-500 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200">
                 多交易所深度
               </router-link>
+              <router-link to="/symbol/BTCUSDT" class="text-gray-500 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200">
+                单币对详情
+              </router-link>
             </nav>
 
             <!-- 主题切换按钮 -->

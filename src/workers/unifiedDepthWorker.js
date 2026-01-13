@@ -51,12 +51,12 @@ function handleUpdateConfig(newConfig) {
 }
 
 /**
- * 判断是否为 Toobit 交易所
+ * 判断是否为 Toobit 合约交易所（只有合约需要除以 1000）
  * @param {string} exchange - 交易所 ID
  * @returns {boolean}
  */
-function isToobitExchange(exchange) {
-  return exchange && (exchange.startsWith('toobit') || exchange === 'toobitUM' || exchange === 'toobitSpot');
+function isToobitFutures(exchange) {
+  return exchange === 'toobitUM';
 }
 
 /**
@@ -71,8 +71,8 @@ function handleProcessDepth(data) {
       return;
     }
 
-    // 判断是否需要对数量进行转换（Toobit 需要除以 1000）
-    const quantityDivisor = isToobitExchange(exchange) ? 1000 : 1;
+    // 判断是否需要对数量进行转换（只有 Toobit 合约需要除以 1000）
+    const quantityDivisor = isToobitFutures(exchange) ? 1000 : 1;
 
     // 处理买盘和卖盘数据
     const processedBids = processDepthData(bids, 'bids', quantityDivisor);
@@ -129,7 +129,7 @@ function handleProcessDepth(data) {
  * 处理深度数据
  * @param {Array} rawData - 原始数据 [{ px, qty }, ...]
  * @param {string} type - 'bids' 或 'asks'
- * @param {number} quantityDivisor - 数量除数（Toobit 为 1000，其他为 1）
+ * @param {number} quantityDivisor - 数量除数（Toobit 合约为 1000，其他为 1）
  * @returns {Array} 处理后的数据
  */
 function processDepthData(rawData, type, quantityDivisor = 1) {
@@ -137,7 +137,7 @@ function processDepthData(rawData, type, quantityDivisor = 1) {
     return [];
   }
 
-  // 转换并过滤数据（Toobit 的数量需要除以 1000）
+  // 转换并过滤数据（Toobit 合约的数量需要除以 1000，现货不需要）
   const processed = rawData
     .map(item => ({
       price: parseFloat(item.px),

@@ -18,15 +18,9 @@
 
     <!-- 控制面板 -->
     <el-card class="control-card" shadow="hover">
-      <template #header>
-        <div class="card-header">
-          <span class="card-title">控制面板</span>
-        </div>
-      </template>
-
-      <el-row :gutter="20">
+      <el-row :gutter="20" align="middle">
         <!-- 交易类型 -->
-        <el-col :span="4">
+        <el-col :span="6">
           <div class="control-group">
             <label class="control-label">交易类型</label>
             <el-radio-group v-model="exchangeType" size="default" @change="handleExchangeTypeChange">
@@ -40,26 +34,11 @@
           </div>
         </el-col>
 
-        <!-- 交易对 -->
-        <el-col :span="4">
-          <div class="control-group">
-            <label class="control-label">交易对</label>
-            <el-select v-model="currentSymbol" size="default" @change="handleSymbolChange">
-              <el-option
-                v-for="symbol in availableSymbols"
-                :key="symbol"
-                :label="symbol"
-                :value="symbol"
-              />
-            </el-select>
-          </div>
-        </el-col>
-
         <!-- 买卖方向 -->
-        <el-col :span="4">
+        <el-col :span="6">
           <div class="control-group">
             <label class="control-label">方向</label>
-            <el-radio-group v-model="orderSide" size="default">
+            <el-radio-group v-model="orderSide" size="default" @change="handleOrderSideChange">
               <el-radio-button label="buy">
                 买盘
               </el-radio-button>
@@ -69,11 +48,16 @@
             </el-radio-group>
           </div>
         </el-col>
+      </el-row>
+    </el-card>
 
-        <!-- 深度范围 -->
-        <el-col :span="12">
-          <div class="control-group">
-            <label class="control-label">深度范围</label>
+    <!-- 深度对比数据 -->
+    <el-card class="table-card" shadow="hover">
+      <template #header>
+        <div class="card-header">
+          <span class="card-title">深度对比数据</span>
+          <div class="depth-selector">
+            <span class="depth-label">深度范围:</span>
             <el-radio-group v-model="depthPercentage" size="small" @change="handleDepthPercentageChange">
               <el-radio-button
                 v-for="option in depthOptions"
@@ -84,152 +68,122 @@
               </el-radio-button>
             </el-radio-group>
           </div>
-        </el-col>
-      </el-row>
-
-      <!-- 交易所选择 -->
-      <el-row :gutter="20" class="exchange-selector">
-        <el-col :span="24">
-          <div class="control-group">
-            <label class="control-label">选择交易所</label>
-            <el-checkbox-group v-model="selectedExchangeIds" @change="handleExchangeSelectionChange">
-              <el-checkbox
-                v-for="exchange in availableExchanges"
-                :key="exchange.id"
-                :label="exchange.id"
-                border
-              >
-                <span :style="{ color: exchange.color }">{{ exchange.name }}</span>
-              </el-checkbox>
-            </el-checkbox-group>
-          </div>
-        </el-col>
-      </el-row>
-    </el-card>
-
-    <!-- 深度对比表格 -->
-    <el-card class="table-card" shadow="hover">
-      <template #header>
-        <div class="card-header">
-          <span class="card-title">
-            {{ currentSymbol }} - {{ orderSide === 'buy' ? '买盘' : '卖盘' }}深度对比
-          </span>
-          <span class="depth-info">
-            深度范围: {{ getCurrentDepthLabel }}
-          </span>
         </div>
       </template>
 
       <el-table
         v-loading="isLoading"
-        :data="comparisonTableData"
+        :data="depthComparisonData"
         class="comparison-table"
         :cell-style="getCellStyle"
         :header-cell-style="getHeaderCellStyle"
       >
-        <el-table-column prop="rank" label="排名" width="80" align="center">
-          <template #default="{ $index }">
-            <el-tag :type="getRankTagType($index)" size="small">
-              {{ $index + 1 }}
+        <el-table-column prop="displayName" label="资产" width="180" align="center">
+          <template #default="{ row }">
+            <el-button type="primary" size="small" @click="goToSymbolDetail(row.symbol)">
+              {{ row.displayName }} {{ exchangeTypeLabel }}
+            </el-button>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="BINANCE" align="center">
+          <template #default="{ row }">
+            <el-tag type="info" size="large">
+              {{ formatDepthValue(row.binanceDepth) }}
             </el-tag>
           </template>
         </el-table-column>
 
-        <el-table-column prop="exchangeName" label="交易所" width="120" align="center">
+        <el-table-column label="TOOBIT" align="center">
           <template #default="{ row }">
-            <span :style="{ color: row.color, fontWeight: 'bold' }">
-              {{ row.exchangeName }}
-            </span>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="深度量" align="center">
-          <template #default="{ row }">
-            <el-tag type="primary" size="large">
-              {{ formatDepthValue(orderSide === 'buy' ? row.bidDepth : row.askDepth) }}
+            <el-tag type="info" size="large">
+              {{ formatDepthValue(row.toobitDepth) }}
             </el-tag>
           </template>
         </el-table-column>
 
-        <el-table-column label="最佳买价" align="center">
+        <el-table-column label="分数" width="100" align="center">
           <template #default="{ row }">
-            <span class="price-value bid">{{ formatPrice(row.bestBid) }}</span>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="最佳卖价" align="center">
-          <template #default="{ row }">
-            <span class="price-value ask">{{ formatPrice(row.bestAsk) }}</span>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="价差" align="center">
-          <template #default="{ row }">
-            <el-tag :type="getSpreadTagType(row.spreadPercent)" size="small">
-              {{ formatSpread(row.spreadPercent) }}
+            <el-tag :type="getScoreTagType(row.depthScore)" size="small">
+              {{ formatScore(row.depthScore) }}
             </el-tag>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="更新时间" width="100" align="center">
-          <template #default="{ row }">
-            <span class="update-time">{{ row.lastUpdate }}</span>
           </template>
         </el-table-column>
       </el-table>
     </el-card>
 
-    <!-- 深度可视化 -->
-    <el-card class="chart-card" shadow="hover">
+    <!-- 价差详情对比 -->
+    <el-card class="table-card" shadow="hover">
       <template #header>
         <div class="card-header">
-          <span class="card-title">深度分布可视化</span>
+          <span class="card-title">价差详情对比</span>
         </div>
       </template>
 
-      <div class="depth-bars">
-        <div
-          v-for="(item, index) in comparisonTableData"
-          :key="item.exchange"
-          class="depth-bar-item"
-        >
-          <div class="bar-label">
-            <span :style="{ color: item.color }">{{ item.exchangeName }}</span>
-            <span class="bar-value">{{ formatDepthValue(orderSide === 'buy' ? item.bidDepth : item.askDepth) }}</span>
-          </div>
-          <div class="bar-container">
-            <div
-              class="bar-fill"
-              :style="{
-                width: getBarWidth(item, index) + '%',
-                backgroundColor: item.color,
-              }"
-            />
-          </div>
-        </div>
-      </div>
+      <el-table
+        v-loading="isLoading"
+        :data="spreadComparisonData"
+        class="comparison-table"
+        :cell-style="getCellStyle"
+        :header-cell-style="getHeaderCellStyle"
+      >
+        <el-table-column prop="displayName" label="资产" width="180" align="center">
+          <template #default="{ row }">
+            <el-button type="primary" size="small" @click="goToSymbolDetail(row.symbol)">
+              {{ row.displayName }} {{ exchangeTypeLabel }}
+            </el-button>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="BINANCE" align="center">
+          <template #default="{ row }">
+            <el-tag type="info" size="large">
+              {{ formatSpread(row.binanceSpread) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="TOOBIT" align="center">
+          <template #default="{ row }">
+            <el-tag type="info" size="large">
+              {{ formatSpread(row.toobitSpread) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="分数 ↑" width="100" align="center">
+          <template #default="{ row }">
+            <el-tag :type="getScoreTagType(row.spreadScore)" size="small">
+              {{ formatScore(row.spreadScore) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+      </el-table>
     </el-card>
   </div>
 </template>
 
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import { useDepthStore } from '../stores/depth';
+
+const router = useRouter();
 
 const depthStore = useDepthStore();
 
 // 响应式数据
 const exchangeType = ref(depthStore.config.exchangeType);
-const currentSymbol = ref(depthStore.config.symbol);
+const orderSide = ref(depthStore.config.orderSide);
 const depthPercentage = ref(depthStore.config.depthPercentage);
-const orderSide = ref('buy');
-const selectedExchangeIds = ref([...depthStore.selectedExchanges]);
 
 // 计算属性
-const availableExchanges = computed(() => depthStore.availableExchanges);
-const availableSymbols = computed(() => depthStore.availableSymbols);
 const depthOptions = computed(() => depthStore.depthOptions);
 const isLoading = computed(() => depthStore.isLoading);
+
+const exchangeTypeLabel = computed(() => {
+  return exchangeType.value === 'futures' ? 'FUTURES' : 'SPOT';
+});
 
 const connectionStatusType = computed(() => {
   const statusMap = {
@@ -253,87 +207,62 @@ const connectionStatusText = computed(() => {
   return statusMap[depthStore.connectionStatus] || '未知';
 });
 
-const getCurrentDepthLabel = computed(() => {
-  const option = depthOptions.value.find(o => o.value === depthPercentage.value);
-  return option ? option.label : '';
+// 深度对比数据
+const depthComparisonData = computed(() => {
+  return depthStore.depthComparisonBySymbol;
 });
 
-// 对比表格数据
-const comparisonTableData = computed(() => {
-  return depthStore.depthComparisonData;
+// 价差对比数据
+const spreadComparisonData = computed(() => {
+  return depthStore.spreadComparisonBySymbol;
 });
 
 // 事件处理
 const handleExchangeTypeChange = type => {
   depthStore.switchExchangeType(type);
-  // 更新选中的交易所
-  selectedExchangeIds.value = [...depthStore.selectedExchanges];
 };
 
-const handleSymbolChange = symbol => {
-  depthStore.switchSymbol(symbol);
+const handleOrderSideChange = side => {
+  depthStore.updateOrderSide(side);
 };
 
 const handleDepthPercentageChange = percentage => {
   depthStore.updateDepthPercentage(percentage);
 };
 
-const handleExchangeSelectionChange = selected => {
-  depthStore.updateSelectedExchanges(selected);
+// 跳转到单币种详情页
+const goToSymbolDetail = symbol => {
+  router.push(`/symbol/${symbol}`);
 };
 
 // 格式化函数
 const formatDepthValue = value => {
   if (!value || value === 0) return '0';
   if (value >= 1000000) {
-    return (value / 1000000).toFixed(2) + 'M';
+    return (value / 1000000).toFixed(1) + 'M';
   } else if (value >= 1000) {
-    return (value / 1000).toFixed(2) + 'K';
+    return (value / 1000).toFixed(1) + 'K';
   } else {
-    return value.toFixed(4);
+    return value.toFixed(1);
   }
 };
 
-const formatPrice = price => {
-  if (!price || price === 0) return '--';
-  return price.toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 8,
-  });
+const formatSpread = spreadPercent => {
+  if (spreadPercent === undefined || spreadPercent === null) return '0.0000 %';
+  return `${spreadPercent.toFixed(4)} %`;
 };
 
-const formatSpread = spreadPercent => {
-  if (!spreadPercent || spreadPercent === 0) return '0.0000%';
-  return `${spreadPercent.toFixed(4)}%`;
+const formatScore = score => {
+  if (score > 0) return '+1';
+  if (score < 0) return '-1';
+  return '=';
 };
 
 // 样式函数
-const getRankTagType = index => {
-  if (index === 0) return 'success';
-  if (index === 1) return 'warning';
-  if (index === 2) return '';
+const getScoreTagType = score => {
+  if (score > 0) return 'success';
+  if (score < 0) return 'danger';
   return 'info';
-};
-
-const getSpreadTagType = spreadPercent => {
-  if (spreadPercent < 0.01) return 'success';
-  if (spreadPercent < 0.05) return 'warning';
-  return 'danger';
-};
-
-const getBarWidth = (item, index) => {
-  if (comparisonTableData.value.length === 0) return 0;
-
-  const maxDepth = Math.max(
-    ...comparisonTableData.value.map(d =>
-      orderSide.value === 'buy' ? d.bidDepth : d.askDepth
-    )
-  );
-
-  if (maxDepth === 0) return 0;
-
-  const depth = orderSide.value === 'buy' ? item.bidDepth : item.askDepth;
-  return (depth / maxDepth) * 100;
 };
 
 const getCellStyle = () => ({
@@ -359,7 +288,7 @@ onUnmounted(() => {
 <style scoped>
 .multi-exchange-depth {
   padding: 20px;
-  max-width: 1600px;
+  max-width: 1200px;
   margin: 0 auto;
   background: var(--el-bg-color-page);
   min-height: 100vh;
@@ -368,8 +297,7 @@ onUnmounted(() => {
 /* 卡片样式 */
 .header-card,
 .control-card,
-.table-card,
-.chart-card {
+.table-card {
   margin-bottom: 20px;
   border-radius: 8px;
 }
@@ -393,33 +321,31 @@ onUnmounted(() => {
   color: var(--el-text-color-primary);
 }
 
-.depth-info {
+/* 深度选择器 */
+.depth-selector {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.depth-label {
   font-size: 14px;
-  color: var(--el-text-color-secondary);
+  color: var(--el-text-color-regular);
+  white-space: nowrap;
 }
 
 /* 控制组样式 */
 .control-group {
-  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .control-label {
-  display: block;
   font-size: 14px;
   font-weight: 500;
   color: var(--el-text-color-regular);
-  margin-bottom: 8px;
-}
-
-.exchange-selector {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid var(--el-border-color-light);
-}
-
-.exchange-selector :deep(.el-checkbox) {
-  margin-right: 12px;
-  margin-bottom: 8px;
+  white-space: nowrap;
 }
 
 /* 表格样式 */
@@ -427,57 +353,9 @@ onUnmounted(() => {
   width: 100%;
 }
 
-.price-value {
-  font-family: 'Monaco', 'Menlo', monospace;
-  font-size: 14px;
-}
-
-.price-value.bid {
-  color: #10b981;
-}
-
-.price-value.ask {
-  color: #ef4444;
-}
-
-.update-time {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-}
-
-/* 深度可视化 */
-.depth-bars {
-  padding: 16px 0;
-}
-
-.depth-bar-item {
-  margin-bottom: 16px;
-}
-
-.bar-label {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-  font-size: 14px;
-}
-
-.bar-value {
-  font-family: 'Monaco', 'Menlo', monospace;
-  color: var(--el-text-color-regular);
-}
-
-.bar-container {
-  height: 24px;
-  background: var(--el-bg-color-page);
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.bar-fill {
-  height: 100%;
-  border-radius: 4px;
-  transition: width 0.3s ease;
+.comparison-table :deep(.el-table__header th) {
+  background-color: var(--el-bg-color);
+  font-weight: bold;
 }
 
 /* 响应式 */
@@ -489,10 +367,16 @@ onUnmounted(() => {
   .card-header {
     flex-direction: column;
     align-items: flex-start;
+    gap: 12px;
+  }
+
+  .depth-selector {
+    flex-direction: column;
+    align-items: flex-start;
     gap: 8px;
   }
 
-  .control-group :deep(.el-radio-group) {
+  .depth-selector :deep(.el-radio-group) {
     display: flex;
     flex-wrap: wrap;
     gap: 4px;

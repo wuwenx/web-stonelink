@@ -166,42 +166,109 @@ export class UnifiedWebSocketService {
 
   /**
    * 处理收到的 WebSocket 消息
+   * 支持处理多条 JSON 粘连的情况
    */
   handleMessage(rawData) {
-    try {
-      const data = JSON.parse(rawData);
+    // 尝试分割多条 JSON 消息（处理 {...}{...} 的情况）
+    const jsonStrings = this.splitJsonMessages(rawData);
 
-      // 处理深度数据
-      if (data.topic && data.topic.startsWith('depth_') && data.payload) {
-        const parsed = parseTopic(data.topic);
-        if (parsed && data.payload.data) {
-          // 将原始数据发送到 Worker 处理
-          // 使用 standardSymbol 作为统一的 symbol 格式（如 BTCUSDT）
-          const depthData = {
-            exchange: data.payload.info?.exchange || parsed.exchange,
-            symbol: parsed.standardSymbol, // 使用标准格式的币对
-            rawSymbol: parsed.symbol, // 保留原始格式
-            bids: data.payload.data.bids || [],
-            asks: data.payload.data.asks || [],
-            tsExch: data.payload.data.tsExch,
-            tsRecv: data.payload.data.tsRecv,
-          };
+    for (const jsonStr of jsonStrings) {
+      try {
+        const data = JSON.parse(jsonStr);
+        this.processMessage(data);
+      } catch (error) {
+        console.error('解析消息失败:', error.message);
+      }
+    }
+  }
 
-          this.sendToWorker('processDepth', depthData);
+  /**
+   * 分割可能粘连的 JSON 消息
+   * @param {string} rawData - 原始数据
+   * @returns {string[]} JSON 字符串数组
+   */
+  splitJsonMessages(rawData) {
+    const messages = [];
+    let depth = 0;
+    let start = 0;
+    let inString = false;
+    let escape = false;
+
+    for (let i = 0; i < rawData.length; i++) {
+      const char = rawData[i];
+
+      if (escape) {
+        escape = false;
+        continue;
+      }
+
+      if (char === '\\' && inString) {
+        escape = true;
+        continue;
+      }
+
+      if (char === '"') {
+        inString = !inString;
+        continue;
+      }
+
+      if (inString) {
+        continue;
+      }
+
+      if (char === '{') {
+        if (depth === 0) {
+          start = i;
+        }
+        depth++;
+      } else if (char === '}') {
+        depth--;
+        if (depth === 0) {
+          messages.push(rawData.substring(start, i + 1));
         }
       }
+    }
 
-      // 处理 ping/pong
-      if (data.op === 'ping') {
-        this.send({ op: 'pong' });
-      }
+    // 如果没有找到完整的 JSON，返回原始数据
+    if (messages.length === 0 && rawData.trim()) {
+      messages.push(rawData);
+    }
 
-      // 处理订阅确认
-      if (data.op === 'subscribe' && data.code === 0) {
-        console.log('订阅成功:', data.args);
+    return messages;
+  }
+
+  /**
+   * 处理单条解析后的消息
+   */
+  processMessage(data) {
+    // 处理深度数据
+    if (data.topic && data.topic.startsWith('depth_') && data.payload) {
+      const parsed = parseTopic(data.topic);
+      if (parsed && data.payload.data) {
+        // 将原始数据发送到 Worker 处理
+        // 使用 standardSymbol 作为统一的 symbol 格式（如 BTCUSDT）
+        const depthData = {
+          exchange: data.payload.info?.exchange || parsed.exchange,
+          symbol: parsed.standardSymbol, // 使用标准格式的币对
+          rawSymbol: parsed.symbol, // 保留原始格式
+          bids: data.payload.data.bids || [],
+          asks: data.payload.data.asks || [],
+          tsExch: data.payload.data.tsExch,
+          tsRecv: data.payload.data.tsRecv,
+        };
+
+        this.sendToWorker('processDepth', depthData);
       }
-    } catch (error) {
-      console.error('解析消息失败:', error, rawData);
+    }
+
+    // 处理 ping/pong
+    if (data.op === 'ping') {
+      this.send({ op: 'pong' });
+    }
+
+    // 处理订阅确认
+    if (data.op === 'subscribe' && data.code === 0) {
+      console.log('订阅成功:', data.args);
     }
   }
 

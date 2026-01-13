@@ -22,6 +22,12 @@ const routes = [
         component: () => import('../pages/MultiExchangeDepth.vue'),
         meta: { title: '多交易所深度对比' },
       },
+      {
+        path: 'symbol/:symbol',
+        name: 'SymbolDetail',
+        component: () => import('../pages/SymbolDetail.vue'),
+        meta: { title: '单币种详情' },
+      },
     ],
   },
   // {
