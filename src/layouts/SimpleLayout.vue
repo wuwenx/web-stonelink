@@ -37,6 +37,12 @@
               </svg>
               <span>单币对详情</span>
             </router-link>
+            <router-link to="/orderbook" class="nav-link" active-class="nav-link-active">
+              <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+              </svg>
+              <span>订单簿</span>
+            </router-link>
           </nav>
 
           <!-- 连接状态指示器 -->

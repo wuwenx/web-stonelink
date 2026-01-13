@@ -28,6 +28,12 @@ const routes = [
         component: () => import('../pages/SymbolDetail.vue'),
         meta: { title: '单币种详情' },
       },
+      {
+        path: 'orderbook',
+        name: 'OrderBook',
+        component: () => import('../pages/OrderBook.vue'),
+        meta: { title: '实时订单簿' },
+      },
     ],
   },
   // {

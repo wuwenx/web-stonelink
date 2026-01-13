@@ -4,11 +4,11 @@
  * 以币种为维度组织数据，支持多币种多交易所对比
  */
 import { defineStore } from 'pinia';
-import { DEPTH_OPTIONS } from '../config/exchanges';
+import { DEPTH_OPTIONS, SYMBOLS } from '../config/exchanges';
 import { getUnifiedWebSocketService } from '../services/UnifiedWebSocketService';
 
-// 默认支持的币种
-const DEFAULT_SYMBOLS = ['BTCUSDT', 'ETHUSDT'];
+// 默认支持的币种（从统一配置获取，只使用前两个作为默认订阅）
+const DEFAULT_SYMBOLS = SYMBOLS.slice(0, 2);
 
 // 默认对比的两个交易所
 const COMPARE_EXCHANGES = {

@@ -222,7 +222,7 @@
 import { ArrowLeft } from '@element-plus/icons-vue';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { getExchangeName } from '../config/exchanges';
+import { getExchangeName, SYMBOLS } from '../config/exchanges';
 import { useDepthStore } from '../stores/depth';
 
 const route = useRoute();
@@ -241,11 +241,10 @@ const simulationQuantity = ref(1.0);
 const slippageData = ref([]);
 const isCalculating = ref(false);
 
-// 交易对选项
-const symbolOptions = ref([
-  { label: 'BTCUSDT', value: 'BTCUSDT' },
-  { label: 'ETHUSDT', value: 'ETHUSDT' },
-]);
+// 从统一配置获取交易对选项
+const symbolOptions = computed(() =>
+  SYMBOLS.map(sym => ({ label: sym, value: sym }))
+);
 
 // 深度级别配置
 const depthLevels = [
