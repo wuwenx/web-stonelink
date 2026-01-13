@@ -78,34 +78,35 @@
         :cell-style="getCellStyle"
         :header-cell-style="getHeaderCellStyle"
       >
-        <el-table-column prop="displayName" label="资产" width="180" align="center">
+        <el-table-column prop="displayName" label="资产" width="140" align="center" fixed>
           <template #default="{ row }">
             <el-button type="primary" size="small" @click="goToSymbolDetail(row.symbol)">
-              {{ row.displayName }} {{ exchangeTypeLabel }}
+              {{ row.displayName }}
             </el-button>
           </template>
         </el-table-column>
 
-        <el-table-column label="BINANCE" align="center">
+        <el-table-column
+          v-for="exchange in compareExchanges"
+          :key="exchange.id"
+          :label="exchange.name"
+          align="center"
+          min-width="120"
+        >
           <template #default="{ row }">
-            <el-tag type="info" size="large">
-              {{ formatDepthValue(row.binanceDepth) }}
+            <el-tag
+              :type="row.maxExchange === exchange.id ? 'success' : 'info'"
+              size="large"
+            >
+              {{ formatDepthValue(row.exchanges[exchange.id]) }}
             </el-tag>
           </template>
         </el-table-column>
 
-        <el-table-column label="TOOBIT" align="center">
+        <el-table-column label="最优" width="100" align="center">
           <template #default="{ row }">
-            <el-tag type="info" size="large">
-              {{ formatDepthValue(row.toobitDepth) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="分数" width="100" align="center">
-          <template #default="{ row }">
-            <el-tag :type="getScoreTagType(row.depthScore)" size="small">
-              {{ formatScore(row.depthScore) }}
+            <el-tag type="warning" size="small">
+              {{ getExchangeShortName(row.maxExchange) }}
             </el-tag>
           </template>
         </el-table-column>
@@ -127,34 +128,35 @@
         :cell-style="getCellStyle"
         :header-cell-style="getHeaderCellStyle"
       >
-        <el-table-column prop="displayName" label="资产" width="180" align="center">
+        <el-table-column prop="displayName" label="资产" width="140" align="center" fixed>
           <template #default="{ row }">
             <el-button type="primary" size="small" @click="goToSymbolDetail(row.symbol)">
-              {{ row.displayName }} {{ exchangeTypeLabel }}
+              {{ row.displayName }}
             </el-button>
           </template>
         </el-table-column>
 
-        <el-table-column label="BINANCE" align="center">
+        <el-table-column
+          v-for="exchange in compareExchanges"
+          :key="exchange.id"
+          :label="exchange.name"
+          align="center"
+          min-width="120"
+        >
           <template #default="{ row }">
-            <el-tag type="info" size="large">
-              {{ formatSpread(row.binanceSpread) }}
+            <el-tag
+              :type="row.minExchange === exchange.id ? 'success' : 'info'"
+              size="large"
+            >
+              {{ formatSpread(row.exchanges[exchange.id]) }}
             </el-tag>
           </template>
         </el-table-column>
 
-        <el-table-column label="TOOBIT" align="center">
+        <el-table-column label="最优" width="100" align="center">
           <template #default="{ row }">
-            <el-tag type="info" size="large">
-              {{ formatSpread(row.toobitSpread) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="分数 ↑" width="100" align="center">
-          <template #default="{ row }">
-            <el-tag :type="getScoreTagType(row.spreadScore)" size="small">
-              {{ formatScore(row.spreadScore) }}
+            <el-tag type="warning" size="small">
+              {{ getExchangeShortName(row.minExchange) }}
             </el-tag>
           </template>
         </el-table-column>
@@ -166,6 +168,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
+import { getExchangeName } from '../config/exchanges';
 import { useDepthStore } from '../stores/depth';
 
 const router = useRouter();
@@ -180,6 +183,14 @@ const depthPercentage = ref(depthStore.config.depthPercentage);
 // 计算属性
 const depthOptions = computed(() => depthStore.depthOptions);
 const isLoading = computed(() => depthStore.isLoading);
+
+// 获取当前对比的交易所列表
+const compareExchanges = computed(() => {
+  return depthStore.compareExchanges.map(id => ({
+    id,
+    name: getExchangeName(id, exchangeType.value),
+  }));
+});
 
 const exchangeTypeLabel = computed(() => {
   return exchangeType.value === 'futures' ? 'FUTURES' : 'SPOT';
@@ -252,17 +263,10 @@ const formatSpread = spreadPercent => {
   return `${spreadPercent.toFixed(4)} %`;
 };
 
-const formatScore = score => {
-  if (score > 0) return '+1';
-  if (score < 0) return '-1';
-  return '=';
-};
-
-// 样式函数
-const getScoreTagType = score => {
-  if (score > 0) return 'success';
-  if (score < 0) return 'danger';
-  return 'info';
+// 获取交易所简称
+const getExchangeShortName = exchangeId => {
+  if (!exchangeId) return '-';
+  return getExchangeName(exchangeId, exchangeType.value);
 };
 
 const getCellStyle = () => ({

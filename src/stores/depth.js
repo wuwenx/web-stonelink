@@ -10,10 +10,10 @@ import { getUnifiedWebSocketService } from '../services/UnifiedWebSocketService'
 // 默认支持的币种（从统一配置获取，只使用前两个作为默认订阅）
 const DEFAULT_SYMBOLS = SYMBOLS.slice(0, 2);
 
-// 默认对比的两个交易所
+// 默认对比的交易所（启用 Binance、Toobit、OKX、Bybit）
 const COMPARE_EXCHANGES = {
-  futures: ['bnUM', 'toobitUM'],
-  spot: ['bnSpot', 'toobitSpot'],
+  futures: ['bnUM', 'toobitUM', 'okexUM', 'bybitUM'],
+  spot: ['bnSpot', 'toobitSpot', 'okexSpot', 'bybitSpot'],
 };
 
 export const useDepthStore = defineStore('depth', {
@@ -69,75 +69,72 @@ export const useDepthStore = defineStore('depth', {
       );
     },
 
-    // 获取深度对比数据（以币种为维度）
+    // 获取深度对比数据（以币种为维度，支持多交易所）
     depthComparisonBySymbol: state => {
       const pctKey = `${state.config.depthPercentage}`;
       const exchanges = COMPARE_EXCHANGES[state.config.exchangeType] || [];
-      const [binanceEx, toobitEx] = exchanges;
       const isBuy = state.config.orderSide === 'buy';
 
       return state.symbols.map(symbol => {
-        const binanceKey = `${symbol}_${binanceEx}`;
-        const toobitKey = `${symbol}_${toobitEx}`;
+        const exchangeDepths = {};
+        let maxDepth = 0;
+        let maxExchange = '';
 
-        const binanceData = state.depthData[binanceKey];
-        const toobitData = state.depthData[toobitKey];
+        // 收集所有交易所的深度数据
+        for (const exchangeId of exchanges) {
+          const key = `${symbol}_${exchangeId}`;
+          const data = state.depthData[key];
+          const depth = isBuy
+            ? (data?.depthStats?.[pctKey]?.bidDepth || 0)
+            : (data?.depthStats?.[pctKey]?.askDepth || 0);
 
-        // 根据买卖方向获取对应的深度
-        const binanceDepth = isBuy
-          ? (binanceData?.depthStats?.[pctKey]?.bidDepth || 0)
-          : (binanceData?.depthStats?.[pctKey]?.askDepth || 0);
-        const toobitDepth = isBuy
-          ? (toobitData?.depthStats?.[pctKey]?.bidDepth || 0)
-          : (toobitData?.depthStats?.[pctKey]?.askDepth || 0);
+          exchangeDepths[exchangeId] = depth;
 
-        // 计算深度分数：谁高谁 +1，相等 0
-        let depthScore = 0;
-        if (toobitDepth > binanceDepth) {
-          depthScore = 1;
-        } else if (toobitDepth < binanceDepth) {
-          depthScore = -1;
+          if (depth > maxDepth) {
+            maxDepth = depth;
+            maxExchange = exchangeId;
+          }
         }
 
         return {
           symbol,
           displayName: `${symbol.replace('USDT', '')}USDT`,
-          binanceDepth,
-          toobitDepth,
-          depthScore,
+          exchanges: exchangeDepths,
+          maxDepth,
+          maxExchange,
         };
       });
     },
 
-    // 获取价差对比数据（以币种为维度）
+    // 获取价差对比数据（以币种为维度，支持多交易所）
     spreadComparisonBySymbol: state => {
       const exchanges = COMPARE_EXCHANGES[state.config.exchangeType] || [];
-      const [binanceEx, toobitEx] = exchanges;
 
       return state.symbols.map(symbol => {
-        const binanceKey = `${symbol}_${binanceEx}`;
-        const toobitKey = `${symbol}_${toobitEx}`;
+        const exchangeSpreads = {};
+        let minSpread = Infinity;
+        let minExchange = '';
 
-        const binanceData = state.depthData[binanceKey];
-        const toobitData = state.depthData[toobitKey];
+        // 收集所有交易所的价差数据
+        for (const exchangeId of exchanges) {
+          const key = `${symbol}_${exchangeId}`;
+          const data = state.depthData[key];
+          const spread = data?.spreadPercent || 0;
 
-        const binanceSpread = binanceData?.spreadPercent || 0;
-        const toobitSpread = toobitData?.spreadPercent || 0;
+          exchangeSpreads[exchangeId] = spread;
 
-        // 计算价差分数：谁低谁 +1（价差低更好），相等 0
-        let spreadScore = 0;
-        if (toobitSpread < binanceSpread) {
-          spreadScore = 1;
-        } else if (toobitSpread > binanceSpread) {
-          spreadScore = -1;
+          if (spread > 0 && spread < minSpread) {
+            minSpread = spread;
+            minExchange = exchangeId;
+          }
         }
 
         return {
           symbol,
           displayName: `${symbol.replace('USDT', '')}USDT`,
-          binanceSpread,
-          toobitSpread,
-          spreadScore,
+          exchanges: exchangeSpreads,
+          minSpread: minSpread === Infinity ? 0 : minSpread,
+          minExchange,
         };
       });
     },
