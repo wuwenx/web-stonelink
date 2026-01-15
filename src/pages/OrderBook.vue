@@ -223,9 +223,16 @@
 </template>
 
 <script setup>
+import BigNumber from 'bignumber.js';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { getExchangeName, SYMBOLS } from '../config/exchanges';
 import { useDepthStore } from '../stores/depth';
+
+// 配置 BigNumber：不使用指数表示法，截取模式
+BigNumber.config({
+  EXPONENTIAL_AT: [-20, 20],
+  ROUNDING_MODE: BigNumber.ROUND_DOWN, // 截取，不四舍五入
+});
 
 const depthStore = useDepthStore();
 
@@ -403,18 +410,11 @@ const formatPrice = price => {
   });
 };
 
-// 格式化数量
+// 格式化数量（使用 BigNumber 截取3位小数，不四舍五入）
 const formatQuantity = quantity => {
   if (!quantity || quantity === 0) return '0';
-  if (quantity >= 1000000) {
-    return (quantity / 1000000).toFixed(2) + 'M';
-  } else if (quantity >= 1000) {
-    return (quantity / 1000).toFixed(2) + 'K';
-  } else if (quantity >= 1) {
-    return quantity.toFixed(2);
-  } else {
-    return quantity.toFixed(4);
-  }
+  const bn = new BigNumber(quantity);
+  return bn.decimalPlaces(3, BigNumber.ROUND_DOWN).toString();
 };
 
 // 格式化价差
