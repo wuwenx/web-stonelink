@@ -1050,34 +1050,3 @@ watch(displayAsks, () => {
   }
 }
 </style>
-
-<!-- 全局样式 - 下拉框弹出层 -->
-<style>
-.symbol-select-dropdown {
-  background: rgba(26, 31, 46, 0.95) !important;
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(0, 212, 255, 0.3) !important;
-  border-radius: 12px !important;
-}
-
-.symbol-select-dropdown .el-select-dropdown__item {
-  color: #a0aec0;
-  font-size: 14px;
-  padding: 12px 20px;
-}
-
-.symbol-select-dropdown .el-select-dropdown__item:hover {
-  background: rgba(0, 212, 255, 0.1);
-  color: #00d4ff;
-}
-
-.symbol-select-dropdown .el-select-dropdown__item.selected {
-  background: rgba(0, 212, 255, 0.2);
-  color: #00d4ff;
-  font-weight: 600;
-}
-
-.symbol-select-dropdown .el-select-dropdown__item.selected::after {
-  display: none;
-}
-</style>

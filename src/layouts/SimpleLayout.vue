@@ -45,6 +45,26 @@
             </router-link>
           </nav>
 
+          <!-- 现货/合约全局切换 -->
+          <div class="exchange-type-switch">
+            <el-dropdown trigger="click" @command="handleExchangeTypeChange">
+              <span class="exchange-type-trigger">
+                <span class="type-label">{{ exchangeType === 'futures' ? '合约' : '现货' }}</span>
+                <el-icon class="el-icon--right"><arrow-down /></el-icon>
+              </span>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="futures" :class="{ active: exchangeType === 'futures' }">
+                    合约
+                  </el-dropdown-item>
+                  <el-dropdown-item command="spot" :class="{ active: exchangeType === 'spot' }">
+                    现货
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </div>
+
           <!-- 连接状态指示器 -->
           <div class="connection-indicator" :class="connectionClass">
             <span class="indicator-dot" />
@@ -89,16 +109,32 @@
 </template>
 
 <script>
+import { ArrowDown } from '@element-plus/icons-vue';
 import { computed, onMounted } from 'vue';
 import { useDepthStore } from '../stores/index.js';
 
 export default {
   name: 'SimpleLayout',
+  components: {
+    ArrowDown,
+  },
   setup() {
     const currentYear = computed(() => new Date().getFullYear());
     
     // 使用统一的深度 store
     const depthStore = useDepthStore();
+
+    // 当前交易类型（从 store 获取）
+    const exchangeType = computed({
+      get: () => depthStore.config.exchangeType,
+      set: val => depthStore.switchExchangeType(val),
+    });
+
+    // 切换交易类型 - 保存后刷新页面
+    const handleExchangeTypeChange = type => {
+      depthStore.switchExchangeType(type);
+      window.location.reload();
+    };
 
     // 连接状态
     const connectionStatus = computed(() => {
@@ -135,6 +171,8 @@ export default {
 
     return {
       currentYear,
+      exchangeType,
+      handleExchangeTypeChange,
       connectionStatus,
       connectionClass,
     };
@@ -254,6 +292,73 @@ export default {
 .nav-icon {
   width: 18px;
   height: 18px;
+}
+
+/* 现货/合约切换 */
+.exchange-type-switch {
+  display: flex;
+  align-items: center;
+}
+
+.exchange-type-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(0, 212, 255, 0.3);
+  border-radius: 8px;
+  color: #00d4ff;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.exchange-type-trigger:hover {
+  background: rgba(0, 212, 255, 0.1);
+  border-color: rgba(0, 212, 255, 0.5);
+}
+
+.exchange-type-trigger .type-label {
+  min-width: 32px;
+  text-align: center;
+}
+
+.exchange-type-trigger .el-icon {
+  font-size: 12px;
+  transition: transform 0.3s ease;
+}
+
+.exchange-type-switch :deep(.el-dropdown__popper) {
+  background: rgba(26, 31, 46, 0.95) !important;
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(0, 212, 255, 0.3) !important;
+  border-radius: 8px !important;
+}
+
+.exchange-type-switch :deep(.el-dropdown-menu) {
+  background: transparent;
+  padding: 6px;
+}
+
+.exchange-type-switch :deep(.el-dropdown-menu__item) {
+  color: #a0aec0;
+  font-size: 13px;
+  padding: 10px 20px;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+}
+
+.exchange-type-switch :deep(.el-dropdown-menu__item:hover) {
+  background: rgba(0, 212, 255, 0.1);
+  color: #00d4ff;
+}
+
+.exchange-type-switch :deep(.el-dropdown-menu__item.active) {
+  background: rgba(0, 212, 255, 0.2);
+  color: #00d4ff;
+  font-weight: 600;
 }
 
 /* 连接状态指示器 */

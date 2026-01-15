@@ -19,21 +19,6 @@
     <!-- 控制面板 -->
     <el-card class="control-card" shadow="hover">
       <el-row :gutter="20" align="middle">
-        <!-- 交易类型 -->
-        <el-col :span="6">
-          <div class="control-group">
-            <label class="control-label">交易类型</label>
-            <el-radio-group v-model="exchangeType" size="default" @change="handleExchangeTypeChange">
-              <el-radio-button label="futures">
-                合约
-              </el-radio-button>
-              <el-radio-button label="spot">
-                现货
-              </el-radio-button>
-            </el-radio-group>
-          </div>
-        </el-col>
-
         <!-- 买卖方向 -->
         <el-col :span="6">
           <div class="control-group">
@@ -176,11 +161,11 @@ const router = useRouter();
 const depthStore = useDepthStore();
 
 // 响应式数据
-const exchangeType = ref(depthStore.config.exchangeType);
 const orderSide = ref(depthStore.config.orderSide);
 const depthPercentage = ref(depthStore.config.depthPercentage);
 
-// 计算属性
+// 计算属性 - 从全局 store 读取交易类型
+const exchangeType = computed(() => depthStore.config.exchangeType);
 const depthOptions = computed(() => depthStore.depthOptions);
 const isLoading = computed(() => depthStore.isLoading);
 
@@ -190,10 +175,6 @@ const compareExchanges = computed(() => {
     id,
     name: getExchangeName(id, exchangeType.value),
   }));
-});
-
-const exchangeTypeLabel = computed(() => {
-  return exchangeType.value === 'futures' ? 'FUTURES' : 'SPOT';
 });
 
 const connectionStatusType = computed(() => {
@@ -229,10 +210,6 @@ const spreadComparisonData = computed(() => {
 });
 
 // 事件处理
-const handleExchangeTypeChange = type => {
-  depthStore.switchExchangeType(type);
-};
-
 const handleOrderSideChange = side => {
   depthStore.updateOrderSide(side);
 };

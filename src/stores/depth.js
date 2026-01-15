@@ -16,6 +16,22 @@ const COMPARE_EXCHANGES = {
   spot: ['bnSpot', 'toobitSpot', 'okexSpot', 'bybitSpot'],
 };
 
+// 缓存 key
+const EXCHANGE_TYPE_CACHE_KEY = 'stonelink_exchange_type';
+
+// 从缓存获取交易类型
+const getCachedExchangeType = () => {
+  try {
+    const cached = localStorage.getItem(EXCHANGE_TYPE_CACHE_KEY);
+    if (cached === 'spot' || cached === 'futures') {
+      return cached;
+    }
+  } catch {
+    // localStorage 不可用
+  }
+  return 'futures';
+};
+
 export const useDepthStore = defineStore('depth', {
   state: () => ({
     // 连接状态
@@ -23,7 +39,7 @@ export const useDepthStore = defineStore('depth', {
 
     // 当前配置
     config: {
-      exchangeType: 'futures', // 'spot' 或 'futures'
+      exchangeType: getCachedExchangeType(), // 从缓存获取，默认 'futures'
       orderSide: 'buy', // 'buy' 买盘 或 'sell' 卖盘
       depthLevels: 250,
       depthPercentage: 0.0001, // 当前选择的深度百分比
@@ -240,6 +256,13 @@ export const useDepthStore = defineStore('depth', {
 
       // 更新配置
       this.config.exchangeType = type;
+
+      // 保存到缓存
+      try {
+        localStorage.setItem(EXCHANGE_TYPE_CACHE_KEY, type);
+      } catch {
+        // localStorage 不可用
+      }
 
       // 重新订阅
       if (this.wsService && this.wsService.getStatus() === 'connected') {

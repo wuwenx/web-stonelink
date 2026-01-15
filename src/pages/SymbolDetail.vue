@@ -201,20 +201,6 @@
       </el-table>
     </el-card>
 
-    <!-- 连接状态 -->
-    <el-card class="status-card" shadow="hover">
-      <template #header>
-        <div class="card-header">
-          <span class="card-title">连接状态</span>
-        </div>
-      </template>
-      
-      <div class="status-display">
-        <el-tag :type="getConnectionStatusTagType" size="large">
-          {{ connectionStatusText }}
-        </el-tag>
-      </div>
-    </el-card>
   </div>
 </template>
 
@@ -257,29 +243,6 @@ const depthLevels = [
   { label: '大额(5%)', value: 0.05 },
   { label: '极限(10%)', value: 0.1 },
 ];
-
-// 计算属性
-const connectionStatusText = computed(() => {
-  const statusMap = {
-    connected: '已连接',
-    connecting: '连接中...',
-    disconnected: '未连接',
-    error: '连接错误',
-    failed: '连接失败',
-  };
-  return statusMap[depthStore.connectionStatus] || '未知';
-});
-
-const getConnectionStatusTagType = computed(() => {
-  const statusTypeMap = {
-    connected: 'success',
-    connecting: 'warning',
-    disconnected: 'info',
-    error: 'danger',
-    failed: 'danger',
-  };
-  return statusTypeMap[depthStore.connectionStatus] || 'info';
-});
 
 // 获取当前对比的交易所
 const compareExchanges = computed(() => depthStore.compareExchanges);
@@ -568,8 +531,7 @@ watch(() => depthStore.depthData, () => {
 .header-card,
 .control-card,
 .slippage-card,
-.table-card,
-.status-card {
+.table-card {
   margin-bottom: 24px;
   background: rgba(26, 31, 46, 0.6) !important;
   backdrop-filter: blur(10px);
@@ -581,8 +543,7 @@ watch(() => depthStore.depthData, () => {
 .header-card:hover,
 .control-card:hover,
 .slippage-card:hover,
-.table-card:hover,
-.status-card:hover {
+.table-card:hover {
   border-color: rgba(0, 212, 255, 0.3) !important;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
@@ -794,12 +755,6 @@ watch(() => depthStore.depthData, () => {
 :deep(.el-button--primary:hover) {
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(0, 212, 255, 0.4);
-}
-
-/* 连接状态样式 */
-.status-display {
-  text-align: center;
-  padding: 16px;
 }
 
 /* 响应式设计 */
