@@ -69,30 +69,81 @@
     <el-card class="slippage-card" shadow="hover">
       <template #header>
         <div class="card-header">
-          <span class="card-title">滑点模拟</span>
+          <span class="card-title">高级滑点模拟</span>
         </div>
       </template>
       
       <div class="slippage-controls">
-        <div class="input-group">
-          <label class="input-label">模拟交易数量 ({{ symbol.replace('USDT', '') }})</label>
-          <el-input-number
-            v-model="simulationQuantity"
-            :min="0.001"
-            :max="1000"
-            :precision="3"
-            :step="0.1"
+        <el-row :gutter="20">
+          <el-col :span="6">
+            <div class="input-group">
+              <label class="input-label">交易数量 ({{ symbol.replace('USDT', '') }})</label>
+              <el-input-number
+                v-model="simulationQuantity"
+                :min="0.001"
+                :max="1000"
+                :precision="3"
+                :step="0.1"
+                size="large"
+                @change="calculateSlippage"
+              />
+            </div>
+          </el-col>
+          
+          <el-col :span="6">
+            <div class="input-group">
+              <label class="input-label">订单类型</label>
+              <el-select v-model="orderType" size="large" @change="calculateSlippage">
+                <el-option label="市价单" value="market" />
+                <el-option label="限价单" value="limit" />
+              </el-select>
+            </div>
+          </el-col>
+          
+          <el-col :span="6">
+            <div class="input-group">
+              <label class="input-label">订单拆分</label>
+              <el-select v-model="splitStrategy" size="large" @change="calculateSlippage">
+                <el-option label="不拆分" value="none" />
+                <el-option label="平均拆分" value="equal" />
+                <el-option label="智能拆分" value="smart" />
+              </el-select>
+            </div>
+          </el-col>
+          
+          <el-col :span="6">
+            <div class="input-group">
+              <label class="input-label">限价偏移 (%)</label>
+              <el-input-number
+                v-model="limitPriceOffset"
+                :min="0"
+                :max="5"
+                :precision="2"
+                :step="0.01"
+                size="large"
+                :disabled="orderType !== 'limit'"
+                @change="calculateSlippage"
+              />
+            </div>
+          </el-col>
+        </el-row>
+        
+        <div class="action-buttons">
+          <el-button 
+            type="primary" 
             size="large"
-            @change="calculateSlippage"
-          />
+            @click="calculateSlippage"
+          >
+            计算滑点
+          </el-button>
+          <el-button 
+            type="success" 
+            size="large"
+            @click="compareAllExchanges"
+          >
+            对比所有交易所
+          </el-button>
         </div>
-        <el-button 
-          type="primary" 
-          size="large"
-          @click="calculateSlippage"
-        >
-          计算滑点
-        </el-button>
       </div>
       
       <el-table 
@@ -109,7 +160,7 @@
           </template>
         </el-table-column>
         
-        <el-table-column prop="buySlippage" label="买入滑点" width="200" align="center">
+        <el-table-column prop="buySlippage" label="买入滑点" width="150" align="center">
           <template #default="{ row }">
             <el-tag 
               :type="getSlippageTagType(row.buySlippage)"
@@ -120,7 +171,7 @@
           </template>
         </el-table-column>
         
-        <el-table-column prop="sellSlippage" label="卖出滑点" width="200" align="center">
+        <el-table-column prop="sellSlippage" label="卖出滑点" width="150" align="center">
           <template #default="{ row }">
             <el-tag 
               :type="getSlippageTagType(row.sellSlippage)"
@@ -140,6 +191,20 @@
         <el-table-column prop="sellAvgPrice" label="卖出均价" width="150" align="center">
           <template #default="{ row }">
             <span class="price-text">{{ formatPrice(row.sellAvgPrice) }}</span>
+          </template>
+        </el-table-column>
+        
+        <el-table-column prop="totalCost" label="总成本" width="150" align="center">
+          <template #default="{ row }">
+            <span class="cost-text" :class="row.totalCost > 0 ? 'negative' : 'positive'">
+              {{ formatCost(row.totalCost) }}
+            </span>
+          </template>
+        </el-table-column>
+        
+        <el-table-column prop="executionTime" label="预计执行时间" width="150" align="center">
+          <template #default="{ row }">
+            <span class="time-text">{{ row.executionTime }}ms</span>
           </template>
         </el-table-column>
       </el-table>
@@ -210,6 +275,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { getExchangeName, SYMBOLS } from '../config/exchanges';
 import { useDepthStore } from '../stores/depth';
+import { ElMessage } from 'element-plus';
 
 const route = useRoute();
 const router = useRouter();
@@ -226,6 +292,9 @@ const lastUpdateTime = ref('--');
 const simulationQuantity = ref(1.0);
 const slippageData = ref([]);
 const isCalculating = ref(false);
+const orderType = ref('market'); // 'market' 或 'limit'
+const splitStrategy = ref('none'); // 'none', 'equal', 'smart'
+const limitPriceOffset = ref(0.1); // 限价单价格偏移百分比
 
 // 从统一配置获取交易对选项
 const symbolOptions = computed(() =>
@@ -296,16 +365,36 @@ const calculateSlippage = () => {
       const exchangeName = getExchangeName(exchangeId, exchangeType);
       
       if (depthData && depthData.asks && depthData.bids) {
-        const buySlippage = calculateSlippageForSide(depthData.asks, simulationQuantity.value, 'buy');
-        const sellSlippage = calculateSlippageForSide(depthData.bids, simulationQuantity.value, 'sell');
+        const buyResult = calculateAdvancedSlippage(
+          depthData.asks,
+          simulationQuantity.value,
+          'buy',
+          orderType.value,
+          splitStrategy.value,
+          limitPriceOffset.value
+        );
+        
+        const sellResult = calculateAdvancedSlippage(
+          depthData.bids,
+          simulationQuantity.value,
+          'sell',
+          orderType.value,
+          splitStrategy.value,
+          limitPriceOffset.value
+        );
+        
+        // 计算总成本（买入均价 - 卖出均价）
+        const totalCost = buyResult.averagePrice - sellResult.averagePrice;
         
         data.push({
           exchangeId,
           exchangeName,
-          buySlippage: buySlippage.slippagePercent,
-          sellSlippage: sellSlippage.slippagePercent,
-          buyAvgPrice: buySlippage.averagePrice,
-          sellAvgPrice: sellSlippage.averagePrice,
+          buySlippage: buyResult.slippagePercent,
+          sellSlippage: sellResult.slippagePercent,
+          buyAvgPrice: buyResult.averagePrice,
+          sellAvgPrice: sellResult.averagePrice,
+          totalCost: totalCost * simulationQuantity.value,
+          executionTime: buyResult.executionTime + sellResult.executionTime,
         });
       } else {
         data.push({
@@ -315,6 +404,8 @@ const calculateSlippage = () => {
           sellSlippage: 0,
           buyAvgPrice: 0,
           sellAvgPrice: 0,
+          totalCost: 0,
+          executionTime: 0,
         });
       }
     }
@@ -327,49 +418,128 @@ const calculateSlippage = () => {
   }
 };
 
-// 计算单边滑点
-const calculateSlippageForSide = (depthData, targetQuantity, side) => {
+// 高级滑点计算（支持订单类型和拆分策略）
+const calculateAdvancedSlippage = (depthData, targetQuantity, side, orderType, splitStrategy, limitOffset) => {
   if (!depthData || depthData.length === 0) {
-    return { slippagePercent: 0, averagePrice: 0, startPrice: 0, finalPrice: 0 };
+    return { slippagePercent: 0, averagePrice: 0, startPrice: 0, finalPrice: 0, executionTime: 0 };
   }
   
-  // 确定起始价格
   const startPrice = depthData[0].price;
-  
   let totalExecutedValue = 0;
   let totalExecutedQuantity = 0;
   let remainingQuantity = targetQuantity;
   let finalPrice = startPrice;
+  let executionTime = 0;
   
-  // 模拟吃单过程
-  for (const order of depthData) {
-    if (remainingQuantity <= 0) {
-      break;
+  // 限价单处理
+  if (orderType === 'limit') {
+    const limitPrice = side === 'buy' 
+      ? startPrice * (1 + limitOffset / 100)  // 买入限价单：高于市价
+      : startPrice * (1 - limitOffset / 100); // 卖出限价单：低于市价
+    
+    // 只执行限价范围内的订单
+    const filteredData = depthData.filter(order => {
+      if (side === 'buy') {
+        return order.price <= limitPrice; // 买入：价格不高于限价
+      } else {
+        return order.price >= limitPrice; // 卖出：价格不低于限价
+      }
+    });
+    
+    if (filteredData.length === 0) {
+      return {
+        slippagePercent: 0,
+        averagePrice: limitPrice,
+        startPrice: startPrice,
+        finalPrice: limitPrice,
+        executionTime: 0,
+      };
     }
     
-    const price = order.price;
-    const availableQuantity = order.quantity;
+    depthData = filteredData;
+  }
+  
+  // 订单拆分处理
+  let orders = [];
+  if (splitStrategy === 'equal') {
+    // 平均拆分：将订单平均分成3份
+    const splitCount = 3;
+    const splitQuantity = targetQuantity / splitCount;
+    orders = Array(splitCount).fill(splitQuantity);
+  } else if (splitStrategy === 'smart') {
+    // 智能拆分：根据深度分布拆分
+    const totalDepth = depthData.reduce((sum, o) => sum + o.quantity, 0);
+    orders = depthData.slice(0, 5).map(order => {
+      const ratio = order.quantity / totalDepth;
+      return targetQuantity * ratio;
+    }).filter(qty => qty > 0);
+  } else {
+    // 不拆分：一次性执行
+    orders = [targetQuantity];
+  }
+  
+  // 执行每个拆分订单
+  for (const orderQuantity of orders) {
+    let orderRemaining = orderQuantity;
     
-    const executedQty = Math.min(remainingQuantity, availableQuantity);
+    for (const order of depthData) {
+      if (orderRemaining <= 0) break;
+      
+      const price = order.price;
+      const availableQuantity = order.quantity;
+      const executedQty = Math.min(orderRemaining, availableQuantity);
+      
+      totalExecutedValue += executedQty * price;
+      totalExecutedQuantity += executedQty;
+      orderRemaining -= executedQty;
+      finalPrice = price;
+      
+      // 模拟执行时间（每个订单档位需要10-50ms）
+      executionTime += 10 + Math.random() * 40;
+    }
     
-    totalExecutedValue += executedQty * price;
-    totalExecutedQuantity += executedQty;
-    remainingQuantity -= executedQty;
-    finalPrice = price;
+    // 拆分订单之间的延迟（100-300ms）
+    if (orders.length > 1) {
+      executionTime += 100 + Math.random() * 200;
+    }
   }
   
   // 计算实际成交均价
   const averagePrice = totalExecutedQuantity > 0 ? totalExecutedValue / totalExecutedQuantity : startPrice;
   
   // 计算滑点百分比
-  const slippage = ((averagePrice - startPrice) / startPrice) * 100;
+  const slippage = side === 'buy'
+    ? ((averagePrice - startPrice) / startPrice) * 100
+    : ((startPrice - averagePrice) / startPrice) * 100;
   
   return {
     slippagePercent: Math.abs(slippage),
     averagePrice: averagePrice,
     startPrice: startPrice,
     finalPrice: finalPrice,
+    executionTime: Math.round(executionTime),
   };
+};
+
+// 对比所有交易所
+const compareAllExchanges = () => {
+  calculateSlippage();
+  
+  // 找出最优交易所
+  if (slippageData.value.length > 0) {
+    const bestBuy = slippageData.value.reduce((best, current) => 
+      current.buySlippage < best.buySlippage ? current : best
+    );
+    
+    const bestSell = slippageData.value.reduce((best, current) => 
+      current.sellSlippage < best.sellSlippage ? current : best
+    );
+    
+    ElMessage.success({
+      message: `最优买入: ${bestBuy.exchangeName} (滑点 ${bestBuy.buySlippage.toFixed(4)}%) | 最优卖出: ${bestSell.exchangeName} (滑点 ${bestSell.sellSlippage.toFixed(4)}%)`,
+      duration: 5000,
+    });
+  }
 };
 
 // 更新最后更新时间
@@ -448,6 +618,13 @@ const formatSlippage = slippage => {
 const formatPrice = price => {
   if (!price || price === 0) return '--';
   return price.toFixed(2);
+};
+
+// 格式化成本
+const formatCost = cost => {
+  if (!cost || cost === 0) return '0.00';
+  const sign = cost > 0 ? '+' : '';
+  return `${sign}${cost.toFixed(2)}`;
 };
 
 // 获取滑点标签类型
@@ -637,10 +814,47 @@ watch(() => depthStore.depthData, () => {
 
 /* 滑点控制面板样式 */
 .slippage-controls {
-  display: flex;
-  align-items: end;
-  gap: 20px;
   margin-bottom: 20px;
+}
+
+.slippage-controls .input-group {
+  margin-bottom: 16px;
+}
+
+.slippage-controls .input-label {
+  display: block;
+  font-size: 12px;
+  color: #a0aec0;
+  margin-bottom: 8px;
+}
+
+.action-buttons {
+  margin-top: 20px;
+  display: flex;
+  gap: 12px;
+}
+
+.price-text {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+}
+
+.cost-text {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+}
+
+.cost-text.positive {
+  color: #00ff88;
+}
+
+.cost-text.negative {
+  color: #ff4757;
+}
+
+.time-text {
+  font-family: 'JetBrains Mono', monospace;
+  color: #718096;
 }
 
 .input-group {

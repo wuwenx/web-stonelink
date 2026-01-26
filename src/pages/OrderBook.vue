@@ -4,9 +4,11 @@
     <el-card class="header-card" shadow="hover">
       <div class="card-header">
         <div class="header-left">
-          <h1 class="page-title">实时订单簿</h1>
+          <h1 class="page-title">
+            实时订单簿
+          </h1>
           <span class="current-symbol">{{ selectedSymbol }}</span>
-          <el-tag type="success" size="small" v-if="isConnected">
+          <el-tag v-if="isConnected" type="success" size="small">
             <span class="live-dot" /> 实时更新
           </el-tag>
         </div>
@@ -17,8 +19,8 @@
               v-model="selectedSymbol"
               placeholder="选择交易对"
               size="large"
-              @change="handleSymbolChange"
               popper-class="symbol-select-dropdown"
+              @change="handleSymbolChange"
             >
               <el-option
                 v-for="sym in symbols"
@@ -63,6 +65,18 @@
         </template>
 
         <div class="depth-chart">
+          <!-- 视图切换 -->
+          <div class="view-toggle">
+            <el-radio-group v-model="chartView" size="small">
+              <el-radio-button label="bars">
+                柱状图
+              </el-radio-button>
+              <el-radio-button label="heatmap">
+                热力图
+              </el-radio-button>
+            </el-radio-group>
+          </div>
+
           <!-- 买卖压力指示器 -->
           <div class="pressure-indicator">
             <div class="pressure-bar">
@@ -79,11 +93,26 @@
             </div>
           </div>
 
+          <!-- 深度热力图 -->
+          <div v-if="chartView === 'heatmap'" class="heatmap-container">
+            <canvas ref="heatmapCanvas" class="heatmap-canvas" />
+            <div class="heatmap-legend">
+              <span class="legend-label">流动性强度</span>
+              <div class="legend-gradient" />
+              <div class="legend-labels">
+                <span>低</span>
+                <span>高</span>
+              </div>
+            </div>
+          </div>
+
           <!-- 深度图可视化 -->
-          <div class="depth-visualization">
+          <div v-if="chartView === 'bars'" class="depth-visualization">
             <!-- 买盘深度（左侧，绿色） -->
             <div class="depth-side bids-side">
-              <div class="depth-title">买盘深度</div>
+              <div class="depth-title">
+                买盘深度
+              </div>
               <div class="depth-bars">
                 <div
                   v-for="(level, index) in depthLevels"
@@ -105,7 +134,9 @@
 
             <!-- 卖盘深度（右侧，红色） -->
             <div class="depth-side asks-side">
-              <div class="depth-title">卖盘深度</div>
+              <div class="depth-title">
+                卖盘深度
+              </div>
               <div class="depth-bars">
                 <div
                   v-for="(level, index) in depthLevels"
@@ -217,6 +248,91 @@
           <span class="stat-label">大单数量</span>
           <span class="stat-value highlight-value">{{ largeOrderCount }}</span>
         </div>
+        <div class="stat-item">
+          <span class="stat-label">不平衡度</span>
+          <span class="stat-value" :class="getImbalanceClass(imbalanceRatio)">
+            {{ formatImbalanceRatio(imbalanceRatio) }}
+          </span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">压力指数</span>
+          <span class="stat-value" :class="getPressureIndexClass(pressureIndex)">
+            {{ pressureIndex.toFixed(2) }}
+          </span>
+        </div>
+      </div>
+    </el-card>
+
+    <!-- 深度预警系统 -->
+    <el-card class="alert-card" shadow="hover">
+      <template #header>
+        <div class="card-header">
+          <span class="card-title">深度预警</span>
+          <el-switch
+            v-model="alertEnabled"
+            active-text="启用"
+            inactive-text="禁用"
+            size="small"
+          />
+        </div>
+      </template>
+      
+      <div class="alert-config">
+        <el-row :gutter="20">
+          <el-col :span="8">
+            <div class="alert-item">
+              <label>深度下降预警</label>
+              <el-input-number
+                v-model="alertConfig.depthDropPercent"
+                :min="10"
+                :max="90"
+                :step="5"
+                size="small"
+              />
+              <span class="unit">%</span>
+            </div>
+          </el-col>
+          <el-col :span="8">
+            <div class="alert-item">
+              <label>价差异常预警</label>
+              <el-input-number
+                v-model="alertConfig.spreadPercent"
+                :min="0.01"
+                :max="1"
+                :step="0.01"
+                :precision="2"
+                size="small"
+              />
+              <span class="unit">%</span>
+            </div>
+          </el-col>
+          <el-col :span="8">
+            <div class="alert-item">
+              <label>不平衡度预警</label>
+              <el-input-number
+                v-model="alertConfig.imbalanceRatio"
+                :min="1.5"
+                :max="5"
+                :step="0.1"
+                :precision="1"
+                size="small"
+              />
+            </div>
+          </el-col>
+        </el-row>
+      </div>
+      
+      <div class="alert-status">
+        <el-tag
+          v-for="alert in activeAlerts"
+          :key="alert.id"
+          :type="alert.type"
+          size="small"
+          class="alert-tag"
+        >
+          {{ alert.message }}
+        </el-tag>
+        <span v-if="activeAlerts.length === 0" class="no-alerts">暂无预警</span>
       </div>
     </el-card>
   </div>
@@ -242,9 +358,32 @@ const selectedExchange = ref('');
 const lastUpdateTime = ref('--:--:--');
 const priceDirection = ref('');
 const prevPrice = ref(0);
+const chartView = ref('bars'); // 'bars' 或 'heatmap'
 
 // 卖盘滚动区域 ref
 const asksScrollRef = ref(null);
+const heatmapCanvas = ref(null);
+
+// 预警系统
+const alertEnabled = ref(false);
+const alertConfig = ref({
+  depthDropPercent: 30, // 深度下降30%触发预警
+  spreadPercent: 0.1, // 价差超过0.1%触发预警
+  imbalanceRatio: 2.0, // 不平衡度超过2.0触发预警
+});
+const activeAlerts = ref([]);
+const prevDepthStats = ref({});
+const notificationPermission = ref(false);
+
+// 请求通知权限
+const requestNotificationPermission = async() => {
+  if ('Notification' in window && Notification.permission === 'default') {
+    const permission = await Notification.requestPermission();
+    notificationPermission.value = permission === 'granted';
+  } else if ('Notification' in window && Notification.permission === 'granted') {
+    notificationPermission.value = true;
+  }
+};
 
 // 从统一配置获取币对列表
 const symbols = SYMBOLS;
@@ -336,6 +475,41 @@ const bidPressure = computed(() => {
 const askPressure = computed(() => {
   return 100 - bidPressure.value;
 });
+
+// 订单簿不平衡度分析
+const imbalanceRatio = computed(() => {
+  if (totalAskQuantity.value === 0) return 1;
+  const ratio = totalBidQuantity.value / totalAskQuantity.value;
+  // 返回不平衡度：>1表示买盘强，<1表示卖盘强，越接近1越平衡
+  return ratio > 1 ? ratio : 1 / ratio;
+});
+
+// 压力指数（-1到1，-1表示卖压大，1表示买压大）
+const pressureIndex = computed(() => {
+  const total = totalBidQuantity.value + totalAskQuantity.value;
+  if (total === 0) return 0;
+  return (totalBidQuantity.value - totalAskQuantity.value) / total;
+});
+
+// 格式化不平衡度
+const formatImbalanceRatio = ratio => {
+  if (ratio === 1) return '1.00 (平衡)';
+  return ratio.toFixed(2);
+};
+
+// 获取不平衡度样式类
+const getImbalanceClass = ratio => {
+  if (ratio < 1.2) return 'bid-value'; // 相对平衡
+  if (ratio < 2.0) return 'highlight-value'; // 中等不平衡
+  return 'ask-value'; // 严重不平衡
+};
+
+// 获取压力指数样式类
+const getPressureIndexClass = index => {
+  if (index > 0.3) return 'bid-value'; // 买压大
+  if (index < -0.3) return 'ask-value'; // 卖压大
+  return 'highlight-value'; // 相对平衡
+};
 
 // 大单阈值（动态计算）
 const largeOrderThreshold = computed(() => {
@@ -445,23 +619,120 @@ const updateTime = () => {
 // 定时更新
 let timer = null;
 
+// 监听窗口大小变化
+let resizeObserver = null;
+
 onMounted(() => {
   if (!depthStore.isConnected) {
     depthStore.connect();
   }
   timer = setInterval(updateTime, 500);
+  requestNotificationPermission();
+  
+  // 设置 ResizeObserver
+  if (heatmapCanvas.value) {
+    resizeObserver = new ResizeObserver(() => {
+      if (chartView.value === 'heatmap' && heatmapCanvas.value) {
+        const canvas = heatmapCanvas.value;
+        const container = canvas.parentElement;
+        if (container) {
+          canvas.width = container.clientWidth - 32; // 减去padding
+          canvas.height = 500 - 32; // 减去padding
+          drawHeatmap();
+        }
+      }
+    });
+    
+    resizeObserver.observe(heatmapCanvas.value.parentElement);
+  }
 });
 
 onUnmounted(() => {
   if (timer) {
     clearInterval(timer);
   }
+  if (resizeObserver) {
+    resizeObserver.disconnect();
+  }
 });
 
 // 监听数据变化
 watch(() => currentData.value, () => {
   updateTime();
+  checkAlerts();
 }, { deep: true });
+
+// 检查预警条件
+const checkAlerts = () => {
+  if (!alertEnabled.value) {
+    activeAlerts.value = [];
+    return;
+  }
+  
+  const alerts = [];
+  const data = currentData.value;
+  
+  if (!data || !data.depthStats) return;
+  
+  // 检查深度下降
+  const currentDepth = data.depthStats['0.001']?.totalDepth || 0;
+  const prevDepth = prevDepthStats.value.totalDepth || currentDepth;
+  
+  if (prevDepth > 0 && currentDepth < prevDepth * (1 - alertConfig.value.depthDropPercent / 100)) {
+    const dropPercent = ((prevDepth - currentDepth) / prevDepth * 100).toFixed(1);
+    alerts.push({
+      id: 'depth-drop',
+      type: 'warning',
+      message: `深度下降 ${dropPercent}%`,
+    });
+    
+    if (notificationPermission.value) {
+      new Notification('深度预警', {
+        body: `${selectedSymbol.value} 深度下降 ${dropPercent}%`,
+        icon: '/favicon.ico',
+      });
+    }
+  }
+  
+  // 检查价差异常
+  if (data.spreadPercent > alertConfig.value.spreadPercent) {
+    alerts.push({
+      id: 'spread-high',
+      type: 'danger',
+      message: `价差异常: ${formatSpread(data.spreadPercent)}`,
+    });
+    
+    if (notificationPermission.value) {
+      new Notification('价差预警', {
+        body: `${selectedSymbol.value} 价差 ${formatSpread(data.spreadPercent)}`,
+        icon: '/favicon.ico',
+      });
+    }
+  }
+  
+  // 检查不平衡度
+  if (imbalanceRatio.value > alertConfig.value.imbalanceRatio) {
+    alerts.push({
+      id: 'imbalance-high',
+      type: 'warning',
+      message: `不平衡度: ${imbalanceRatio.value.toFixed(2)}`,
+    });
+    
+    if (notificationPermission.value) {
+      new Notification('不平衡度预警', {
+        body: `${selectedSymbol.value} 不平衡度 ${imbalanceRatio.value.toFixed(2)}`,
+        icon: '/favicon.ico',
+      });
+    }
+  }
+  
+  activeAlerts.value = alerts;
+  
+  // 更新历史深度统计
+  prevDepthStats.value = {
+    totalDepth: currentDepth,
+  };
+};
 
 // 滚动卖盘到底部
 const scrollAsksToBottom = () => {
@@ -480,6 +751,192 @@ watch(displayAsks, () => {
     scrollAsksToBottom();
   }
 }, { immediate: true });
+
+// 绘制深度热力图
+const drawHeatmap = () => {
+  if (!heatmapCanvas.value || chartView.value !== 'heatmap') return;
+  
+  const canvas = heatmapCanvas.value;
+  const ctx = canvas.getContext('2d');
+  const width = canvas.width;
+  const height = canvas.height;
+  
+  // 清空画布
+  ctx.clearRect(0, 0, width, height);
+  
+  const bids = currentData.value?.bids || [];
+  const asks = currentData.value?.asks || [];
+  const bestBid = currentData.value?.bestBid || 0;
+  const bestAsk = currentData.value?.bestAsk || 0;
+  
+  if (bids.length === 0 && asks.length === 0) return;
+  
+  // 显示前100档，让图表更连续
+  const maxDisplayLevels = 100;
+  const displayBids = bids.slice(0, maxDisplayLevels);
+  const displayAsks = asks.slice(0, maxDisplayLevels);
+  
+  if (displayBids.length === 0 || displayAsks.length === 0) return;
+  
+  // 计算价格范围（显示最佳买卖价附近的价格）
+  const spread = bestAsk - bestBid;
+  const minBidPrice = displayBids[displayBids.length - 1]?.price || bestBid;
+  const maxAskPrice = displayAsks[displayAsks.length - 1]?.price || bestAsk;
+  const minPrice = minBidPrice;
+  const maxPrice = maxAskPrice;
+  const priceRange = maxPrice - minPrice;
+  
+  if (priceRange <= 0) return;
+  
+  // 计算最大累计深度（用于归一化）
+  const maxBidTotal = displayBids[displayBids.length - 1]?.total || 0;
+  const maxAskTotal = displayAsks[displayAsks.length - 1]?.total || 0;
+  const maxTotal = Math.max(maxBidTotal, maxAskTotal, 1);
+  
+  // 配置参数
+  const padding = 60; // 左右边距（增加以容纳标签）
+  const topPadding = 30;
+  const bottomPadding = 30;
+  const chartWidth = width - padding * 2;
+  const chartHeight = height - topPadding - bottomPadding;
+  const centerY = topPadding + chartHeight / 2;
+  const bidHeight = chartHeight / 2;
+  const askHeight = chartHeight / 2;
+  
+  // 绘制买盘热力图（下半部分，从中心线向左延伸）
+  displayBids.forEach((order, index) => {
+    const priceRatio = (order.price - minPrice) / priceRange;
+    const x = padding + priceRatio * chartWidth;
+    
+    // 使用累计深度来计算条形长度
+    const depthRatio = order.total / maxTotal;
+    const barLength = depthRatio * chartWidth * 0.8; // 最大长度为图表宽度的80%
+    
+    // 计算条形高度（基于价格间距）
+    let barHeight = 2;
+    if (index < displayBids.length - 1) {
+      const nextPrice = displayBids[index + 1].price;
+      const priceDiff = Math.abs(order.price - nextPrice);
+      const avgPriceDiff = priceRange / displayBids.length;
+      barHeight = Math.max(2, (priceDiff / avgPriceDiff) * (chartHeight / displayBids.length));
+    } else {
+      barHeight = Math.max(2, chartHeight / displayBids.length);
+    }
+    
+    // 绘制条形（从中心线向左延伸）
+    const y = centerY + bidHeight - barHeight / 2;
+    const intensity = Math.min(depthRatio, 1);
+    const alpha = 0.5 + intensity * 0.5;
+    
+    // 创建渐变
+    const gradient = ctx.createLinearGradient(x, y, x - barLength, y);
+    gradient.addColorStop(0, `rgba(0, 255, 136, ${alpha})`);
+    gradient.addColorStop(1, `rgba(0, 255, 136, ${alpha * 0.3})`);
+    
+    ctx.fillStyle = gradient;
+    ctx.fillRect(x - barLength, y, barLength, barHeight);
+  });
+  
+  // 绘制卖盘热力图（上半部分，从中心线向右延伸）
+  displayAsks.forEach((order, index) => {
+    const priceRatio = (order.price - minPrice) / priceRange;
+    const x = padding + priceRatio * chartWidth;
+    
+    // 使用累计深度来计算条形长度
+    const depthRatio = order.total / maxTotal;
+    const barLength = depthRatio * chartWidth * 0.8;
+    
+    // 计算条形高度
+    let barHeight = 2;
+    if (index < displayAsks.length - 1) {
+      const nextPrice = displayAsks[index + 1].price;
+      const priceDiff = Math.abs(order.price - nextPrice);
+      const avgPriceDiff = priceRange / displayAsks.length;
+      barHeight = Math.max(2, (priceDiff / avgPriceDiff) * (chartHeight / displayAsks.length));
+    } else {
+      barHeight = Math.max(2, chartHeight / displayAsks.length);
+    }
+    
+    // 绘制条形（从中心线向右延伸）
+    const y = centerY - askHeight + barHeight / 2;
+    const intensity = Math.min(depthRatio, 1);
+    const alpha = 0.5 + intensity * 0.5;
+    
+    // 创建渐变
+    const gradient = ctx.createLinearGradient(x, y, x + barLength, y);
+    gradient.addColorStop(0, `rgba(255, 71, 87, ${alpha})`);
+    gradient.addColorStop(1, `rgba(255, 71, 87, ${alpha * 0.3})`);
+    
+    ctx.fillStyle = gradient;
+    ctx.fillRect(x, y, barLength, barHeight);
+  });
+  
+  // 绘制中心价格线（最佳买卖价中间）
+  const midPrice = (bestBid + bestAsk) / 2;
+  const midX = padding + ((midPrice - minPrice) / priceRange) * chartWidth;
+  ctx.strokeStyle = '#00d4ff';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([5, 5]);
+  ctx.beginPath();
+  ctx.moveTo(midX, topPadding);
+  ctx.lineTo(midX, height - bottomPadding);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  
+  // 绘制水平分隔线
+  ctx.strokeStyle = 'rgba(0, 212, 255, 0.3)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(padding, centerY);
+  ctx.lineTo(width - padding, centerY);
+  ctx.stroke();
+  
+  // 绘制价格标签
+  ctx.font = '12px monospace';
+  ctx.textBaseline = 'middle';
+  
+  // 买一价标签（中心线下方）
+  ctx.fillStyle = '#00ff88';
+  ctx.textAlign = 'center';
+  ctx.fillText(formatPrice(bestBid), midX, centerY + 15);
+  
+  // 卖一价标签（中心线上方）
+  ctx.fillStyle = '#ff4757';
+  ctx.fillText(formatPrice(bestAsk), midX, centerY - 15);
+  
+  // 价格范围标签（底部）
+  ctx.fillStyle = '#718096';
+  ctx.font = '10px monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText(formatPrice(minPrice), padding, height - 10);
+  
+  ctx.textAlign = 'right';
+  ctx.fillText(formatPrice(maxPrice), width - padding, height - 10);
+  
+  // 价差标签（顶部）
+  ctx.fillStyle = '#a0aec0';
+  ctx.textAlign = 'center';
+  ctx.fillText(`价差: ${formatSpread(currentData.value?.spreadPercent || 0)}`, width / 2, 15);
+};
+
+// 监听数据变化，更新热力图
+watch([() => currentData.value, chartView], () => {
+  if (chartView.value === 'heatmap') {
+    nextTick(() => {
+      if (heatmapCanvas.value) {
+        const canvas = heatmapCanvas.value;
+        const container = canvas.parentElement;
+        if (container) {
+          canvas.width = container.clientWidth - 32; // 减去padding
+          canvas.height = 500 - 32; // 减去padding
+        }
+        drawHeatmap();
+      }
+    });
+  }
+}, { deep: true });
+
 </script>
 
 <style scoped>
@@ -687,6 +1144,64 @@ watch(displayAsks, () => {
 /* 深度图 */
 .depth-chart {
   padding: 16px 0;
+}
+
+/* 视图切换 */
+.view-toggle {
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: center;
+}
+
+/* 热力图容器 */
+.heatmap-container {
+  position: relative;
+  width: 100%;
+  height: 500px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 12px;
+  overflow: hidden;
+  padding: 16px;
+}
+
+.heatmap-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+}
+
+.heatmap-legend {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 12px;
+  border-radius: 8px;
+  backdrop-filter: blur(10px);
+}
+
+.legend-label {
+  display: block;
+  font-size: 12px;
+  color: #a0aec0;
+  margin-bottom: 8px;
+}
+
+.legend-gradient {
+  width: 200px;
+  height: 12px;
+  background: linear-gradient(to right, rgba(255, 71, 87, 0.3), rgba(255, 71, 87, 1), rgba(0, 255, 136, 1), rgba(0, 255, 136, 0.3));
+  border-radius: 6px;
+  margin-bottom: 4px;
+}
+
+.legend-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: #718096;
 }
 
 /* 压力指示器 */
@@ -973,7 +1488,7 @@ watch(displayAsks, () => {
 /* 统计信息 */
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 24px;
 }
 
@@ -1009,6 +1524,52 @@ watch(displayAsks, () => {
   color: #fbbf24;
 }
 
+/* 预警卡片 */
+.alert-card {
+  margin-bottom: 24px;
+  background: rgba(26, 31, 46, 0.6) !important;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(0, 212, 255, 0.15) !important;
+  border-radius: 16px !important;
+}
+
+.alert-config {
+  margin-bottom: 16px;
+}
+
+.alert-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.alert-item label {
+  font-size: 12px;
+  color: #a0aec0;
+  min-width: 80px;
+}
+
+.alert-item .unit {
+  font-size: 12px;
+  color: #718096;
+}
+
+.alert-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.alert-tag {
+  margin-right: 8px;
+}
+
+.no-alerts {
+  color: #718096;
+  font-size: 12px;
+}
+
 /* Tag 样式 */
 :deep(.el-tag--success) {
   background: rgba(0, 255, 136, 0.15) !important;
@@ -1027,7 +1588,16 @@ watch(displayAsks, () => {
   }
 
   .stats-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(3, 1fr);
+  }
+  
+  .alert-config .el-row {
+    flex-direction: column;
+  }
+  
+  .alert-config .el-col {
+    width: 100%;
+    margin-bottom: 12px;
   }
 }
 
