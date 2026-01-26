@@ -588,7 +588,7 @@ const formatPrice = price => {
 const formatQuantity = quantity => {
   if (!quantity || quantity === 0) return '0';
   const bn = new BigNumber(quantity);
-  return bn.decimalPlaces(3, BigNumber.ROUND_DOWN).toString();
+  return bn.decimalPlaces(5, BigNumber.ROUND_DOWN).toString();
 };
 
 // 格式化价差
