@@ -110,8 +110,8 @@
 
 <script>
 import { ArrowDown } from '@element-plus/icons-vue';
-import { computed, onMounted } from 'vue';
-import { useDepthStore } from '../stores/index.js';
+import { computed, onMounted, watch } from 'vue';
+import { useDepthStore, useSymbolStore } from '../stores/index.js';
 
 export default {
   name: 'SimpleLayout',
@@ -123,6 +123,7 @@ export default {
     
     // 使用统一的深度 store
     const depthStore = useDepthStore();
+    const symbolStore = useSymbolStore();
 
     // 当前交易类型（从 store 获取）
     const exchangeType = computed({
@@ -154,19 +155,114 @@ export default {
     // 初始化 WebSocket 连接
     const initializeWebSockets = async() => {
       try {
-        console.log('SimpleLayout: 初始化统一 WebSocket 连接');
         await depthStore.connect();
-        console.log('SimpleLayout: WebSocket 连接初始化完成');
       } catch (error) {
         console.error('SimpleLayout: WebSocket 连接失败:', error);
+      }
+    };
+
+    // 初始化交易对数据
+    const initSymbols = async() => {
+      // 将 depthStore 的 exchangeType (futures/spot) 映射到 API 的 type (contract/spot)
+      const apiType = depthStore.config.exchangeType === 'futures' ? 'contract' : 'spot';
+      
+      // 设置 symbolStore 的当前类型
+      symbolStore.setCurrentType(apiType);
+      symbolStore.setCurrentExchange('toobit');
+      
+      // 获取交易对列表，强制刷新以确保每次页面加载都请求
+      try {
+        await symbolStore.fetchSymbols({
+          exchange: 'toobit',
+          type: apiType,
+          forceRefresh: true, // 强制刷新，确保每次页面加载都请求
+        });
+        
+        // 更新 depthStore 的交易对列表并重新订阅（默认只订阅 BTC 和 ETH）
+        if (symbolStore.symbolList.length > 0) {
+          // 优先选择 BTC 和 ETH，如果不存在则选择前两个
+          const defaultSymbols = [];
+          const btcSymbol = symbolStore.symbolList.find(s => s.includes('BTC'));
+          const ethSymbol = symbolStore.symbolList.find(s => s.includes('ETH'));
+          
+          if (btcSymbol) defaultSymbols.push(btcSymbol);
+          if (ethSymbol) defaultSymbols.push(ethSymbol);
+          
+          // 如果 BTC 和 ETH 都找到了，就用这两个；否则用前两个
+          const symbolsToSubscribe = defaultSymbols.length >= 2 
+            ? defaultSymbols.slice(0, 2)
+            : symbolStore.symbolList.slice(0, 2);
+          
+          depthStore.updateSymbols(symbolsToSubscribe);
+        }
+      } catch (error) {
+        console.error('SimpleLayout: 初始化交易对列表失败:', error);
       }
     };
 
     onMounted(async() => {
       // 默认设置为黑色模式
       document.documentElement.classList.add('dark');
+      
+      // 初始化交易对数据
+      await initSymbols();
+      
       // 初始化 WebSocket 连接
       await initializeWebSockets();
+    });
+
+    // 监听交易所类型变化，更新交易对列表
+    watch(() => depthStore.config.exchangeType, async newType => {
+      const apiType = newType === 'futures' ? 'contract' : 'spot';
+      symbolStore.setCurrentType(apiType);
+      
+      try {
+        await symbolStore.fetchSymbols({
+          exchange: 'toobit',
+          type: apiType,
+          forceRefresh: true,
+        });
+        
+        // 更新 depthStore 的交易对列表并重新订阅（默认只订阅 BTC 和 ETH）
+        if (symbolStore.symbolList.length > 0) {
+          // 优先选择 BTC 和 ETH，如果不存在则选择前两个
+          const defaultSymbols = [];
+          const btcSymbol = symbolStore.symbolList.find(s => s.includes('BTC'));
+          const ethSymbol = symbolStore.symbolList.find(s => s.includes('ETH'));
+          
+          if (btcSymbol) defaultSymbols.push(btcSymbol);
+          if (ethSymbol) defaultSymbols.push(ethSymbol);
+          
+          // 如果 BTC 和 ETH 都找到了，就用这两个；否则用前两个
+          const symbolsToSubscribe = defaultSymbols.length >= 2 
+            ? defaultSymbols.slice(0, 2)
+            : symbolStore.symbolList.slice(0, 2);
+          
+          depthStore.updateSymbols(symbolsToSubscribe);
+        }
+      } catch (error) {
+        console.error('SimpleLayout: 更新交易对列表失败:', error);
+      }
+    });
+
+    // 监听交易对列表变化，更新 WebSocket 订阅（默认只订阅 BTC 和 ETH）
+    watch(() => symbolStore.symbolList, newList => {
+      if (newList.length > 0 && depthStore.isConnected) {
+        // 优先选择 BTC 和 ETH，如果不存在则选择前两个
+        const defaultSymbols = [];
+        const btcSymbol = newList.find(s => s.includes('BTC'));
+        const ethSymbol = newList.find(s => s.includes('ETH'));
+        
+        if (btcSymbol) defaultSymbols.push(btcSymbol);
+        if (ethSymbol) defaultSymbols.push(ethSymbol);
+        
+        // 如果 BTC 和 ETH 都找到了，就用这两个；否则用前两个
+        const symbolsToSubscribe = defaultSymbols.length >= 2 
+          ? defaultSymbols.slice(0, 2)
+          : newList.slice(0, 2);
+        
+        depthStore.updateSymbols(symbolsToSubscribe);
+      }
     });
 
     return {

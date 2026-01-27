@@ -64,10 +64,15 @@ export function isSpotExchange(exchangeId) {
 /**
  * 将标准币对格式转换为合约格式
  * BTCUSDT -> BTC-SWAP-USDT
- * @param {string} symbol - 标准币对，如 'BTCUSDT'
+ * @param {string} symbol - 标准币对，如 'BTCUSDT' 或已经是合约格式 'BTC-SWAP-USDT'
  * @returns {string} 合约格式币对，如 'BTC-SWAP-USDT'
  */
 export function toFuturesSymbol(symbol) {
+  // 如果已经是合约格式（包含 -SWAP-），直接返回
+  if (symbol.includes('-SWAP-')) {
+    return symbol;
+  }
+
   // 支持的报价币种
   const quoteCurrencies = ['USDT', 'USDC', 'BUSD'];
 
@@ -85,15 +90,20 @@ export function toFuturesSymbol(symbol) {
 /**
  * 将合约格式币对转换为标准格式
  * BTC-SWAP-USDT -> BTCUSDT
- * @param {string} symbol - 合约格式币对
+ * @param {string} symbol - 合约格式币对或标准格式币对
  * @returns {string} 标准格式币对
  */
 export function toStandardSymbol(symbol) {
-  // 处理合约格式 BTC-SWAP-USDT
-  const swapMatch = symbol.match(/^([A-Z]+)-SWAP-([A-Z]+)$/);
+  if (!symbol) return symbol;
+  
+  // 处理合约格式 BTC-SWAP-USDT 或 ETH-SWAP-USDT
+  // 支持多种格式：BTC-SWAP-USDT, ETH-SWAP-USDT, FIGHT-SWAP-USDT 等
+  const swapMatch = symbol.match(/^([A-Z0-9-]+)-SWAP-([A-Z]+)$/);
   if (swapMatch) {
     return `${swapMatch[1]}${swapMatch[2]}`;
   }
+  
+  // 如果已经是标准格式（如 BTCUSDT），直接返回
   return symbol;
 }
 

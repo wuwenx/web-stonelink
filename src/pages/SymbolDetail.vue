@@ -265,21 +265,22 @@
         </el-table-column>
       </el-table>
     </el-card>
-
   </div>
 </template>
 
 <script setup>
 import { ArrowLeft } from '@element-plus/icons-vue';
+import { ElMessage } from 'element-plus';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { getExchangeName, SYMBOLS } from '../config/exchanges';
+import { getExchangeName } from '../config/exchanges';
 import { useDepthStore } from '../stores/depth';
-import { ElMessage } from 'element-plus';
+import { useSymbolStore } from '../stores/symbol';
 
 const route = useRoute();
 const router = useRouter();
 const depthStore = useDepthStore();
+const symbolStore = useSymbolStore();
 
 // 响应式数据
 const symbol = ref('BTCUSDT');
@@ -296,9 +297,9 @@ const orderType = ref('market'); // 'market' 或 'limit'
 const splitStrategy = ref('none'); // 'none', 'equal', 'smart'
 const limitPriceOffset = ref(0.1); // 限价单价格偏移百分比
 
-// 从统一配置获取交易对选项
+// 从 store 获取交易对选项
 const symbolOptions = computed(() =>
-  SYMBOLS.map(sym => ({ label: sym, value: sym }))
+  symbolStore.symbolList.map(sym => ({ label: sym, value: sym }))
 );
 
 // 深度级别配置
@@ -552,10 +553,11 @@ const goBack = () => {
   router.push('/multi-depth');
 };
 
-// 更新交易对
+// 更新交易对：确保当前选中的交易对已订阅
 const updateSymbol = newSymbol => {
   symbol.value = newSymbol;
   selectedSymbol.value = newSymbol;
+  depthStore.subscribeSymbol(newSymbol);
   calculateSlippage();
 };
 
@@ -658,8 +660,19 @@ let updateTimer = null;
 // 组件挂载
 onMounted(() => {
   // 从路由参数获取币种
-  symbol.value = route.params.symbol || 'BTCUSDT';
-  selectedSymbol.value = symbol.value;
+  const routeSymbol = route.params.symbol || 'BTCUSDT';
+  
+  // 如果路由中的 symbol 在列表中，使用它；否则使用列表中的第一个
+  if (symbolStore.symbolList.includes(routeSymbol)) {
+    symbol.value = routeSymbol;
+    selectedSymbol.value = routeSymbol;
+  } else if (symbolStore.symbolList.length > 0) {
+    symbol.value = symbolStore.symbolList[0];
+    selectedSymbol.value = symbolStore.symbolList[0];
+  } else {
+    symbol.value = routeSymbol;
+    selectedSymbol.value = routeSymbol;
+  }
   
   // 同步订单方向
   orderSide.value = depthStore.config.orderSide;
@@ -691,6 +704,14 @@ onUnmounted(() => {
 watch(() => depthStore.depthData, () => {
   updateLastTime();
 }, { deep: true });
+
+// 监听交易对列表变化，如果当前选中的不在列表中，切换到第一个
+watch(() => symbolStore.symbolList, newList => {
+  if (newList.length > 0 && !newList.includes(selectedSymbol.value)) {
+    selectedSymbol.value = newList[0];
+    symbol.value = newList[0];
+  }
+}, { immediate: true });
 </script>
 
 <style scoped>

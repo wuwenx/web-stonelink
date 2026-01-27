@@ -19,6 +19,7 @@
               v-model="selectedSymbol"
               placeholder="选择交易对"
               size="large"
+              filterable
               popper-class="symbol-select-dropdown"
               @change="handleSymbolChange"
             >
@@ -341,8 +342,9 @@
 <script setup>
 import BigNumber from 'bignumber.js';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
-import { getExchangeName, SYMBOLS } from '../config/exchanges';
+import { getExchangeName } from '../config/exchanges';
 import { useDepthStore } from '../stores/depth';
+import { useSymbolStore } from '../stores/symbol';
 
 // 配置 BigNumber：不使用指数表示法，截取模式
 BigNumber.config({
@@ -351,6 +353,7 @@ BigNumber.config({
 });
 
 const depthStore = useDepthStore();
+const symbolStore = useSymbolStore();
 
 // 响应式数据
 const selectedSymbol = ref('BTCUSDT');
@@ -385,8 +388,8 @@ const requestNotificationPermission = async() => {
   }
 };
 
-// 从统一配置获取币对列表
-const symbols = SYMBOLS;
+// 从 store 获取币对列表
+const symbols = computed(() => symbolStore.symbolList);
 
 // 深度级别
 const depthLevels = [
@@ -597,9 +600,9 @@ const formatSpread = spreadPercent => {
   return spreadPercent.toFixed(4) + '%';
 };
 
-// 处理交易对变化
+// 处理交易对变化：确保当前选中的交易对已订阅
 const handleSymbolChange = () => {
-  // 数据会自动更新
+  depthStore.subscribeSymbol(selectedSymbol.value);
 };
 
 // 更新时间
@@ -622,7 +625,14 @@ let timer = null;
 // 监听窗口大小变化
 let resizeObserver = null;
 
-onMounted(() => {
+onMounted(async() => {
+  // 如果列表不为空，设置默认选中的交易对
+  if (symbolStore.symbolList.length > 0) {
+    if (!symbolStore.symbolList.includes(selectedSymbol.value)) {
+      selectedSymbol.value = symbolStore.symbolList[0];
+    }
+  }
+  
   if (!depthStore.isConnected) {
     depthStore.connect();
   }
@@ -661,6 +671,20 @@ watch(() => currentData.value, () => {
   updateTime();
   checkAlerts();
 }, { deep: true });
+
+// 监听交易对列表变化，更新选中的交易对
+watch(() => symbolStore.symbolList, newList => {
+  if (newList.length > 0) {
+    const currentSymbol = selectedSymbol.value;
+    if (newList.includes(currentSymbol)) {
+      // 如果当前交易对在新列表中，保持选中
+      selectedSymbol.value = currentSymbol;
+    } else {
+      // 否则选择第一个
+      selectedSymbol.value = newList[0];
+    }
+  }
+}, { immediate: true });
 
 // 检查预警条件
 const checkAlerts = () => {

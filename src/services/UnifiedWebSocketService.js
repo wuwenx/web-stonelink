@@ -65,7 +65,6 @@ export class UnifiedWebSocketService {
     switch (type) {
     case 'ready':
       this.workerReady = true;
-      console.log('深度处理 Worker 已就绪');
       break;
 
     case 'depthUpdate':
@@ -83,7 +82,6 @@ export class UnifiedWebSocketService {
       break;
 
     case 'configUpdated':
-      console.log('Worker 配置已更新:', data);
       break;
 
     default:
@@ -115,7 +113,6 @@ export class UnifiedWebSocketService {
    */
   connect() {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      console.log('WebSocket 已连接');
       return;
     }
 
@@ -131,7 +128,6 @@ export class UnifiedWebSocketService {
       this.ws = new WebSocket(UNIFIED_WS_URL);
 
       this.ws.onopen = () => {
-        console.log('统一 WS 服务已连接:', UNIFIED_WS_URL);
         this.reconnectAttempts = 0;
         this.updateStatus('connected');
         this.startHeartbeat();
@@ -145,7 +141,6 @@ export class UnifiedWebSocketService {
       };
 
       this.ws.onclose = event => {
-        console.log('WebSocket 连接关闭:', event.code, event.reason);
         this.updateStatus('disconnected');
         this.stopHeartbeat();
         this.scheduleReconnect();
@@ -268,7 +263,7 @@ export class UnifiedWebSocketService {
 
     // 处理订阅确认
     if (data.op === 'subscribe' && data.code === 0) {
-      console.log('订阅成功:', data.args);
+      // 订阅成功
     }
   }
 
@@ -281,7 +276,6 @@ export class UnifiedWebSocketService {
     const topic = getDepthTopic(exchange, symbol);
 
     if (this.subscriptions.has(topic)) {
-      console.log(`已订阅: ${topic}`);
       return;
     }
 
@@ -292,7 +286,6 @@ export class UnifiedWebSocketService {
         op: 'subscribe',
         args: [topic],
       });
-      console.log(`订阅: ${topic}`);
     }
   }
 
@@ -306,7 +299,6 @@ export class UnifiedWebSocketService {
     const newTopics = topics.filter(t => !this.subscriptions.has(t));
 
     if (newTopics.length === 0) {
-      console.log('所有 topic 已订阅');
       return;
     }
 
@@ -317,7 +309,6 @@ export class UnifiedWebSocketService {
         op: 'subscribe',
         args: newTopics,
       });
-      console.log(`批量订阅: ${newTopics.join(', ')}`);
     }
   }
 
@@ -338,7 +329,6 @@ export class UnifiedWebSocketService {
         op: 'unsubscribe',
         args: [topic],
       });
-      console.log(`取消订阅: ${topic}`);
     }
 
     // 清除 Worker 中对应的缓存
@@ -360,7 +350,6 @@ export class UnifiedWebSocketService {
       });
     }
 
-    console.log(`取消所有订阅: ${Array.from(this.subscriptions).join(', ')}`);
     this.subscriptions.clear();
 
     // 清除 Worker 中的所有缓存
@@ -376,7 +365,6 @@ export class UnifiedWebSocketService {
         op: 'subscribe',
         args: Array.from(this.subscriptions),
       });
-      console.log(`重新订阅: ${Array.from(this.subscriptions).join(', ')}`);
     }
   }
 
@@ -430,7 +418,6 @@ export class UnifiedWebSocketService {
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++;
       const delay = this.reconnectDelay * this.reconnectAttempts; // 递增延迟
-      console.log(`${delay / 1000}秒后尝试重连 (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
 
       this.reconnectTimer = setTimeout(() => this.connect(), delay);
     } else {

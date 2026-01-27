@@ -4,7 +4,7 @@
  * 以币种为维度组织数据，支持多币种多交易所对比
  */
 import { defineStore } from 'pinia';
-import { DEPTH_OPTIONS, SYMBOLS } from '../config/exchanges';
+import { DEPTH_OPTIONS, SYMBOLS, getDepthTopic, toStandardSymbol } from '../config/exchanges';
 import { getUnifiedWebSocketService } from '../services/UnifiedWebSocketService';
 
 // 默认支持的币种（从统一配置获取，只使用前两个作为默认订阅）
@@ -70,7 +70,9 @@ export const useDepthStore = defineStore('depth', {
 
     // 获取指定币种和交易所的深度数据
     getDepthData: state => (symbol, exchange) => {
-      const key = `${symbol}_${exchange}`;
+      // 将 symbol 转换为标准格式，确保能正确匹配
+      const standardSymbol = toStandardSymbol(symbol);
+      const key = `${standardSymbol}_${exchange}`;
       return (
         state.depthData[key] || {
           asks: [],
@@ -92,13 +94,15 @@ export const useDepthStore = defineStore('depth', {
       const isBuy = state.config.orderSide === 'buy';
 
       return state.symbols.map(symbol => {
+        // 将 symbol 转换为标准格式，确保能正确匹配存储的 key
+        const standardSymbol = toStandardSymbol(symbol);
         const exchangeDepths = {};
         let maxDepth = 0;
         let maxExchange = '';
 
         // 收集所有交易所的深度数据
         for (const exchangeId of exchanges) {
-          const key = `${symbol}_${exchangeId}`;
+          const key = `${standardSymbol}_${exchangeId}`;
           const data = state.depthData[key];
           const depth = isBuy
             ? (data?.depthStats?.[pctKey]?.bidDepth || 0)
@@ -113,8 +117,8 @@ export const useDepthStore = defineStore('depth', {
         }
 
         return {
-          symbol,
-          displayName: `${symbol.replace('USDT', '')}USDT`,
+          symbol: standardSymbol, // 返回标准格式的 symbol
+          displayName: `${standardSymbol.replace('USDT', '')}USDT`,
           exchanges: exchangeDepths,
           maxDepth,
           maxExchange,
@@ -127,13 +131,15 @@ export const useDepthStore = defineStore('depth', {
       const exchanges = COMPARE_EXCHANGES[state.config.exchangeType] || [];
 
       return state.symbols.map(symbol => {
+        // 将 symbol 转换为标准格式，确保能正确匹配存储的 key
+        const standardSymbol = toStandardSymbol(symbol);
         const exchangeSpreads = {};
         let minSpread = Infinity;
         let minExchange = '';
 
         // 收集所有交易所的价差数据
         for (const exchangeId of exchanges) {
-          const key = `${symbol}_${exchangeId}`;
+          const key = `${standardSymbol}_${exchangeId}`;
           const data = state.depthData[key];
           const spread = data?.spreadPercent || 0;
 
@@ -146,8 +152,8 @@ export const useDepthStore = defineStore('depth', {
         }
 
         return {
-          symbol,
-          displayName: `${symbol.replace('USDT', '')}USDT`,
+          symbol: standardSymbol, // 返回标准格式的 symbol
+          displayName: `${standardSymbol.replace('USDT', '')}USDT`,
           exchanges: exchangeSpreads,
           minSpread: minSpread === Infinity ? 0 : minSpread,
           minExchange,
@@ -169,7 +175,6 @@ export const useDepthStore = defineStore('depth', {
         this.wsService.onDepthUpdate = data => this.handleDepthUpdate(data);
         this.wsService.onStatusChange = status => {
           this.connectionStatus = status;
-          console.log('连接状态变化:', status);
         };
         this.wsService.onError = error => {
           console.error('WebSocket 错误:', error);
@@ -226,8 +231,12 @@ export const useDepthStore = defineStore('depth', {
     handleDepthUpdate(data) {
       const { exchange, symbol, bids, asks, bestBid, bestAsk, spread, spreadPercent, depthStats, processedAt } = data;
 
-      // 使用 symbol_exchange 作为 key
-      const key = `${symbol}_${exchange}`;
+      // 将 symbol 转换为标准格式（统一使用标准格式存储，如 BTCUSDT）
+      // Worker 返回的 symbol 已经是标准格式，但为了保险起见，再次转换
+      const standardSymbol = toStandardSymbol(symbol);
+
+      // 使用 standardSymbol_exchange 作为 key，确保格式统一
+      const key = `${standardSymbol}_${exchange}`;
 
       // 更新 store
       this.depthData[key] = {
@@ -294,6 +303,58 @@ export const useDepthStore = defineStore('depth', {
       this.disconnect();
       await new Promise(resolve => setTimeout(resolve, 500));
       await this.connect();
+    },
+
+    // 更新交易对列表并重新订阅
+    updateSymbols(newSymbols) {
+      if (!Array.isArray(newSymbols) || newSymbols.length === 0) {
+        console.warn('[DepthStore] 交易对列表为空，跳过更新');
+        return;
+      }
+
+      // 如果列表没有变化，不需要更新
+      const symbolListStr = JSON.stringify([...this.symbols].sort());
+      const newSymbolListStr = JSON.stringify([...newSymbols].sort());
+      if (symbolListStr === newSymbolListStr) {
+        return;
+      }
+
+      const oldSymbols = [...this.symbols];
+      this.symbols = newSymbols;
+
+      // 如果 WebSocket 已连接，需要重新订阅
+      if (this.wsService && this.wsService.getStatus() === 'connected') {
+        // 取消旧交易对的订阅（只取消不在新列表中的）
+        const exchanges = COMPARE_EXCHANGES[this.config.exchangeType] || [];
+        const symbolsToUnsubscribe = oldSymbols.filter(s => !newSymbols.includes(s));
+        
+        for (const symbol of symbolsToUnsubscribe) {
+          for (const exchange of exchanges) {
+            this.wsService.unsubscribeDepth(exchange, symbol);
+          }
+        }
+
+        // 订阅新交易对（只订阅不在旧列表中的）
+        const symbolsToSubscribe = newSymbols.filter(s => !oldSymbols.includes(s));
+        for (const symbol of symbolsToSubscribe) {
+          this.wsService.subscribeDepthBatch(exchanges, symbol);
+        }
+      }
+    },
+
+    /**
+     * 按需订阅单个交易对（用户切换交易对时调用）
+     * 若该交易对尚未在订阅列表中，则加入并订阅
+     */
+    subscribeSymbol(symbol) {
+      if (!symbol) return;
+      if (this.symbols.includes(symbol)) return;
+
+      this.symbols = [...this.symbols, symbol];
+      if (this.wsService && this.wsService.getStatus() === 'connected') {
+        const exchanges = COMPARE_EXCHANGES[this.config.exchangeType] || [];
+        this.wsService.subscribeDepthBatch(exchanges, symbol);
+      }
     },
   },
 });

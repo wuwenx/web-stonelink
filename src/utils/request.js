@@ -17,7 +17,6 @@ request.interceptors.request.use(
     return config;
   },
   error => {
-    console.log(error); // for debug
     Promise.reject(error);
   }
 );
@@ -40,7 +39,6 @@ request.interceptors.response.use(
     }
   },
   error => {
-    console.log('err' + error); // for debug
     // ElMessage({
     //   message: error.message,
     //   type: 'error',
