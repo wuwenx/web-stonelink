@@ -43,6 +43,12 @@
               </svg>
               <span>订单簿</span>
             </router-link>
+            <router-link to="/market" class="nav-link" active-class="nav-link-active">
+              <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 7h8m0 0v8m0-8v8M3 21h18M3 10h18M3 7l9-4 9 4M3 21V7M21 21V7l-9 4" />
+              </svg>
+              <span>市场</span>
+            </router-link>
           </nav>
 
           <!-- 现货/合约全局切换 -->

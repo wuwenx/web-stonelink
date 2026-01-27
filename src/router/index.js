@@ -34,6 +34,12 @@ const routes = [
         component: () => import('../pages/OrderBook.vue'),
         meta: { title: '实时订单簿' },
       },
+      {
+        path: 'market',
+        name: 'Market',
+        component: () => import('../pages/Market.vue'),
+        meta: { title: '市场行情' },
+      },
     ],
   },
   // {
