@@ -345,6 +345,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { getExchangeName } from '../config/exchanges';
 import { useDepthStore } from '../stores/depth';
 import { useSymbolStore } from '../stores/symbol';
+import { getPrecisionDecimals } from '../utils/precision';
 
 // 配置 BigNumber：不使用指数表示法，截取模式
 BigNumber.config({
@@ -578,20 +579,28 @@ const isLargeOrder = quantity => {
   return quantity >= largeOrderThreshold.value;
 };
 
-// 格式化价格
+// 当前币对精度（从币对接口：价格取 quote_precision，数量取 base_asset_precision）
+const currentSymbolInfo = computed(() => symbolStore.getSymbolInfo(selectedSymbol.value));
+const priceDecimals = computed(() =>
+  getPrecisionDecimals(currentSymbolInfo.value?.quote_precision, 2));
+const quantityDecimals = computed(() =>
+  getPrecisionDecimals(currentSymbolInfo.value?.base_asset_precision, 5));
+
+// 格式化价格（按 quote_precision）
 const formatPrice = price => {
   if (!price || price === 0) return '----.--';
-  return price.toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+  const d = priceDecimals.value;
+  return Number(price).toLocaleString('en-US', {
+    minimumFractionDigits: d,
+    maximumFractionDigits: d,
   });
 };
 
-// 格式化数量（使用 BigNumber 截取3位小数，不四舍五入）
+// 格式化数量（按 base_asset_precision，使用 BigNumber 截取不四舍五入）
 const formatQuantity = quantity => {
   if (!quantity || quantity === 0) return '0';
   const bn = new BigNumber(quantity);
-  return bn.decimalPlaces(5, BigNumber.ROUND_DOWN).toString();
+  return bn.decimalPlaces(quantityDecimals.value, BigNumber.ROUND_DOWN).toString();
 };
 
 // 格式化价差

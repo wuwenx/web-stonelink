@@ -276,6 +276,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { getExchangeName } from '../config/exchanges';
 import { useDepthStore } from '../stores/depth';
 import { useSymbolStore } from '../stores/symbol';
+import { getPrecisionDecimals } from '../utils/precision';
 
 const route = useRoute();
 const router = useRouter();
@@ -301,6 +302,13 @@ const limitPriceOffset = ref(0.1); // 限价单价格偏移百分比
 const symbolOptions = computed(() =>
   symbolStore.symbolList.map(sym => ({ label: sym, value: sym }))
 );
+
+// 当前币对精度（从币对接口：价格取 quote_precision，数量取 base_asset_precision）
+const currentSymbolInfo = computed(() => symbolStore.getSymbolInfo(selectedSymbol.value));
+const priceDecimals = computed(() =>
+  getPrecisionDecimals(currentSymbolInfo.value?.quote_precision, 2));
+const quantityDecimals = computed(() =>
+  getPrecisionDecimals(currentSymbolInfo.value?.base_asset_precision, 5));
 
 // 深度级别配置
 const depthLevels = [
@@ -591,16 +599,16 @@ const getLiquidityTagType = liquidity => {
   return 'danger';
 };
 
-// 格式化流动性
+// 格式化流动性（数量按 base_asset_precision）
 const formatLiquidity = liquidity => {
   if (!liquidity || liquidity === 0) return '--';
-  
+  const d = quantityDecimals.value;
   if (liquidity >= 1000000) {
-    return `${(liquidity / 1000000).toFixed(1)}M`;
+    return `${(liquidity / 1000000).toFixed(d)}M`;
   } else if (liquidity >= 1000) {
-    return `${(liquidity / 1000).toFixed(1)}K`;
+    return `${(liquidity / 1000).toFixed(d)}K`;
   } else {
-    return liquidity.toFixed(1);
+    return Number(liquidity).toFixed(d);
   }
 };
 
@@ -616,17 +624,17 @@ const formatSlippage = slippage => {
   return `${slippage.toFixed(4)} %`;
 };
 
-// 格式化价格
+// 格式化价格（按 quote_precision）
 const formatPrice = price => {
   if (!price || price === 0) return '--';
-  return price.toFixed(2);
+  return Number(price).toFixed(priceDecimals.value);
 };
 
-// 格式化成本
+// 格式化成本（按 quote_precision）
 const formatCost = cost => {
   if (!cost || cost === 0) return '0.00';
   const sign = cost > 0 ? '+' : '';
-  return `${sign}${cost.toFixed(2)}`;
+  return `${sign}${Number(cost).toFixed(priceDecimals.value)}`;
 };
 
 // 获取滑点标签类型
