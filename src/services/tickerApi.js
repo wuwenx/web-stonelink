@@ -2,8 +2,7 @@
  * 24hr Ticker 相关 API
  */
 import axios from 'axios';
-
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+import { API_BASE_URL } from '@/config/api';
 
 /**
  * 获取 24 小时行情

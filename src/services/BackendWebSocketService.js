@@ -1,10 +1,9 @@
 /**
  * 后端 WebSocket 服务
- * 连接 ws://localhost:8000/api/v1/ws，使用 Web Worker 在独立线程中解析/转换消息
+ * 地址由 config/api 的 BACKEND_WS_URL 决定（开发 ws://localhost:8000/api/v1/ws，生产 ws://10.246.2.52/api/v1/ws）
  * 协议：{ event, exchange?, symbol?, topic }
  */
-
-const BACKEND_WS_URL = 'ws://localhost:8000/api/v1/ws';
+import { BACKEND_WS_URL } from '@/config/api';
 
 export class BackendWebSocketService {
   constructor() {
