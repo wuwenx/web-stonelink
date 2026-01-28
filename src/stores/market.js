@@ -75,12 +75,15 @@ export const useMarketStore = defineStore('market', {
       this._wsInitialized = true;
 
       ws.onMessage = msg => {
-        // 后端推送用 event 或 topic 标识主题，都认
-        const isWholeRealTime =
-          (msg.topic === 'wholeRealTime' || msg.event === 'wholeRealTime') &&
-          msg.data;
-        if (isWholeRealTime) {
-          const row = wsRowToTicker(msg);
+        // Worker 已转换时直接带 row；否则用 event/topic+data 在主线程转换
+        let row = msg.row;
+        if (!row) {
+          const isWholeRealTime =
+            (msg.topic === 'wholeRealTime' || msg.event === 'wholeRealTime') &&
+            msg.data;
+          if (isWholeRealTime) row = wsRowToTicker(msg);
+        }
+        if (row) {
           const key = normalizeSymbol(row.s);
           const list = [...this.tickers];
           const idx = list.findIndex(

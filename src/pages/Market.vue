@@ -50,8 +50,10 @@
               :width="width"
               :height="height"
               :row-height="44"
+              :sort-by="sortBy"
               fixed
               class="ticker-table-v2"
+              @column-sort="onColumnSort"
             >
               <template #empty>
                 <div class="table-empty">
@@ -71,12 +73,16 @@
 
 <script setup>
 import { Loading } from '@element-plus/icons-vue';
+import { TableV2SortOrder } from 'element-plus';
 import { computed, h, onMounted, onUnmounted, ref } from 'vue';
 import { RouterLink } from 'vue-router';
 import { useMarketStore } from '../stores/market';
 
 const marketStore = useMarketStore();
 const quoteSuffix = ref('USDT'); // 'USDT' | 'USDC'
+
+// 列排序状态，默认按成交额降序（交易对列不参与排序）
+const sortBy = ref({ key: 'qv', order: TableV2SortOrder.DESC });
 
 // 按 s 后缀过滤：s 以 -USDT 或 -USDC 结尾
 const filteredTickers = computed(() => {
@@ -88,16 +94,27 @@ const filteredTickers = computed(() => {
   });
 });
 
-// 虚拟表格要求每行有 id；按成交额 qv 降序排列；保证始终为数组
-const filteredTableData = computed(() => {
-  const rows = (filteredTickers.value || []).map(row => ({ ...row, id: row.s }));
-  return rows.sort((a, b) => {
-    const qa = Number(a.qv) || 0;
-    const qb = Number(b.qv) || 0;
-    return qb - qa;
+// 虚拟表格要求每行有 id；先不排序
+const filteredTableData = computed(() =>
+  (filteredTickers.value || []).map(row => ({ ...row, id: row.s }))
+);
+
+// 按当前 sortBy 排序后的表格数据
+const tableData = computed(() => {
+  const list = filteredTableData.value ?? [];
+  const { key, order } = sortBy.value;
+  if (!key) return list;
+  return [...list].sort((a, b) => {
+    const va = Number(a[key]) ?? 0;
+    const vb = Number(b[key]) ?? 0;
+    const cmp = va - vb;
+    return order === TableV2SortOrder.DESC ? -cmp : cmp;
   });
 });
-const tableData = computed(() => filteredTableData.value ?? []);
+
+function onColumnSort(next) {
+  sortBy.value = next;
+}
 
 function formatNum(val) {
   if (val == null || val === '' || val === undefined) return '--';
@@ -150,6 +167,7 @@ const columns = [
     title: '最新价',
     width: 120,
     align: 'right',
+    sortable: true,
     cellRenderer: ({ cellData, rowData }) =>
       h('span', { class: 'num-text', style: priceChangeStyle(rowData) }, formatNum(cellData ?? rowData.c)),
   },
@@ -159,6 +177,7 @@ const columns = [
     title: '开盘价',
     width: 120,
     align: 'right',
+    sortable: true,
     cellRenderer: ({ cellData }) => h('span', { class: 'num-text' }, formatNum(cellData)),
   },
   {
@@ -167,6 +186,7 @@ const columns = [
     title: '最高价',
     width: 120,
     align: 'right',
+    sortable: true,
     cellRenderer: ({ cellData }) => h('span', { class: 'num-text up' }, formatNum(cellData)),
   },
   {
@@ -175,6 +195,7 @@ const columns = [
     title: '最低价',
     width: 200,
     align: 'right',
+    sortable: true,
     cellRenderer: ({ cellData }) => h('span', { class: 'num-text down' }, formatNum(cellData)),
   },
   {
@@ -183,6 +204,7 @@ const columns = [
     title: '成交量',
     width: 140,
     align: 'right',
+    sortable: true,
     cellRenderer: ({ cellData }) => h('span', { class: 'num-text' }, formatVol(cellData)),
   },
   {
@@ -191,6 +213,7 @@ const columns = [
     title: '成交额',
     width: 140,
     align: 'right',
+    sortable: true,
     cellRenderer: ({ cellData }) => h('span', { class: 'num-text' }, formatVol(cellData)),
   },
   {
@@ -199,6 +222,7 @@ const columns = [
     title: '涨跌额',
     width: 120,
     align: 'right',
+    sortable: true,
     cellRenderer: ({ cellData, rowData }) =>
       h('span', { class: 'num-text', style: priceChangeStyle(rowData) }, formatNum(cellData ?? rowData.pc)),
   },
@@ -208,6 +232,7 @@ const columns = [
     title: '涨跌幅',
     width: 100,
     align: 'right',
+    sortable: true,
     cellRenderer: ({ cellData, rowData }) => {
       const style = { ...priceChangeStyle(rowData), padding: '2px 6px', borderRadius: '4px' };
       if (style.color === '#00ff88') style.backgroundColor = 'rgba(0, 255, 136, 0.08)';
@@ -333,7 +358,7 @@ onUnmounted(() => {
 }
 
 .table-wrap {
-  height: 500px;
+  height: 800px;
   min-height: 400px;
   position: relative;
 }

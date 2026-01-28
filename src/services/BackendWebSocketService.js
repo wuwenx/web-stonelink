@@ -1,6 +1,6 @@
 /**
  * 后端 WebSocket 服务
- * 连接 ws://localhost:8000/api/v1/ws
+ * 连接 ws://localhost:8000/api/v1/ws，使用 Web Worker 在独立线程中解析/转换消息
  * 协议：{ event, exchange?, symbol?, topic }
  */
 
@@ -21,6 +21,43 @@ export class BackendWebSocketService {
     this.onMessage = null;
     this.onStatusChange = null;
     this.onError = null;
+
+    // Web Worker：在独立线程处理 wholeRealTime 解析与转换
+    this.worker = null;
+    this.workerReady = false;
+    this._initWorker();
+  }
+
+  _initWorker() {
+    try {
+      this.worker = new Worker(
+        new URL('../workers/marketTickerWorker.js', import.meta.url)
+      );
+      this.worker.onmessage = e => this._onWorkerMessage(e.data);
+      this.worker.onerror = err => {
+        if (this.onError) this.onError({ type: 'worker_error', error: err });
+      };
+    } catch (err) {
+      this.worker = null;
+    }
+  }
+
+  _onWorkerMessage(data) {
+    if (data.type === 'ready') {
+      this.workerReady = true;
+      return;
+    }
+    if (data.event === 'wholeRealTime' && data.row && this.onMessage) {
+      this.onMessage({ event: 'wholeRealTime', row: data.row });
+    }
+  }
+
+  _sendToWorker(type, data) {
+    if (this.worker && this.workerReady) {
+      this.worker.postMessage({ type, ...data });
+    } else if (this.worker) {
+      setTimeout(() => this._sendToWorker(type, data), 50);
+    }
   }
 
   connect() {
@@ -60,11 +97,16 @@ export class BackendWebSocketService {
   }
 
   _handleMessage(raw) {
-    try {
-      const data = JSON.parse(raw);
-      if (this.onMessage) this.onMessage(data);
-    } catch (e) {
-      // ignore parse error
+    if (this.worker && this.workerReady) {
+      this._sendToWorker('message', { raw });
+    } else {
+      // Worker 未就绪时在主线程解析，保证不丢包
+      try {
+        const data = JSON.parse(raw);
+        if (this.onMessage) this.onMessage(data);
+      } catch (e) {
+        // ignore
+      }
     }
   }
 
@@ -137,6 +179,11 @@ export class BackendWebSocketService {
       this.reconnectTimer = null;
     }
     this.subscriptions.clear();
+    if (this.worker) {
+      this.worker.terminate();
+      this.worker = null;
+      this.workerReady = false;
+    }
     if (this.ws) {
       this.ws.onclose = null;
       this.ws.close();
