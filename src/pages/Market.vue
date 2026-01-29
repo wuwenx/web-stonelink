@@ -74,23 +74,32 @@
 <script setup>
 import { Loading } from '@element-plus/icons-vue';
 import { TableV2SortOrder } from 'element-plus';
-import { computed, h, onMounted, onUnmounted, ref } from 'vue';
+import { computed, h, onMounted, onUnmounted, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
+import { useDepthStore } from '../stores/depth';
 import { useMarketStore } from '../stores/market';
 
+const depthStore = useDepthStore();
 const marketStore = useMarketStore();
+
+// 头部现货/合约切换 → API type：futures→contract，spot→spot
+const apiType = computed(() =>
+  depthStore.config.exchangeType === 'futures' ? 'contract' : 'spot'
+);
 const quoteSuffix = ref('USDT'); // 'USDT' | 'USDC'
 
 // 列排序状态，默认按成交额降序（交易对列不参与排序）
 const sortBy = ref({ key: 'qv', order: TableV2SortOrder.DESC });
 
-// 按 s 后缀过滤：s 以 -USDT 或 -USDC 结尾
+// 按 s 后缀过滤：合约格式 XXX-USDT，现货格式 XXXUSDT
 const filteredTickers = computed(() => {
   const list = marketStore.tickerList || [];
   const suffix = quoteSuffix.value;
   return list.filter(row => {
     const s = (row.s || '').toUpperCase();
-    return s.endsWith(`-${suffix}`);
+    if (s.endsWith(`-${suffix}`)) return true; // 合约格式
+    if (s.endsWith(suffix) && !s.includes('-')) return true; // 现货格式
+    return false;
   });
 });
 
@@ -243,11 +252,17 @@ const columns = [
 ];
 
 async function refresh() {
-  await marketStore.fetchTicker24hr();
+  await marketStore.fetchTicker24hr(marketStore.exchange, apiType.value);
 }
 
 onMounted(async() => {
-  await marketStore.fetchTicker24hr();
+  await marketStore.fetchTicker24hr(marketStore.exchange, apiType.value);
+  marketStore.initWs();
+});
+
+// 监听头部现货/合约切换，自动拉取对应接口
+watch(() => depthStore.config.exchangeType, async() => {
+  await marketStore.fetchTicker24hr(marketStore.exchange, apiType.value);
   marketStore.initWs();
 });
 

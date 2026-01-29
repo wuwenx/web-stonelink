@@ -36,7 +36,9 @@ function wsRowToTicker(msg) {
 export const useMarketStore = defineStore('market', {
   state: () => ({
     exchange: 'toobit',
+    marketType: 'contract', // 'spot' | 'contract'，现货不启用 WS
     tickers: [], // 与 API 24hr 结构一致：{ t, a, b, s, c, o, h, l, v, qv, pc, pcp, op }
+    allowedSymbols: null, // 接口返回的币对白名单 Set，WS 仅更新白名单内的币对
     loading: false,
     error: null,
     wsStatus: 'disconnected',
@@ -53,13 +55,24 @@ export const useMarketStore = defineStore('market', {
   },
 
   actions: {
-    async fetchTicker24hr(exchange = this.exchange) {
+    async fetchTicker24hr(exchange = this.exchange, type = this.marketType) {
       this.loading = true;
       this.error = null;
+      if (type === 'spot') {
+        this.stopWs();
+      }
       try {
-        const data = await getTicker24hr({ exchange });
+        const data = await getTicker24hr({ exchange, type });
         this.exchange = exchange;
+        this.marketType = type;
         this.tickers = Array.isArray(data) ? data : [];
+        // 以接口返回的币对为主，建立白名单
+        this.allowedSymbols = new Set(
+          (this.tickers || []).map(t => normalizeSymbol(t.s)).filter(Boolean)
+        );
+        if (type === 'contract') {
+          this.initWs(exchange);
+        }
         return this.tickers;
       } catch (e) {
         this.error = e.message || '获取24hr行情失败';
@@ -70,6 +83,8 @@ export const useMarketStore = defineStore('market', {
     },
 
     initWs(exchange = this.exchange) {
+      // 现货暂不启用 WS 实时更新
+      if (this.marketType === 'spot') return;
       const ws = getBackendWebSocketService();
       if (ws.getStatus() === 'connected' && this._wsInitialized) return;
       this._wsInitialized = true;
@@ -85,22 +100,24 @@ export const useMarketStore = defineStore('market', {
         }
         if (row) {
           const key = normalizeSymbol(row.s);
+          // 以接口请求的币对为主：仅更新白名单内的币对，不展示 WS 推送但接口未返回的币对
+          if (!this.allowedSymbols || !this.allowedSymbols.has(key)) return;
           const list = [...this.tickers];
           const idx = list.findIndex(
             t => normalizeSymbol(t.s) === key || t.s === row.s
           );
           if (idx >= 0) {
             list[idx] = { ...list[idx], ...row };
-          } else {
-            list.push(row);
+            this.tickers = list;
           }
-          this.tickers = list;
         }
       };
       ws.onStatusChange = status => {
         this.wsStatus = status;
       };
       ws.connect();
+      // 同步当前连接状态（WS 可能已在别处连接，需立即反映到 UI）
+      this.wsStatus = ws.getStatus();
       // 后端协议要求 exchange 格式为 "toobit"（交易所名）
       const wsExchange = exchange ? `${exchange}` : exchange;
       ws.subscribe({ exchange: wsExchange, topic: 'wholeRealTime' });

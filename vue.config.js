@@ -1,4 +1,10 @@
 const { defineConfig } = require('@vue/cli-service');
+
+// 生产构建时若未从 .env.production 读到，则用线上地址，避免 build 后仍走 localhost
+if (process.env.NODE_ENV === 'production' && !process.env.VUE_APP_API_BASE_URL) {
+  process.env.VUE_APP_API_BASE_URL = 'http://10.246.2.52/api/v1';
+}
+
 module.exports = defineConfig({
   transpileDependencies: true,
   // 配置 GitHub Pages 部署

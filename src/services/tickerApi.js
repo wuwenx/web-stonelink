@@ -1,23 +1,28 @@
 /**
  * 24hr Ticker 相关 API
  */
-import axios from 'axios';
 import { API_BASE_URL } from '@/config/api';
+import axios from 'axios';
 
 /**
  * 获取 24 小时行情
  * @param {Object} params - 查询参数
  * @param {string} params.exchange - 交易所名称，如 'toobit'
+ * @param {string} [params.type] - 类型：'spot' 现货，不传或 'contract' 为合约
  * @returns {Promise<Array>} ticker 列表
  */
 export function getTicker24hr(params = {}) {
-  const { exchange = 'toobit' } = params;
+  const { exchange = 'toobit', type } = params;
   const url = `${API_BASE_URL}/ticker/24hr`;
+  const requestParams = { exchange };
+  if (type === 'spot') {
+    requestParams.type = 'spot';
+  }
 
   return axios({
     url,
     method: 'get',
-    params: { exchange },
+    params: requestParams,
     timeout: 15000,
   })
     .then(response => {

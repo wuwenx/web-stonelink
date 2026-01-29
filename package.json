@@ -5,8 +5,8 @@
   "scripts": {
     "dev": "vue-cli-service serve",
     "dev:prod": "VUE_APP_API_BASE_URL=http://10.246.2.52/api/v1 vue-cli-service serve",
-    "build": "vue-cli-service build",
-    "build:prod": "NODE_ENV=production vue-cli-service build",
+    "build": "vue-cli-service build --mode production",
+    "build:prod": "vue-cli-service build --mode production",
     "deploy": "npm run build:prod && gh-pages -d dist",
     "lint": "vue-cli-service lint",
     "lint:fix": "vue-cli-service lint --fix",
