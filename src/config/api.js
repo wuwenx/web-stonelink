@@ -18,8 +18,8 @@ export const BACKEND_WS_URL = (() => {
   try {
     const u = new URL(base);
     const protocol = u.protocol === 'https:' ? 'wss:' : 'ws:';
-    return `${protocol}//${u.host}/api/v1/ws/cctx`;
+    return `${protocol}//${u.host}/api/v1/ws`;
   } catch {
-    return 'ws://localhost:8000/api/v1/ws/cctx';
+    return 'ws://localhost:8000/api/v1/ws';
   }
 })();
