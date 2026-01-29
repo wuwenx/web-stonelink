@@ -180,7 +180,8 @@ function processDepthData(rawData, type, quantityDivisor = 1) {
 }
 
 /**
- * 计算各深度范围的统计数据
+ * 计算各深度范围的统计数据（币安、Toobit、OKX 等所有交易所共用同一算法，无差别）
+ * 公式：买盘 bidThreshold = bestBid * (1 - pct)，卖盘 askThreshold = bestAsk * (1 + pct)，累计范围内数量
  * @param {Array} bids - 买盘数据
  * @param {Array} asks - 卖盘数据
  * @param {number} bestBid - 最佳买价
@@ -188,7 +189,7 @@ function processDepthData(rawData, type, quantityDivisor = 1) {
  * @returns {Object} 深度统计数据
  */
 function calculateDepthStats(bids, asks, bestBid, bestAsk) {
-  // 预定义的深度百分比
+  // 预定义的深度百分比（所有交易所统一）
   const percentages = [0.0001, 0.0005, 0.001, 0.005, 0.01, 0.02, 0.05, 0.1];
 
   const stats = {};
