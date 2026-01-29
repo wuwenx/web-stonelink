@@ -13,11 +13,6 @@
             已断开
           </el-tag>
         </div>
-        <div class="header-right">
-          <el-button type="primary" size="small" :loading="marketStore.loading" @click="refresh">
-            刷新
-          </el-button>
-        </div>
       </div>
     </el-card>
 
@@ -26,104 +21,152 @@
         <div class="card-header table-card-header">
           <div class="table-header-left">
             <span class="card-title">24h 行情</span>
-            <span class="exchange-label">交易所: {{ marketStore.exchange }}</span>
-          </div>
-          <div class="quote-toggle">
-            <span
-              v-for="q in ['USDT', 'USDC']"
-              :key="q"
-              :class="['quote-tab', { active: quoteSuffix === q }]"
-              @click="quoteSuffix = q"
-            >
-              {{ q }}
-            </span>
+            <span class="exchange-label">交易所: toobit</span>
           </div>
         </div>
       </template>
 
-      <div class="table-wrap" :class="{ loading: marketStore.loading }">
-        <el-auto-resizer>
-          <template #default="{ height, width }">
-            <el-table-v2
-              :columns="columns"
-              :data="tableData"
-              :width="width"
-              :height="height"
-              :row-height="44"
-              :sort-by="sortBy"
-              fixed
-              class="ticker-table-v2"
-              @column-sort="onColumnSort"
-            >
-              <template #empty>
-                <div class="table-empty">
-                  <el-icon v-if="marketStore.loading" class="is-loading" :size="28">
-                    <Loading />
-                  </el-icon>
-                  <span v-else>暂无数据</span>
-                </div>
-              </template>
-            </el-table-v2>
-          </template>
-        </el-auto-resizer>
+      <div class="table-wrap" :class="{ loading }">
+        <el-table
+          v-loading="loading"
+          :data="tableData"
+          stripe
+          border
+          class="market-table"
+          empty-text="暂无数据"
+        >
+          <el-table-column label="交易对" min-width="140" fixed>
+            <template #default="{ row }">
+              <router-link :to="`/symbol/${row.id}`" class="symbol-link">
+                {{ row.symbol || row.id }}
+              </router-link>
+            </template>
+          </el-table-column>
+          <el-table-column prop="c" label="最新价" min-width="120" align="right" sortable>
+            <template #default="{ row }">
+              <span class="num-text" :style="priceChangeStyle(row)">{{ formatNum(row.c) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="o" label="开盘价" min-width="110" align="right" sortable>
+            <template #default="{ row }">
+              <span class="num-text">{{ formatNum(row.o) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="h" label="最高价" min-width="110" align="right" sortable>
+            <template #default="{ row }">
+              <span class="num-text up">{{ formatNum(row.h) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="l" label="最低价" min-width="110" align="right" sortable>
+            <template #default="{ row }">
+              <span class="num-text down">{{ formatNum(row.l) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="v" label="成交量" min-width="120" align="right" sortable>
+            <template #default="{ row }">
+              <span class="num-text">{{ formatVol(row.v) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="qv" label="成交额" min-width="120" align="right" sortable>
+            <template #default="{ row }">
+              <span class="num-text">{{ formatVol(row.qv) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="pc" label="涨跌额" min-width="100" align="right" sortable>
+            <template #default="{ row }">
+              <span class="num-text" :style="priceChangeStyle(row)">{{ formatNum(row.pc) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="pcp" label="涨跌幅" min-width="100" align="right" sortable>
+            <template #default="{ row }">
+              <span
+                class="num-text pcp-cell"
+                :style="pcpCellStyle(row)"
+              >{{ formatPcp(row.pcp) }}</span>
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <div class="pagination-wrap">
+          <el-pagination
+            :current-page="page"
+            :page-size="pageSize"
+            :page-sizes="[10, 20, 50, 100]"
+            :total="total"
+            layout="total, sizes, prev, pager, next"
+            background
+            @current-change="onPageChange"
+            @size-change="onSizeChange"
+          />
+        </div>
       </div>
     </el-card>
   </div>
 </template>
 
 <script setup>
-import { Loading } from '@element-plus/icons-vue';
-import { TableV2SortOrder } from 'element-plus';
-import { computed, h, onMounted, onUnmounted, ref, watch } from 'vue';
-import { RouterLink } from 'vue-router';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { toStandardSymbol } from '../config/exchanges';
+import { getSymbolsCcxtContracts } from '../services/symbolApi';
 import { useDepthStore } from '../stores/depth';
 import { useMarketStore } from '../stores/market';
 
 const depthStore = useDepthStore();
 const marketStore = useMarketStore();
 
-// 头部现货/合约切换 → API type：futures→contract，spot→spot
 const apiType = computed(() =>
   depthStore.config.exchangeType === 'futures' ? 'contract' : 'spot'
 );
-const quoteSuffix = ref('USDT'); // 'USDT' | 'USDC'
 
-// 列排序状态，默认按成交额降序（交易对列不参与排序）
-const sortBy = ref({ key: 'qv', order: TableV2SortOrder.DESC });
+const page = ref(1);
+const pageSize = ref(50);
+const symbolItems = ref([]);
+const total = ref(0);
+const loadingSymbols = ref(false);
 
-// 按 s 后缀过滤：合约格式 XXX-USDT，现货格式 XXXUSDT
-const filteredTickers = computed(() => {
-  const list = marketStore.tickerList || [];
-  const suffix = quoteSuffix.value;
-  return list.filter(row => {
-    const s = (row.s || '').toUpperCase();
-    if (s.endsWith(`-${suffix}`)) return true; // 合约格式
-    if (s.endsWith(suffix) && !s.includes('-')) return true; // 现货格式
-    return false;
-  });
-});
+const loading = computed(() => loadingSymbols.value);
 
-// 虚拟表格要求每行有 id；先不排序
-const filteredTableData = computed(() =>
-  (filteredTickers.value || []).map(row => ({ ...row, id: row.s }))
-);
+const exchange = 'toobit';
 
-// 按当前 sortBy 排序后的表格数据
-const tableData = computed(() => {
-  const list = filteredTableData.value ?? [];
-  const { key, order } = sortBy.value;
-  if (!key) return list;
-  return [...list].sort((a, b) => {
-    const va = Number(a[key]) ?? 0;
-    const vb = Number(b[key]) ?? 0;
-    const cmp = va - vb;
-    return order === TableV2SortOrder.DESC ? -cmp : cmp;
-  });
-});
-
-function onColumnSort(next) {
-  sortBy.value = next;
+async function fetchSymbolsPage() {
+  loadingSymbols.value = true;
+  try {
+    const res = await getSymbolsCcxtContracts({
+      exchange,
+      market_type: apiType.value,
+      page: page.value,
+      page_size: pageSize.value,
+    });
+    symbolItems.value = res.items || [];
+    total.value = res.total ?? 0;
+    return symbolItems.value;
+  } catch (e) {
+    symbolItems.value = [];
+    total.value = 0;
+    return [];
+  } finally {
+    loadingSymbols.value = false;
+  }
 }
+
+/** 当前展示页的 symbol 列表（CCXT 格式如 ETH/USDT），用于 WS 订阅 */
+function currentPageSymbols() {
+  const list = symbolItems.value || [];
+  return list.map(row => row.symbol || row.id).filter(Boolean);
+}
+
+function mergeTicker(row) {
+  const ticker = (marketStore.tickerList || []).find(
+    t => toStandardSymbol((t.s || '').toUpperCase()) === (row.id || '').toUpperCase() || (t.s || '').toUpperCase() === (row.id || '').toUpperCase()
+  );
+  return ticker ? { ...row, ...ticker } : { ...row };
+}
+
+const tableData = computed(() => {
+  const list = symbolItems.value || [];
+  const merged = list.map(row => mergeTicker(row));
+  return [...merged].sort((a, b) => (Number(b.qv) || 0) - (Number(a.qv) || 0));
+});
 
 function formatNum(val) {
   if (val == null || val === '' || val === undefined) return '--';
@@ -151,7 +194,6 @@ function formatPcp(val) {
   return (Number(p) >= 0 ? '+' : '') + p + '%';
 }
 
-// 涨跌颜色：涨=绿、跌=红，用内联样式保证在 table-v2 内生效
 function priceChangeStyle(row) {
   const pcp = row.pcp != null && row.pcp !== '' ? Number(row.pcp) : 0;
   if (pcp > 0) return { color: '#00ff88', fontWeight: 600 };
@@ -159,111 +201,37 @@ function priceChangeStyle(row) {
   return {};
 }
 
-const columns = [
-  {
-    key: 's',
-    dataKey: 's',
-    title: '交易对',
-    width: 160,
-    align: 'left',
-    fixed: true,
-    cellRenderer: ({ cellData, rowData }) =>
-      h(RouterLink, { to: `/symbol/${rowData.s}`, class: 'symbol-link' }, () => cellData ?? rowData.s),
-  },
-  {
-    key: 'c',
-    dataKey: 'c',
-    title: '最新价',
-    width: 120,
-    align: 'right',
-    sortable: true,
-    cellRenderer: ({ cellData, rowData }) =>
-      h('span', { class: 'num-text', style: priceChangeStyle(rowData) }, formatNum(cellData ?? rowData.c)),
-  },
-  {
-    key: 'o',
-    dataKey: 'o',
-    title: '开盘价',
-    width: 120,
-    align: 'right',
-    sortable: true,
-    cellRenderer: ({ cellData }) => h('span', { class: 'num-text' }, formatNum(cellData)),
-  },
-  {
-    key: 'h',
-    dataKey: 'h',
-    title: '最高价',
-    width: 120,
-    align: 'right',
-    sortable: true,
-    cellRenderer: ({ cellData }) => h('span', { class: 'num-text up' }, formatNum(cellData)),
-  },
-  {
-    key: 'l',
-    dataKey: 'l',
-    title: '最低价',
-    width: 200,
-    align: 'right',
-    sortable: true,
-    cellRenderer: ({ cellData }) => h('span', { class: 'num-text down' }, formatNum(cellData)),
-  },
-  {
-    key: 'v',
-    dataKey: 'v',
-    title: '成交量',
-    width: 140,
-    align: 'right',
-    sortable: true,
-    cellRenderer: ({ cellData }) => h('span', { class: 'num-text' }, formatVol(cellData)),
-  },
-  {
-    key: 'qv',
-    dataKey: 'qv',
-    title: '成交额',
-    width: 140,
-    align: 'right',
-    sortable: true,
-    cellRenderer: ({ cellData }) => h('span', { class: 'num-text' }, formatVol(cellData)),
-  },
-  {
-    key: 'pc',
-    dataKey: 'pc',
-    title: '涨跌额',
-    width: 120,
-    align: 'right',
-    sortable: true,
-    cellRenderer: ({ cellData, rowData }) =>
-      h('span', { class: 'num-text', style: priceChangeStyle(rowData) }, formatNum(cellData ?? rowData.pc)),
-  },
-  {
-    key: 'pcp',
-    dataKey: 'pcp',
-    title: '涨跌幅',
-    width: 100,
-    align: 'right',
-    sortable: true,
-    cellRenderer: ({ cellData, rowData }) => {
-      const style = { ...priceChangeStyle(rowData), padding: '2px 6px', borderRadius: '4px' };
-      if (style.color === '#00ff88') style.backgroundColor = 'rgba(0, 255, 136, 0.08)';
-      if (style.color === '#ff4757') style.backgroundColor = 'rgba(255, 71, 87, 0.08)';
-      return h('span', { class: 'num-text', style }, formatPcp(cellData ?? rowData.pcp));
-    },
-  },
-];
+function pcpCellStyle(row) {
+  const style = { ...priceChangeStyle(row), padding: '2px 6px', borderRadius: '4px' };
+  if (style.color === '#00ff88') style.backgroundColor = 'rgba(0, 255, 136, 0.08)';
+  if (style.color === '#ff4757') style.backgroundColor = 'rgba(255, 71, 87, 0.08)';
+  return style;
+}
 
-async function refresh() {
-  await marketStore.fetchTicker24hr(marketStore.exchange, apiType.value);
+function onPageChange(p) {
+  page.value = p;
+  fetchSymbolsPage().then(() => {
+    marketStore.updateTickerSymbols(currentPageSymbols());
+  });
+}
+
+function onSizeChange(size) {
+  pageSize.value = size;
+  page.value = 1;
+  fetchSymbolsPage().then(() => {
+    marketStore.updateTickerSymbols(currentPageSymbols());
+  });
 }
 
 onMounted(async() => {
-  await marketStore.fetchTicker24hr(marketStore.exchange, apiType.value);
-  marketStore.initWs();
+  await fetchSymbolsPage();
+  marketStore.startTickers(exchange, apiType.value, currentPageSymbols());
 });
 
-// 监听头部现货/合约切换，自动拉取对应接口
 watch(() => depthStore.config.exchangeType, async() => {
-  await marketStore.fetchTicker24hr(marketStore.exchange, apiType.value);
-  marketStore.initWs();
+  page.value = 1;
+  await fetchSymbolsPage();
+  marketStore.startTickers(exchange, apiType.value, currentPageSymbols());
 });
 
 onUnmounted(() => {
@@ -319,38 +287,6 @@ onUnmounted(() => {
   gap: 16px;
 }
 
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.quote-toggle {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.quote-tab {
-  padding: 6px 14px;
-  font-size: 13px;
-  color: #a0aec0;
-  cursor: pointer;
-  border-radius: 8px;
-  transition: color 0.2s, background 0.2s;
-}
-
-.quote-tab:hover {
-  color: #00d4ff;
-  background: rgba(0, 212, 255, 0.08);
-}
-
-.quote-tab.active {
-  color: #00d4ff;
-  background: rgba(0, 212, 255, 0.15);
-  font-weight: 600;
-}
-
 .page-title {
   margin: 0;
   font-size: 24px;
@@ -373,7 +309,6 @@ onUnmounted(() => {
 }
 
 .table-wrap {
-  height: 800px;
   min-height: 400px;
   position: relative;
 }
@@ -381,17 +316,6 @@ onUnmounted(() => {
 .table-wrap.loading {
   pointer-events: none;
   opacity: 0.7;
-}
-
-.table-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  min-height: 200px;
-  color: #a0aec0;
-  gap: 12px;
 }
 
 .symbol-link {
@@ -407,19 +331,16 @@ onUnmounted(() => {
   font-variant-numeric: tabular-nums;
 }
 
-/* 涨：绿 */
 .num-text.up {
   color: #00ff88;
   font-weight: 600;
 }
 
-/* 跌：红 */
 .num-text.down {
   color: #ff4757;
   font-weight: 600;
 }
 
-/* 涨跌幅列加强标识 */
 .num-text.pcp-cell.up {
   color: #00ff88;
   padding: 2px 6px;
@@ -434,23 +355,36 @@ onUnmounted(() => {
   background: rgba(255, 71, 87, 0.08);
 }
 
-:deep(.ticker-table-v2) {
+:deep(.market-table) {
   --el-table-border-color: rgba(0, 212, 255, 0.1);
+  --el-table-header-bg-color: rgba(0, 0, 0, 0.3);
+  --el-table-row-hover-bg-color: rgba(0, 212, 255, 0.05);
 }
 
-:deep(.el-table-v2__header-cell) {
+:deep(.market-table .el-table__header th) {
   background: rgba(0, 0, 0, 0.3) !important;
   color: #a0aec0 !important;
   font-weight: 600;
   border-bottom: 1px solid rgba(0, 212, 255, 0.1);
 }
 
-:deep(.el-table-v2__row-cell) {
+:deep(.market-table .el-table__body td) {
   border-bottom: 1px solid rgba(0, 212, 255, 0.05);
 }
 
-:deep(.el-table-v2__row:hover .el-table-v2__row-cell) {
-  background: rgba(0, 212, 255, 0.05);
+.pagination-wrap {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+:deep(.pagination-wrap .el-pagination) {
+  --el-pagination-button-bg-color: rgba(0, 0, 0, 0.3);
+  --el-pagination-hover-color: #00d4ff;
+}
+
+:deep(.pagination-wrap .el-pagination .el-pager li.is-active) {
+  background: rgba(0, 212, 255, 0.3) !important;
 }
 
 @media (max-width: 768px) {

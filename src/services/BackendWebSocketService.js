@@ -14,8 +14,10 @@ export class BackendWebSocketService {
     this.reconnectDelay = 3000;
     this.reconnectTimer = null;
 
-    // 订阅集合，key 为 `${exchange}|${topic}` 或 `${exchange}|${symbol}|${topic}`
+    // 订阅集合，key 为 `${exchange}|${topic}` 或 `${exchange}|${symbol}|${topic}` 或 `tickers|${exchange}|${market_type}`
     this.subscriptions = new Set();
+    // CCXT tickers 订阅时传入的 symbols 列表，用于重连时重发
+    this.tickerSubSymbols = new Map();
 
     this.onMessage = null;
     this.onStatusChange = null;
@@ -96,12 +98,21 @@ export class BackendWebSocketService {
   }
 
   _handleMessage(raw) {
+    try {
+      const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      // CCXT tickers 事件在主线程直接回调，不走 Worker
+      if (data.event === 'tickers') {
+        if (this.onMessage) this.onMessage(data);
+        return;
+      }
+    } catch (e) {
+      // ignore parse error
+    }
     if (this.worker && this.workerReady) {
       this._sendToWorker('message', { raw });
     } else {
-      // Worker 未就绪时在主线程解析，保证不丢包
       try {
-        const data = JSON.parse(raw);
+        const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
         if (this.onMessage) this.onMessage(data);
       } catch (e) {
         // ignore
@@ -121,6 +132,10 @@ export class BackendWebSocketService {
     return `${exchange}|${topic}`;
   }
 
+  _tickersSubKey(exchange, market_type) {
+    return `tickers|${exchange}|${market_type}`;
+  }
+
   /**
    * 订阅
    * @param {Object} payload - { exchange, topic, symbol? }
@@ -135,6 +150,62 @@ export class BackendWebSocketService {
       ? { event: 'sub', exchange, symbol, topic }
       : { event: 'sub', exchange, topic };
     this._send(msg);
+  }
+
+  /**
+   * 订阅 CCXT Tickers（现货/合约），仅订阅传入的 symbols 列表
+   * @param {Object} payload - { exchange, market_type, symbols }
+   * symbols: 当前展示列表的 symbol 数组，如 ['ETH/USDT','BTC/USDT']，空数组 [] 表示不订阅任何
+   */
+  subscribeTickers(payload) {
+    const { exchange, market_type = 'contract', symbols = [] } = payload;
+    const key = this._tickersSubKey(exchange, market_type);
+    const symbolList = Array.isArray(symbols) ? symbols : [];
+    this.subscriptions.add(key);
+    this.tickerSubSymbols.set(key, symbolList);
+
+    const msg = {
+      event: 'sub',
+      exchange,
+      market_type,
+      symbols: symbolList,
+    };
+    this._send(msg);
+  }
+
+  /**
+   * 更新 CCXT Tickers 订阅的 symbol 列表（先取消再按新列表订阅）
+   */
+  updateTickerSymbols(payload) {
+    const { exchange, market_type = 'contract', symbols = [] } = payload;
+    const key = this._tickersSubKey(exchange, market_type);
+    const symbolList = Array.isArray(symbols) ? symbols : [];
+    const prevSymbols = this.tickerSubSymbols.get(key) || [];
+    this.tickerSubSymbols.set(key, symbolList);
+
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this._send({ event: 'cancel', exchange, market_type, symbols: prevSymbols });
+      this._send({ event: 'sub', exchange, market_type, symbols: symbolList });
+    }
+  }
+
+  /**
+   * 取消订阅 CCXT Tickers
+   */
+  unsubscribeTickers(payload) {
+    const { exchange, market_type = 'contract' } = payload;
+    const key = this._tickersSubKey(exchange, market_type);
+    if (!this.subscriptions.has(key)) return;
+    this.subscriptions.delete(key);
+    const prevSymbols = this.tickerSubSymbols.get(key) || [];
+    this.tickerSubSymbols.delete(key);
+
+    this._send({
+      event: 'cancel',
+      exchange,
+      market_type,
+      symbols: prevSymbols,
+    });
   }
 
   /**
@@ -155,12 +226,23 @@ export class BackendWebSocketService {
   _resubscribeAll() {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
     this.subscriptions.forEach(key => {
-      const parts = key.split('|');
-      const [exchange, p2, topic] = parts;
-      if (parts.length >= 3) {
-        this._send({ event: 'sub', exchange, symbol: p2, topic });
+      if (key.startsWith('tickers|')) {
+        const [, exchange, market_type] = key.split('|');
+        const symbols = this.tickerSubSymbols.get(key) || [];
+        this._send({
+          event: 'sub',
+          exchange,
+          market_type: market_type || 'contract',
+          symbols,
+        });
       } else {
-        this._send({ event: 'sub', exchange, topic: p2 });
+        const parts = key.split('|');
+        const [exchange, p2, topic] = parts;
+        if (parts.length >= 3) {
+          this._send({ event: 'sub', exchange, symbol: p2, topic });
+        } else {
+          this._send({ event: 'sub', exchange, topic: p2 });
+        }
       }
     });
   }
