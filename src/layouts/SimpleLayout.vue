@@ -49,6 +49,12 @@
               </svg>
               <span>市场</span>
             </router-link>
+            <router-link to="/news" class="nav-link" :class="{ 'nav-link-active': isNewsActive }">
+              <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+              </svg>
+              <span>快讯</span>
+            </router-link>
           </nav>
 
           <!-- 现货/合约全局切换 -->
@@ -80,9 +86,13 @@
       </div>
     </header>
 
-    <!-- 主内容区域 - 无间距限制 -->
+    <!-- 主内容区域 - 无间距限制，快讯列表使用 keep-alive 避免返回时刷新 -->
     <main class="main-content">
-      <router-view />
+      <router-view v-slot="{ Component }">
+        <keep-alive :include="['News']">
+          <component :is="Component" />
+        </keep-alive>
+      </router-view>
     </main>
 
     <!-- 金融科技风格尾部 -->
@@ -115,171 +125,130 @@
 </template>
 
 <script>
+export default { name: 'SimpleLayout' };
+</script>
+<script setup>
 import { ArrowDown } from '@element-plus/icons-vue';
 import { computed, onMounted, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import { useDepthStore, useSymbolStore } from '../stores/index.js';
 
-export default {
-  name: 'SimpleLayout',
-  components: {
-    ArrowDown,
-  },
-  setup() {
-    const currentYear = computed(() => new Date().getFullYear());
-    
-    // 使用统一的深度 store
-    const depthStore = useDepthStore();
-    const symbolStore = useSymbolStore();
+const route = useRoute();
+const depthStore = useDepthStore();
+const symbolStore = useSymbolStore();
 
-    // 当前交易类型（从 store 获取）
-    const exchangeType = computed({
-      get: () => depthStore.config.exchangeType,
-      set: val => depthStore.switchExchangeType(val),
+const currentYear = computed(() => new Date().getFullYear());
+
+// 快讯列表与详情页都高亮「快讯」菜单
+const isNewsActive = computed(() =>
+  route.path.startsWith('/news') ||
+  route.name === 'News' ||
+  route.name === 'NewsDetail'
+);
+
+// 当前交易类型（从 store 获取）
+const exchangeType = computed({
+  get: () => depthStore.config.exchangeType,
+  set: val => depthStore.switchExchangeType(val),
+});
+
+// 切换交易类型 - 保存后刷新页面
+function handleExchangeTypeChange(type) {
+  depthStore.switchExchangeType(type);
+  window.location.reload();
+}
+
+// 连接状态
+const connectionStatus = computed(() => {
+  const statusMap = {
+    connected: '已连接',
+    connecting: '连接中',
+    disconnected: '未连接',
+    error: '错误',
+  };
+  return statusMap[depthStore.connectionStatus] || '未知';
+});
+
+const connectionClass = computed(() =>
+  depthStore.connectionStatus === 'connected' ? 'connected' : 'disconnected'
+);
+
+// 初始化 WebSocket 连接
+async function initializeWebSockets() {
+  try {
+    await depthStore.connect();
+  } catch (error) {
+    console.error('SimpleLayout: WebSocket 连接失败:', error);
+  }
+}
+
+// 从交易对列表中选取默认订阅（BTC、ETH 或前两个）
+function getDefaultSymbols(list) {
+  const btcSymbol = list.find(s => s.includes('BTC'));
+  const ethSymbol = list.find(s => s.includes('ETH'));
+  const defaultSymbols = [];
+  if (btcSymbol) defaultSymbols.push(btcSymbol);
+  if (ethSymbol) defaultSymbols.push(ethSymbol);
+  return defaultSymbols.length >= 2
+    ? defaultSymbols.slice(0, 2)
+    : list.slice(0, 2);
+}
+
+// 初始化交易对数据
+async function initSymbols() {
+  const apiType = depthStore.config.exchangeType === 'futures' ? 'contract' : 'spot';
+  symbolStore.setCurrentType(apiType);
+  symbolStore.setCurrentExchange('toobit');
+  try {
+    await symbolStore.fetchSymbols({
+      exchange: 'toobit',
+      type: apiType,
+      forceRefresh: true,
     });
+    if (symbolStore.symbolList.length > 0) {
+      depthStore.updateSymbols(getDefaultSymbols(symbolStore.symbolList));
+    }
+  } catch (error) {
+    console.error('SimpleLayout: 初始化交易对列表失败:', error);
+  }
+}
 
-    // 切换交易类型 - 保存后刷新页面
-    const handleExchangeTypeChange = type => {
-      depthStore.switchExchangeType(type);
-      window.location.reload();
-    };
+onMounted(async() => {
+  document.documentElement.classList.add('dark');
+  await initSymbols();
+  await initializeWebSockets();
+});
 
-    // 连接状态
-    const connectionStatus = computed(() => {
-      const statusMap = {
-        connected: '已连接',
-        connecting: '连接中',
-        disconnected: '未连接',
-        error: '错误',
-      };
-      return statusMap[depthStore.connectionStatus] || '未知';
-    });
-
-    const connectionClass = computed(() => {
-      return depthStore.connectionStatus === 'connected' ? 'connected' : 'disconnected';
-    });
-
-    // 初始化 WebSocket 连接
-    const initializeWebSockets = async() => {
-      try {
-        await depthStore.connect();
-      } catch (error) {
-        console.error('SimpleLayout: WebSocket 连接失败:', error);
+// 监听交易所类型变化，更新交易对列表
+watch(
+  () => depthStore.config.exchangeType,
+  async() => {
+    const apiType = depthStore.config.exchangeType === 'futures' ? 'contract' : 'spot';
+    symbolStore.setCurrentType(apiType);
+    try {
+      await symbolStore.fetchSymbols({
+        exchange: 'toobit',
+        type: apiType,
+        forceRefresh: true,
+      });
+      if (symbolStore.symbolList.length > 0) {
+        depthStore.updateSymbols(getDefaultSymbols(symbolStore.symbolList));
       }
-    };
+    } catch (error) {
+      console.error('SimpleLayout: 更新交易对列表失败:', error);
+    }
+  }
+);
 
-    // 初始化交易对数据
-    const initSymbols = async() => {
-      // 将 depthStore 的 exchangeType (futures/spot) 映射到 API 的 type (contract/spot)
-      const apiType = depthStore.config.exchangeType === 'futures' ? 'contract' : 'spot';
-      
-      // 设置 symbolStore 的当前类型
-      symbolStore.setCurrentType(apiType);
-      symbolStore.setCurrentExchange('toobit');
-      
-      // 获取交易对列表，强制刷新以确保每次页面加载都请求
-      try {
-        await symbolStore.fetchSymbols({
-          exchange: 'toobit',
-          type: apiType,
-          forceRefresh: true, // 强制刷新，确保每次页面加载都请求
-        });
-        
-        // 更新 depthStore 的交易对列表并重新订阅（默认只订阅 BTC 和 ETH）
-        if (symbolStore.symbolList.length > 0) {
-          // 优先选择 BTC 和 ETH，如果不存在则选择前两个
-          const defaultSymbols = [];
-          const btcSymbol = symbolStore.symbolList.find(s => s.includes('BTC'));
-          const ethSymbol = symbolStore.symbolList.find(s => s.includes('ETH'));
-          
-          if (btcSymbol) defaultSymbols.push(btcSymbol);
-          if (ethSymbol) defaultSymbols.push(ethSymbol);
-          
-          // 如果 BTC 和 ETH 都找到了，就用这两个；否则用前两个
-          const symbolsToSubscribe = defaultSymbols.length >= 2 
-            ? defaultSymbols.slice(0, 2)
-            : symbolStore.symbolList.slice(0, 2);
-          
-          depthStore.updateSymbols(symbolsToSubscribe);
-        }
-      } catch (error) {
-        console.error('SimpleLayout: 初始化交易对列表失败:', error);
-      }
-    };
-
-    onMounted(async() => {
-      // 默认设置为黑色模式
-      document.documentElement.classList.add('dark');
-      
-      // 初始化交易对数据
-      await initSymbols();
-      
-      // 初始化 WebSocket 连接
-      await initializeWebSockets();
-    });
-
-    // 监听交易所类型变化，更新交易对列表
-    watch(() => depthStore.config.exchangeType, async newType => {
-      const apiType = newType === 'futures' ? 'contract' : 'spot';
-      symbolStore.setCurrentType(apiType);
-      
-      try {
-        await symbolStore.fetchSymbols({
-          exchange: 'toobit',
-          type: apiType,
-          forceRefresh: true,
-        });
-        
-        // 更新 depthStore 的交易对列表并重新订阅（默认只订阅 BTC 和 ETH）
-        if (symbolStore.symbolList.length > 0) {
-          // 优先选择 BTC 和 ETH，如果不存在则选择前两个
-          const defaultSymbols = [];
-          const btcSymbol = symbolStore.symbolList.find(s => s.includes('BTC'));
-          const ethSymbol = symbolStore.symbolList.find(s => s.includes('ETH'));
-          
-          if (btcSymbol) defaultSymbols.push(btcSymbol);
-          if (ethSymbol) defaultSymbols.push(ethSymbol);
-          
-          // 如果 BTC 和 ETH 都找到了，就用这两个；否则用前两个
-          const symbolsToSubscribe = defaultSymbols.length >= 2 
-            ? defaultSymbols.slice(0, 2)
-            : symbolStore.symbolList.slice(0, 2);
-          
-          depthStore.updateSymbols(symbolsToSubscribe);
-        }
-      } catch (error) {
-        console.error('SimpleLayout: 更新交易对列表失败:', error);
-      }
-    });
-
-    // 监听交易对列表变化，更新 WebSocket 订阅（默认只订阅 BTC 和 ETH）
-    watch(() => symbolStore.symbolList, newList => {
-      if (newList.length > 0 && depthStore.isConnected) {
-        // 优先选择 BTC 和 ETH，如果不存在则选择前两个
-        const defaultSymbols = [];
-        const btcSymbol = newList.find(s => s.includes('BTC'));
-        const ethSymbol = newList.find(s => s.includes('ETH'));
-        
-        if (btcSymbol) defaultSymbols.push(btcSymbol);
-        if (ethSymbol) defaultSymbols.push(ethSymbol);
-        
-        // 如果 BTC 和 ETH 都找到了，就用这两个；否则用前两个
-        const symbolsToSubscribe = defaultSymbols.length >= 2 
-          ? defaultSymbols.slice(0, 2)
-          : newList.slice(0, 2);
-        
-        depthStore.updateSymbols(symbolsToSubscribe);
-      }
-    });
-
-    return {
-      currentYear,
-      exchangeType,
-      handleExchangeTypeChange,
-      connectionStatus,
-      connectionClass,
-    };
-  },
-};
+// 监听交易对列表变化，更新 WebSocket 订阅
+watch(
+  () => symbolStore.symbolList,
+  newList => {
+    if (newList.length > 0 && depthStore.isConnected) {
+      depthStore.updateSymbols(getDefaultSymbols(newList));
+    }
+  }
+);
 </script>
 
 <style scoped>

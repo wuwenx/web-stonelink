@@ -40,6 +40,18 @@ const routes = [
         component: () => import('../pages/Market.vue'),
         meta: { title: '市场行情' },
       },
+      {
+        path: 'news',
+        name: 'News',
+        component: () => import('../pages/News.vue'),
+        meta: { title: '快讯' },
+      },
+      {
+        path: 'news/:id',
+        name: 'NewsDetail',
+        component: () => import('../pages/NewsDetail.vue'),
+        meta: { title: '快讯详情' },
+      },
     ],
   },
   // {
