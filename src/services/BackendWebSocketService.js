@@ -1,6 +1,6 @@
 /**
  * 后端 WebSocket 服务
- * 地址由 config/api 的 BACKEND_WS_URL 决定（开发 ws://localhost:8000/api/v1/ws，生产 ws://10.246.2.52/api/v1/ws）
+ * 地址由 config/api 的 BACKEND_WS_URL 决定（开发 ws://localhost:8000/ws，生产 wss://hub.stonelink.io/web-stonelink/ws）
  * 协议：{ event, exchange?, symbol?, topic }
  */
 import { BACKEND_WS_URL } from '@/config/api';
