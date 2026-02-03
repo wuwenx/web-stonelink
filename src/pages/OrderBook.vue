@@ -648,18 +648,20 @@ onMounted(async() => {
   timer = setInterval(updateTime, 500);
   requestNotificationPermission();
   
-  // 设置 ResizeObserver
+  // 设置 ResizeObserver（用 requestAnimationFrame 包裹，避免 ResizeObserver loop 报错）
   if (heatmapCanvas.value) {
     resizeObserver = new ResizeObserver(() => {
-      if (chartView.value === 'heatmap' && heatmapCanvas.value) {
-        const canvas = heatmapCanvas.value;
-        const container = canvas.parentElement;
-        if (container) {
-          canvas.width = container.clientWidth - 32; // 减去padding
-          canvas.height = 500 - 32; // 减去padding
-          drawHeatmap();
+      requestAnimationFrame(() => {
+        if (chartView.value === 'heatmap' && heatmapCanvas.value) {
+          const canvas = heatmapCanvas.value;
+          const container = canvas.parentElement;
+          if (container) {
+            canvas.width = container.clientWidth - 32; // 减去padding
+            canvas.height = 500 - 32; // 减去padding
+            drawHeatmap();
+          }
         }
-      }
+      });
     });
     
     resizeObserver.observe(heatmapCanvas.value.parentElement);
