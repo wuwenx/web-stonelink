@@ -6,7 +6,6 @@
         <el-select
           v-model="chartType"
           class="chart-type-select"
-          @change="selectChartType"
         >
           <el-option
             v-for="opt in chartTypeOptions"
@@ -53,7 +52,7 @@ import { getKlineWebSocketService } from '@/services/KlineWebSocketService';
 import { getKlines, toCcxtFuturesSymbol, toCcxtSpotSymbol } from '@/services/ohlcvApi';
 import { Loading } from '@element-plus/icons-vue';
 import { createChart } from 'lightweight-charts';
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 
 const props = defineProps({
   /** 交易对，如 BTCUSDT */
@@ -146,14 +145,6 @@ function toLineAreaData(ohlcData) {
   return ohlcData.map(item => ({ time: item.time, value: item.close }));
 }
 
-/** 将 symbol 规范为可比较格式，如 BTC/USDT:USDT -> BTCUSDT */
-function normalizeSymbolForCompare(s) {
-  if (!s) return '';
-  const str = String(s).toUpperCase().replace(/\s/g, '');
-  const m = str.match(/^([A-Z0-9]+)\/([A-Z0-9]+)(?::[A-Z0-9]+)?$/i);
-  return m ? m[1] + m[2] : str.replace(/[/:]/g, '');
-}
-
 /** 单条 K 线转图表格式 */
 function toChartBar(data) {
   if (!data) return null;
@@ -166,11 +157,6 @@ function toChartBar(data) {
   };
 }
 
-function selectChartType() {
-  if (chart && chartDataRef.value.length > 0) {
-    applyChartType();
-  }
-}
 
 /** 根据当前 chartType 设置系列数据 */
 function applySeriesData(data) {
@@ -188,7 +174,7 @@ function createMainSeries() {
   const commonOpts = {
     priceScaleId: 'right',
     crosshairMarkerVisible: true,
-    lastValueVisible: false,
+    lastValueVisible: true,
   };
   if (type === 'candlestick') {
     return chart.addCandlestickSeries({
@@ -301,13 +287,43 @@ function applyChartType() {
   mainSeries.priceScale().applyOptions({ scaleMargins: { top: 0.15, bottom: 0.2 } });
   applySeriesData(chartDataRef.value);
   subscribeCrosshair();
-  subscribeKlineWs();
+  updateKlineCallback();
 }
 
 function selectInterval(val) {
   interval.value = val;
   unsubscribeKlineWs();
   fetchData();
+}
+
+/** 创建 K 线 WS 回调（切换图表类型时仅更新回调，不断开连接） */
+function createKlineHandler() {
+  return msg => {
+    if (!mainSeries || !msg?.data) return;
+    const bar = toChartBar(msg.data);
+    if (!bar) return;
+    const idx = chartDataRef.value.findIndex(d => d.time === bar.time);
+    const next = [...chartDataRef.value];
+    if (idx >= 0) {
+      next[idx] = bar;
+    } else {
+      next.push(bar);
+      next.sort((a, b) => a.time - b.time);
+    }
+    chartDataRef.value = next;
+    if (chartType.value === 'line' || chartType.value === 'area') {
+      mainSeries.update({ time: bar.time, value: bar.close });
+    } else {
+      mainSeries.update(bar);
+    }
+  };
+}
+
+/** 仅更新 onKline 回调，不断开 WS（用于切换图表类型） */
+function updateKlineCallback() {
+  if (klineWs && mainSeries) {
+    klineWs.onKline = createKlineHandler();
+  }
 }
 
 function subscribeKlineWs() {
@@ -319,43 +335,7 @@ function subscribeKlineWs() {
     : toCcxtSpotSymbol(props.symbol);
 
   klineWs = getKlineWebSocketService();
-  klineWs.onKline = msg => {
-    if (!mainSeries || !msg?.data) return;
-    // 仅处理与当前订阅匹配的消息（后端可能推多种，需过滤）
-    const msgSymNorm = normalizeSymbolForCompare(msg.symbol);
-    const ourSymNorm = normalizeSymbolForCompare(ccxtSymbol);
-    const msgInt = (msg.interval || '').toLowerCase();
-    const ourInt = (interval.value || '').toLowerCase();
-    if (msgSymNorm && ourSymNorm && msgSymNorm !== ourSymNorm) return;
-    if (msgInt && ourInt && msgInt !== ourInt) return;
-
-    const bar = toChartBar(msg.data);
-    if (!bar) return;
-
-    nextTick(() => {
-      if (!mainSeries || !chart) return;
-      try {
-        // 更新 chartDataRef（合并或追加）
-        const idx = chartDataRef.value.findIndex(d => d.time === bar.time);
-        const next = [...chartDataRef.value];
-        if (idx >= 0) {
-          next[idx] = bar;
-        } else {
-          next.push(bar);
-          next.sort((a, b) => a.time - b.time);
-        }
-        chartDataRef.value = next;
-        // 按类型更新系列
-        if (chartType.value === 'line' || chartType.value === 'area') {
-          mainSeries.update({ time: bar.time, value: bar.close });
-        } else {
-          mainSeries.update(bar);
-        }
-      } catch (e) {
-        // 组件已销毁或 chart 已移除时忽略
-      }
-    });
-  };
+  klineWs.onKline = createKlineHandler();
   klineWs.subscribe({
     exchange,
     symbol: ccxtSymbol,
@@ -512,6 +492,14 @@ watch(
   },
   { deep: true }
 );
+
+// 图表类型切换：仅用户主动切换时执行，避免 el-select 挂载时误触发导致 WS 断开
+watch(chartType, (newVal, oldVal) => {
+  if (oldVal === undefined) return; // 跳过初始化
+  if (chart && chartDataRef.value.length > 0) {
+    applyChartType();
+  }
+});
 
 onMounted(() => {
   initChart();
