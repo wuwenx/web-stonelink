@@ -28,3 +28,6 @@ export const BACKEND_WS_URL = (() => {
     return 'ws://localhost:8000/ws';
   }
 })();
+
+/** K 线 WebSocket 地址：ws/klines */
+export const KLINE_WS_URL = `${BACKEND_WS_URL.replace(/\/$/, '')}/klines`;
