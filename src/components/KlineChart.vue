@@ -3,6 +3,18 @@
     <div class="kline-chart-header">
       <div class="chart-controls">
         <span class="exchange-label">Toobit</span>
+        <el-select
+          v-model="chartType"
+          class="chart-type-select"
+          @change="selectChartType"
+        >
+          <el-option
+            v-for="opt in chartTypeOptions"
+            :key="opt.value"
+            :label="opt.label"
+            :value="opt.value"
+          />
+        </el-select>
         <div class="interval-btns">
           <button
             v-for="opt in intervalOptions"
@@ -25,7 +37,9 @@
       <div ref="tooltipRef" class="kline-tooltip" />
     </div>
     <div v-if="loading" class="chart-loading-overlay">
-      <el-icon class="is-loading"><Loading /></el-icon>
+      <el-icon class="is-loading">
+        <Loading />
+      </el-icon>
       <span>加载中...</span>
     </div>
     <div v-else-if="error" class="chart-error">
@@ -39,7 +53,7 @@ import { getKlineWebSocketService } from '@/services/KlineWebSocketService';
 import { getKlines, toCcxtFuturesSymbol, toCcxtSpotSymbol } from '@/services/ohlcvApi';
 import { Loading } from '@element-plus/icons-vue';
 import { createChart } from 'lightweight-charts';
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 
 const props = defineProps({
   /** 交易对，如 BTCUSDT */
@@ -60,6 +74,15 @@ const loading = ref(false);
 const error = ref('');
 const exchange = 'toobit'; // 固定 Toobit，不可选择
 const interval = ref('1h');
+const chartType = ref('candlestick'); // candlestick | line | area | bar
+const chartDataRef = ref([]); // 存储完整 OHLC 数据，用于 tooltip 和类型切换
+
+const chartTypeOptions = [
+  { label: '蜡烛', value: 'candlestick' },
+  { label: '折线', value: 'line' },
+  { label: '面积', value: 'area' },
+  { label: '柱状', value: 'bar' },
+];
 
 const legendText = computed(() => {
   const sym = props.symbol || '--';
@@ -79,7 +102,7 @@ const intervalOptions = [
 ];
 
 let chart = null;
-let candlestickSeries = null;
+let mainSeries = null; // 当前主系列（蜡烛/折线/面积/柱状）
 let resizeObserver = null;
 let unsubscribeCrosshair = null;
 let klineWs = null;
@@ -105,7 +128,7 @@ function formatPrice(p) {
   return p.toFixed(6);
 }
 
-/** 将 API/WS 数据转为 lightweight-charts 格式 */
+/** 将 API/WS 数据转为 OHLC 图表格式 */
 function toChartData(apiData) {
   if (!Array.isArray(apiData)) return [];
   return apiData.map(item => ({
@@ -115,6 +138,20 @@ function toChartData(apiData) {
     low: item.low ?? item[3],
     close: item.close ?? item[4],
   }));
+}
+
+/** OHLC 转折线/面积图格式 { time, value } */
+function toLineAreaData(ohlcData) {
+  if (!Array.isArray(ohlcData)) return [];
+  return ohlcData.map(item => ({ time: item.time, value: item.close }));
+}
+
+/** 将 symbol 规范为可比较格式，如 BTC/USDT:USDT -> BTCUSDT */
+function normalizeSymbolForCompare(s) {
+  if (!s) return '';
+  const str = String(s).toUpperCase().replace(/\s/g, '');
+  const m = str.match(/^([A-Z0-9]+)\/([A-Z0-9]+)(?::[A-Z0-9]+)?$/i);
+  return m ? m[1] + m[2] : str.replace(/[/:]/g, '');
 }
 
 /** 单条 K 线转图表格式 */
@@ -129,6 +166,144 @@ function toChartBar(data) {
   };
 }
 
+function selectChartType() {
+  if (chart && chartDataRef.value.length > 0) {
+    applyChartType();
+  }
+}
+
+/** 根据当前 chartType 设置系列数据 */
+function applySeriesData(data) {
+  if (!mainSeries) return;
+  if (chartType.value === 'line' || chartType.value === 'area') {
+    mainSeries.setData(toLineAreaData(data));
+  } else {
+    mainSeries.setData(data);
+  }
+}
+
+/** 创建并配置主系列 */
+function createMainSeries() {
+  const type = chartType.value;
+  const commonOpts = {
+    priceScaleId: 'right',
+    crosshairMarkerVisible: true,
+    lastValueVisible: false,
+  };
+  if (type === 'candlestick') {
+    return chart.addCandlestickSeries({
+      ...commonOpts,
+      upColor: '#00ff88',
+      downColor: '#ff4757',
+      borderUpColor: '#00ff88',
+      borderDownColor: '#ff4757',
+      wickUpColor: '#00ff88',
+      wickDownColor: '#ff4757',
+    });
+  }
+  if (type === 'bar') {
+    return chart.addBarSeries({
+      ...commonOpts,
+      upColor: '#00ff88',
+      downColor: '#ff4757',
+    });
+  }
+  if (type === 'line') {
+    return chart.addLineSeries({
+      ...commonOpts,
+      color: '#00d4ff',
+      lineWidth: 2,
+    });
+  }
+  if (type === 'area') {
+    return chart.addAreaSeries({
+      ...commonOpts,
+      lineColor: '#00d4ff',
+      topColor: 'rgba(0, 212, 255, 0.4)',
+      bottomColor: 'rgba(0, 212, 255, 0)',
+      lineWidth: 2,
+    });
+  }
+  return chart.addCandlestickSeries({
+    ...commonOpts,
+    upColor: '#00ff88',
+    downColor: '#ff4757',
+    borderUpColor: '#00ff88',
+    borderDownColor: '#ff4757',
+    wickUpColor: '#00ff88',
+    wickDownColor: '#ff4757',
+  });
+}
+
+/** 订阅十字线移动，显示 Tooltip */
+function subscribeCrosshair() {
+  if (!chart || !tooltipRef.value || !mainSeries) return;
+  const container = chartContainer.value;
+  unsubscribeCrosshair = chart.subscribeCrosshairMove(param => {
+    const tooltip = tooltipRef.value;
+    if (!tooltip || !param.point || !param.time || param.point.x < 0 || param.point.y < 0) {
+      tooltip.style.display = 'none';
+      return;
+    }
+    if (param.point.x > container.clientWidth || param.point.y > container.clientHeight) {
+      tooltip.style.display = 'none';
+      return;
+    }
+    // 折线/面积图 seriesData 只有 {time, value}，需从 chartDataRef 取 OHLC
+    let bar = param.seriesData.get(mainSeries);
+    if (chartType.value === 'line' || chartType.value === 'area') {
+      const t = typeof param.time === 'number' ? param.time : parseInt(String(param.time), 10);
+      bar = chartDataRef.value.find(d => d.time === t);
+      if (!bar && param.seriesData.get(mainSeries)) {
+        const sd = param.seriesData.get(mainSeries);
+        bar = { open: sd.value, high: sd.value, low: sd.value, close: sd.value };
+      }
+    }
+    if (!bar || (bar.open === undefined && bar.value === undefined)) {
+      tooltip.style.display = 'none';
+      return;
+    }
+    const open = bar.open ?? bar.value;
+    const high = bar.high ?? bar.value;
+    const low = bar.low ?? bar.value;
+    const close = bar.close ?? bar.value;
+    const timeStr = formatTooltipTime(param.time);
+    tooltip.innerHTML = `
+      <div class="tooltip-time">${timeStr}</div>
+      <div class="tooltip-row"><span>开</span> ${formatPrice(open)}</div>
+      <div class="tooltip-row"><span>高</span> ${formatPrice(high)}</div>
+      <div class="tooltip-row"><span>低</span> ${formatPrice(low)}</div>
+      <div class="tooltip-row"><span>收</span> ${formatPrice(close)}</div>
+    `;
+    const margin = 12;
+    let left = param.point.x + margin;
+    let top = param.point.y + margin;
+    if (left + 140 > container.clientWidth) left = param.point.x - 140 - margin;
+    if (top + 110 > container.clientHeight) top = param.point.y - 110 - margin;
+    tooltip.style.left = Math.max(margin, left) + 'px';
+    tooltip.style.top = Math.max(margin, top) + 'px';
+    tooltip.style.display = 'block';
+  });
+}
+
+/** 切换图表类型：移除旧系列，创建新系列，设置数据 */
+function applyChartType() {
+  if (!chart || !tooltipRef.value) return;
+  if (unsubscribeCrosshair) {
+    unsubscribeCrosshair();
+    unsubscribeCrosshair = null;
+  }
+  if (mainSeries) {
+    chart.removeSeries(mainSeries);
+    mainSeries = null;
+  }
+  mainSeries = createMainSeries();
+  mainSeries.priceScale().applyOptions({ scaleMargins: { top: 0.15, bottom: 0.2 } });
+  applySeriesData(chartDataRef.value);
+  subscribeCrosshair();
+  subscribeKlineWs();
+}
+
 function selectInterval(val) {
   interval.value = val;
   unsubscribeKlineWs();
@@ -137,7 +312,7 @@ function selectInterval(val) {
 
 function subscribeKlineWs() {
   unsubscribeKlineWs();
-  if (!candlestickSeries || !props.symbol) return;
+  if (!mainSeries || !props.symbol) return;
 
   const ccxtSymbol = props.isFutures
     ? toCcxtFuturesSymbol(props.symbol)
@@ -145,11 +320,41 @@ function subscribeKlineWs() {
 
   klineWs = getKlineWebSocketService();
   klineWs.onKline = msg => {
-    if (!candlestickSeries || !msg?.data) return;
+    if (!mainSeries || !msg?.data) return;
+    // 仅处理与当前订阅匹配的消息（后端可能推多种，需过滤）
+    const msgSymNorm = normalizeSymbolForCompare(msg.symbol);
+    const ourSymNorm = normalizeSymbolForCompare(ccxtSymbol);
+    const msgInt = (msg.interval || '').toLowerCase();
+    const ourInt = (interval.value || '').toLowerCase();
+    if (msgSymNorm && ourSymNorm && msgSymNorm !== ourSymNorm) return;
+    if (msgInt && ourInt && msgInt !== ourInt) return;
+
     const bar = toChartBar(msg.data);
-    if (bar) {
-      candlestickSeries.update(bar);
-    }
+    if (!bar) return;
+
+    nextTick(() => {
+      if (!mainSeries || !chart) return;
+      try {
+        // 更新 chartDataRef（合并或追加）
+        const idx = chartDataRef.value.findIndex(d => d.time === bar.time);
+        const next = [...chartDataRef.value];
+        if (idx >= 0) {
+          next[idx] = bar;
+        } else {
+          next.push(bar);
+          next.sort((a, b) => a.time - b.time);
+        }
+        chartDataRef.value = next;
+        // 按类型更新系列
+        if (chartType.value === 'line' || chartType.value === 'area') {
+          mainSeries.update({ time: bar.time, value: bar.close });
+        } else {
+          mainSeries.update(bar);
+        }
+      } catch (e) {
+        // 组件已销毁或 chart 已移除时忽略
+      }
+    });
   };
   klineWs.subscribe({
     exchange,
@@ -187,15 +392,17 @@ async function fetchData() {
     });
 
     const chartData = toChartData(data);
+    chartDataRef.value = chartData;
 
-    if (candlestickSeries) {
-      candlestickSeries.setData(chartData);
+    if (mainSeries) {
+      applySeriesData(chartData);
       subscribeKlineWs();
     }
   } catch (err) {
     error.value = err.message || '加载 K 线失败';
-    if (candlestickSeries) {
-      candlestickSeries.setData([]);
+    if (mainSeries) {
+      chartDataRef.value = [];
+      applySeriesData([]);
     }
   } finally {
     loading.value = false;
@@ -209,7 +416,7 @@ function initChart() {
     localization: {
       locale: 'zh-CN',
       dateFormat: 'yyyy/MM/dd',
-      timeFormatter: (time) => {
+      timeFormatter: time => {
         let d;
         if (typeof time === 'number') {
           d = new Date(time * 1000);
@@ -263,57 +470,12 @@ function initChart() {
     },
   });
 
-  candlestickSeries = chart.addCandlestickSeries({
-    upColor: '#00ff88',
-    downColor: '#ff4757',
-    borderUpColor: '#00ff88',
-    borderDownColor: '#ff4757',
-    wickUpColor: '#00ff88',
-    wickDownColor: '#ff4757',
-  });
+  mainSeries = createMainSeries();
+  mainSeries.priceScale().applyOptions({ scaleMargins: { top: 0.15, bottom: 0.2 } });
 
   fetchData();
 
-  // 高开低收 Tooltip
-  if (tooltipRef.value) {
-    const container = chartContainer.value;
-    unsubscribeCrosshair = chart.subscribeCrosshairMove(param => {
-      const tooltip = tooltipRef.value;
-      if (!tooltip || !param.point || !param.time || param.point.x < 0 || param.point.y < 0) {
-        tooltip.style.display = 'none';
-        return;
-      }
-      if (param.point.x > container.clientWidth || param.point.y > container.clientHeight) {
-        tooltip.style.display = 'none';
-        return;
-      }
-      const data = param.seriesData.get(candlestickSeries);
-      if (!data || data.open === undefined) {
-        tooltip.style.display = 'none';
-        return;
-      }
-      const timeStr = formatTooltipTime(param.time);
-      tooltip.innerHTML = `
-        <div class="tooltip-time">${timeStr}</div>
-        <div class="tooltip-row"><span>开</span> ${formatPrice(data.open)}</div>
-        <div class="tooltip-row"><span>高</span> ${formatPrice(data.high)}</div>
-        <div class="tooltip-row"><span>低</span> ${formatPrice(data.low)}</div>
-        <div class="tooltip-row"><span>收</span> ${formatPrice(data.close)}</div>
-      `;
-      const margin = 12;
-      let left = param.point.x + margin;
-      let top = param.point.y + margin;
-      if (left + 140 > chartContainer.value.clientWidth) {
-        left = param.point.x - 140 - margin;
-      }
-      if (top + 110 > chartContainer.value.clientHeight) {
-        top = param.point.y - 110 - margin;
-      }
-      tooltip.style.left = Math.max(margin, left) + 'px';
-      tooltip.style.top = Math.max(margin, top) + 'px';
-      tooltip.style.display = 'block';
-    });
-  }
+  subscribeCrosshair();
 
   resizeObserver = new ResizeObserver(() => {
     if (chart && chartContainer.value) {
@@ -336,14 +498,14 @@ function destroyChart() {
   if (chart) {
     chart.remove();
     chart = null;
-    candlestickSeries = null;
+    mainSeries = null;
   }
 }
 
 watch(
   () => [props.symbol, props.isFutures],
   () => {
-    if (chart && candlestickSeries) {
+    if (chart && mainSeries) {
       unsubscribeKlineWs();
       fetchData();
     }
@@ -385,6 +547,35 @@ onUnmounted(() => {
   padding: 4px 12px;
   background: rgba(0, 212, 170, 0.15);
   border-radius: 6px;
+}
+
+.chart-type-select {
+  width: 100px;
+}
+
+.chart-type-select :deep(.el-input__wrapper) {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: none;
+}
+
+.chart-type-select :deep(.el-input__wrapper:hover) {
+  border-color: rgba(0, 212, 255, 0.4);
+  background: rgba(0, 212, 255, 0.1) !important;
+}
+
+.chart-type-select :deep(.el-input.is-focus .el-input__wrapper) {
+  border-color: #00d4ff;
+  box-shadow: 0 0 0 1px rgba(0, 212, 255, 0.2);
+}
+
+.chart-type-select :deep(.el-input__inner) {
+  color: #9ca3af;
+  font-size: 13px;
+}
+
+.chart-type-select :deep(.el-input__suffix) {
+  color: #9ca3af;
 }
 
 .interval-btns {
