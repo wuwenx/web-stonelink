@@ -41,6 +41,12 @@ const routes = [
         meta: { title: '市场行情' },
       },
       {
+        path: 'kline',
+        name: 'Kline',
+        component: () => import('../pages/Kline.vue'),
+        meta: { title: 'K 线图表' },
+      },
+      {
         path: 'news',
         name: 'News',
         component: () => import('../pages/News.vue'),

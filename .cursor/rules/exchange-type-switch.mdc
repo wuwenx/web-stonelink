@@ -1,0 +1,41 @@
+---
+description: 现货/合约由头部统一切换，所有页面统一从 depthStore 读取
+globs: src/pages/**/*.vue, src/components/**/*.vue
+alwaysApply: false
+---
+
+# 现货/合约切换规范
+
+## 原则
+
+**现货/合约由头部统一切换，所有页面统一从 depthStore 读取，不在各页面单独提供切换控件。**
+
+## 实现方式
+
+- 使用 `depthStore.config.exchangeType` 获取当前类型（`'spot'` 或 `'futures'`）
+- 使用 computed 响应式读取，不要在各页面维护本地 exchangeType 状态
+- 头部切换时，各页面通过 watch `depthStore.config.exchangeType` 响应更新
+
+## 示例
+
+```vue
+<script setup>
+import { computed, watch } from 'vue';
+import { useDepthStore } from '../stores/depth';
+
+const depthStore = useDepthStore();
+
+/** 现货/合约由头部统一切换 */
+const exchangeType = computed(() => depthStore.config.exchangeType || 'futures');
+
+// 头部切换时刷新数据
+watch(() => depthStore.config.exchangeType, () => {
+  // 刷新当前页面数据
+});
+</script>
+```
+
+## 禁止
+
+- 不要在页面内添加 现货/合约 的 el-radio-group、el-dropdown 等切换控件
+- 不要在各页面维护 exchangeType 的 ref 状态
