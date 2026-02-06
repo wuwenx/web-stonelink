@@ -157,7 +157,6 @@ function toChartBar(data) {
   };
 }
 
-
 /** 根据当前 chartType 设置系列数据 */
 function applySeriesData(data) {
   if (!mainSeries) return;
