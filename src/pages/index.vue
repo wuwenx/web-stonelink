@@ -21,18 +21,21 @@
           <span class="sub-title">多交易所深度分析平台</span>
         </h1>
         <p class="hero-desc">
-          专业级深度数据聚合 · 实时滑点模拟 · 多维度流动性分析
+          专业级深度数据聚合 · 实时 K 线 · 滑点模拟 · 订单簿监控 · 市场快讯
         </p>
         <div class="hero-actions">
           <router-link to="/multi-depth" class="btn-primary">
             <span class="btn-glow" />
-            <span class="btn-text">开始分析</span>
+            <span class="btn-text">深度对比</span>
             <svg class="btn-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
             </svg>
           </router-link>
-          <router-link to="/symbol/BTCUSDT" class="btn-secondary">
-            单币对详情
+          <router-link to="/kline" class="btn-secondary">
+            K 线图表
+          </router-link>
+          <router-link to="/orderbook" class="btn-secondary">
+            订单簿
           </router-link>
         </div>
       </div>
@@ -166,6 +169,63 @@
             </svg>
           </div>
         </router-link>
+
+        <router-link to="/kline" class="feature-card">
+          <div class="feature-icon kline-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+            </svg>
+          </div>
+          <h3 class="feature-title">K 线图表</h3>
+          <p class="feature-desc">蜡烛/折线/面积多种图表类型，实时 WebSocket 推送，支持多周期切换</p>
+          <div class="feature-tags">
+            <span class="tag">实时推送</span>
+            <span class="tag">多周期</span>
+          </div>
+          <div class="feature-arrow">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+            </svg>
+          </div>
+        </router-link>
+
+        <router-link to="/market" class="feature-card">
+          <div class="feature-icon market-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 7h8m0 0v8m0-8v8M3 21h18M3 10h18M3 7l9-4 9 4M3 21V7M21 21V7l-9 4" />
+            </svg>
+          </div>
+          <h3 class="feature-title">市场行情</h3>
+          <p class="feature-desc">多交易所行情概览，涨跌幅排行与实时价格监控</p>
+          <div class="feature-tags">
+            <span class="tag">行情概览</span>
+            <span class="tag">涨跌排行</span>
+          </div>
+          <div class="feature-arrow">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+            </svg>
+          </div>
+        </router-link>
+
+        <router-link to="/news" class="feature-card">
+          <div class="feature-icon news-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+            </svg>
+          </div>
+          <h3 class="feature-title">快讯</h3>
+          <p class="feature-desc">行业资讯与市场动态，第一时间掌握重要信息</p>
+          <div class="feature-tags">
+            <span class="tag">行业资讯</span>
+            <span class="tag">市场动态</span>
+          </div>
+          <div class="feature-arrow">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+            </svg>
+          </div>
+        </router-link>
       </div>
     </section>
 
@@ -206,9 +266,9 @@
     <section class="cta-section">
       <div class="cta-content">
         <h2 class="cta-title">开始您的专业深度分析</h2>
-        <p class="cta-desc">实时数据 · 精准分析 · 智能决策</p>
+        <p class="cta-desc">深度对比 · K 线图表 · 订单簿 · 市场快讯 · 实时数据</p>
         <router-link to="/multi-depth" class="cta-btn">
-          立即体验
+          深度对比
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
           </svg>
@@ -719,8 +779,8 @@ onUnmounted(() => {
 
 .features-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 30px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
 }
 
 .feature-card {
@@ -806,6 +866,30 @@ onUnmounted(() => {
 
 .orderbook-icon svg {
   stroke: #ffa500;
+}
+
+.kline-icon {
+  background: linear-gradient(135deg, rgba(0, 255, 136, 0.2), rgba(0, 255, 136, 0.1));
+}
+
+.kline-icon svg {
+  stroke: #00ff88;
+}
+
+.market-icon {
+  background: linear-gradient(135deg, rgba(100, 149, 237, 0.2), rgba(100, 149, 237, 0.1));
+}
+
+.market-icon svg {
+  stroke: #6495ed;
+}
+
+.news-icon {
+  background: linear-gradient(135deg, rgba(255, 105, 180, 0.2), rgba(255, 105, 180, 0.1));
+}
+
+.news-icon svg {
+  stroke: #ff69b4;
 }
 
 .feature-icon svg {
