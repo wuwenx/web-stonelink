@@ -42,3 +42,44 @@ export function getTicker24hr(params = {}) {
       throw error;
     });
 }
+
+/**
+ * 获取涨跌幅、成交额排行
+ * @param {Object} params - 查询参数
+ * @param {string} [params.exchange] - 交易所，默认 toobit
+ * @param {string} [params.type] - 市场类型 spot | contract，默认 contract
+ * @param {number} [params.limit] - 每类条数 1~20，默认 5
+ * @returns {Promise<{ gainers: Array, losers: Array, by_volume: Array }>}
+ */
+export function getTickerRankings(params = {}) {
+  const { exchange = 'toobit', type = 'contract', limit = 10 } = params;
+  const url = `${API_BASE_URL}/ticker/rankings`;
+
+  return axios({
+    url,
+    method: 'get',
+    params: { exchange, type, limit },
+    timeout: 15000,
+  })
+    .then(response => {
+      const res = response.data;
+      if (res.code !== 200) {
+        throw new Error(res.message || '获取排行失败');
+      }
+      const data = res.data || {};
+      return {
+        gainers: data.gainers || [],
+        losers: data.losers || [],
+        by_volume: data.by_volume || [],
+      };
+    })
+    .catch(error => {
+      if (error.response) {
+        throw new Error(error.response.data?.message || '获取排行失败');
+      }
+      if (error.request) {
+        throw new Error('网络错误，请检查后端服务是否启动');
+      }
+      throw error;
+    });
+}

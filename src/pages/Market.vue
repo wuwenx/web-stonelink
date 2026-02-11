@@ -16,6 +16,51 @@
       </div>
     </el-card>
 
+    <!-- 涨跌幅、成交额排行 -->
+    <el-card class="rankings-card" shadow="hover">
+      <template #header>
+        <div class="card-header rankings-card-header">
+          <span class="card-title">排行</span>
+          <span class="exchange-label">交易所: toobit · {{ apiType === 'contract' ? '合约' : '现货' }}</span>
+        </div>
+      </template>
+      <div v-loading="rankingsLoading" class="rankings-grid">
+        <div class="rank-column">
+          <h4 class="rank-title gainers-title">涨幅榜</h4>
+          <ul class="rank-list">
+            <li v-for="(row, i) in rankings.gainers" :key="row.s + i" class="rank-item">
+              <router-link :to="`/symbol/${symbolIdForLink(row.s)}`" class="rank-symbol">{{ row.s }}</router-link>
+              <span class="rank-price" :style="priceChangeStyle(row)">{{ formatNum(row.c) }}</span>
+              <span class="rank-pcp up">{{ formatPcpForRank(row.pcp) }}</span>
+            </li>
+            <li v-if="!rankings.gainers.length" class="rank-item empty">暂无</li>
+          </ul>
+        </div>
+        <div class="rank-column">
+          <h4 class="rank-title losers-title">跌幅榜</h4>
+          <ul class="rank-list">
+            <li v-for="(row, i) in rankings.losers" :key="row.s + i" class="rank-item">
+              <router-link :to="`/symbol/${symbolIdForLink(row.s)}`" class="rank-symbol">{{ row.s }}</router-link>
+              <span class="rank-price" :style="priceChangeStyle(row)">{{ formatNum(row.c) }}</span>
+              <span class="rank-pcp down">{{ formatPcpForRank(row.pcp) }}</span>
+            </li>
+            <li v-if="!rankings.losers.length" class="rank-item empty">暂无</li>
+          </ul>
+        </div>
+        <div class="rank-column">
+          <h4 class="rank-title volume-title">成交额榜</h4>
+          <ul class="rank-list">
+            <li v-for="(row, i) in rankings.by_volume" :key="row.s + i" class="rank-item">
+              <router-link :to="`/symbol/${symbolIdForLink(row.s)}`" class="rank-symbol">{{ row.s }}</router-link>
+              <span class="rank-price">{{ formatNum(row.c) }}</span>
+              <span class="rank-qv">{{ formatVol(row.qv) }}</span>
+            </li>
+            <li v-if="!rankings.by_volume.length" class="rank-item empty">暂无</li>
+          </ul>
+        </div>
+      </div>
+    </el-card>
+
     <el-card class="table-card" shadow="hover">
       <template #header>
         <div class="card-header table-card-header">
@@ -108,6 +153,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { toStandardSymbol } from '../config/exchanges';
 import { getSymbolsCcxtContracts } from '../services/symbolApi';
+import { getTickerRankings } from '../services/tickerApi';
 import { useDepthStore } from '../stores/depth';
 import { useMarketStore } from '../stores/market';
 
@@ -127,6 +173,35 @@ const loadingSymbols = ref(false);
 const loading = computed(() => loadingSymbols.value);
 
 const exchange = 'toobit';
+
+// 排行数据
+const rankings = ref({ gainers: [], losers: [], by_volume: [] });
+const rankingsLoading = ref(false);
+
+/** 排行接口：exchange, type(spot/contract), limit(1~20) */
+async function fetchRankings() {
+  rankingsLoading.value = true;
+  try {
+    const data = await getTickerRankings({
+      exchange,
+      type: apiType.value,
+      limit: 5,
+    });
+    rankings.value = data;
+  } catch (e) {
+    rankings.value = { gainers: [], losers: [], by_volume: [] };
+  } finally {
+    rankingsLoading.value = false;
+  }
+}
+
+/** 跳转详情页的 symbol 使用后端返回的 s，若为 SWAP 可转标准格式 */
+function symbolIdForLink(s) {
+  if (!s) return '';
+  const swapMatch = String(s).match(/^([A-Z0-9-]+)-SWAP-([A-Z]+)$/i);
+  if (swapMatch) return `${swapMatch[1]}${swapMatch[2]}`;
+  return s.replace(/-/g, '');
+}
 
 async function fetchSymbolsPage() {
   loadingSymbols.value = true;
@@ -194,6 +269,15 @@ function formatPcp(val) {
   return (Number(p) >= 0 ? '+' : '') + p + '%';
 }
 
+/** 排行用：后端可能直接返回百分比如 15.5，或小数 0.155 */
+function formatPcpForRank(val) {
+  if (val == null || val === '' || val === undefined) return '--';
+  const n = Number(val);
+  if (Number.isNaN(n)) return String(val);
+  const p = Math.abs(n) > 0 && Math.abs(n) < 1 ? (n * 100).toFixed(2) : n.toFixed(2);
+  return (Number(p) >= 0 ? '+' : '') + p + '%';
+}
+
 function priceChangeStyle(row) {
   const pcp = row.pcp != null && row.pcp !== '' ? Number(row.pcp) : 0;
   if (pcp > 0) return { color: '#00ff88', fontWeight: 600 };
@@ -224,13 +308,13 @@ function onSizeChange(size) {
 }
 
 onMounted(async() => {
-  await fetchSymbolsPage();
+  await Promise.all([fetchSymbolsPage(), fetchRankings()]);
   marketStore.startTickers(exchange, apiType.value, currentPageSymbols());
 });
 
 watch(() => depthStore.config.exchangeType, async() => {
   page.value = 1;
-  await fetchSymbolsPage();
+  await Promise.all([fetchSymbolsPage(), fetchRankings()]);
   marketStore.startTickers(exchange, apiType.value, currentPageSymbols());
 });
 
@@ -372,6 +456,108 @@ onUnmounted(() => {
   border-bottom: 1px solid rgba(0, 212, 255, 0.05);
 }
 
+/* 排行卡片 */
+.rankings-card {
+  margin-bottom: 24px;
+  background: rgba(26, 31, 46, 0.6) !important;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(0, 212, 255, 0.15) !important;
+  border-radius: 16px !important;
+}
+
+.rankings-card:hover {
+  border-color: rgba(0, 212, 255, 0.3) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.rankings-card-header {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.rankings-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.rank-column {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 12px;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.rank-title {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #a0aec0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(0, 212, 255, 0.2);
+}
+
+.gainers-title { color: #00ff88; }
+.losers-title { color: #ff4757; }
+.volume-title { color: #00d4ff; }
+
+.rank-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.rank-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  font-size: 13px;
+}
+
+.rank-item:last-child {
+  border-bottom: none;
+}
+
+.rank-item.empty {
+  color: #718096;
+  justify-content: center;
+}
+
+.rank-symbol {
+  flex: 1;
+  min-width: 0;
+  color: #00d4ff;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.rank-symbol:hover {
+  text-decoration: underline;
+}
+
+.rank-price {
+  font-variant-numeric: tabular-nums;
+  color: #e4e8f0;
+}
+
+.rank-pcp {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  min-width: 64px;
+  text-align: right;
+}
+
+.rank-pcp.up { color: #00ff88; }
+.rank-pcp.down { color: #ff4757; }
+
+.rank-qv {
+  font-variant-numeric: tabular-nums;
+  color: #a0aec0;
+  font-size: 12px;
+}
+
 .pagination-wrap {
   margin-top: 16px;
   display: flex;
@@ -392,13 +578,18 @@ onUnmounted(() => {
     padding: 16px;
   }
 
+  .rankings-grid {
+    grid-template-columns: 1fr;
+  }
+
   .card-header {
     flex-direction: column;
     align-items: flex-start;
     gap: 10px;
   }
 
-  .table-card-header {
+  .table-card-header,
+  .rankings-card-header {
     flex-direction: column;
     align-items: flex-start;
   }
