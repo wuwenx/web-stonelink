@@ -38,7 +38,7 @@
           <el-table-column label="交易对" min-width="140" fixed>
             <template #default="{ row }">
               <router-link :to="`/symbol/${row.id}`" class="symbol-link">
-                {{ row.symbol || row.id }}
+                {{ row.id || row.symbol }}
               </router-link>
             </template>
           </el-table-column>
@@ -119,7 +119,7 @@ const apiType = computed(() =>
 );
 
 const page = ref(1);
-const pageSize = ref(50);
+const pageSize = ref(20);
 const symbolItems = ref([]);
 const total = ref(0);
 const loadingSymbols = ref(false);
