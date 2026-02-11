@@ -153,7 +153,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { toStandardSymbol } from '../config/exchanges';
 import { getSymbolsCcxtContracts } from '../services/symbolApi';
-import { getTickerRankings } from '../services/tickerApi';
+import { getTicker24hr, getTickerRankings } from '../services/tickerApi';
 import { useDepthStore } from '../stores/depth';
 import { useMarketStore } from '../stores/market';
 
@@ -177,10 +177,14 @@ const exchange = 'toobit';
 // 排行数据
 const rankings = ref({ gainers: [], losers: [], by_volume: [] });
 const rankingsLoading = ref(false);
+let rankingsFirstLoad = true;
 
 /** 排行接口：exchange, type(spot/contract), limit(1~20) */
 async function fetchRankings() {
-  rankingsLoading.value = true;
+  if (rankingsFirstLoad) {
+    rankingsLoading.value = true;
+    rankingsFirstLoad = false;
+  }
   try {
     const data = await getTickerRankings({
       exchange,
@@ -224,6 +228,19 @@ async function fetchSymbolsPage() {
   }
 }
 
+/** 拉取 24hr 全量并写入 store，用于表格首屏展示，避免等 WS 才有数据 */
+async function fillTickersFrom24hr() {
+  try {
+    const list = await getTicker24hr({
+      exchange,
+      type: apiType.value === 'contract' ? undefined : 'spot',
+    });
+    marketStore.setInitialTickersFrom24hr(Array.isArray(list) ? list : []);
+  } catch (e) {
+    marketStore.setInitialTickersFrom24hr([]);
+  }
+}
+
 /** 当前展示页的 symbol 列表（CCXT 格式如 ETH/USDT），用于 WS 订阅 */
 function currentPageSymbols() {
   const list = symbolItems.value || [];
@@ -231,8 +248,9 @@ function currentPageSymbols() {
 }
 
 function mergeTicker(row) {
+  const rowKey = toStandardSymbol((row.id || row.symbol || '').toUpperCase());
   const ticker = (marketStore.tickerList || []).find(
-    t => toStandardSymbol((t.s || '').toUpperCase()) === (row.id || '').toUpperCase() || (t.s || '').toUpperCase() === (row.id || '').toUpperCase()
+    t => toStandardSymbol((t.s || '').toUpperCase()) === rowKey || (t.s || '').toUpperCase() === (row.id || '').toUpperCase()
   );
   return ticker ? { ...row, ...ticker } : { ...row };
 }
@@ -307,18 +325,29 @@ function onSizeChange(size) {
   });
 }
 
+let rankingsTimer = null;
+
 onMounted(async() => {
-  await Promise.all([fetchSymbolsPage(), fetchRankings()]);
+  fetchRankings();
+  await fetchSymbolsPage();
+  await fillTickersFrom24hr();
   marketStore.startTickers(exchange, apiType.value, currentPageSymbols());
+  rankingsTimer = setInterval(fetchRankings, 10000);
 });
 
 watch(() => depthStore.config.exchangeType, async() => {
   page.value = 1;
-  await Promise.all([fetchSymbolsPage(), fetchRankings()]);
+  fetchRankings();
+  await fetchSymbolsPage();
+  await fillTickersFrom24hr();
   marketStore.startTickers(exchange, apiType.value, currentPageSymbols());
 });
 
 onUnmounted(() => {
+  if (rankingsTimer) {
+    clearInterval(rankingsTimer);
+    rankingsTimer = null;
+  }
   marketStore.stopWs();
 });
 </script>

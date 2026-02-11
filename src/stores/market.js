@@ -76,6 +76,29 @@ export const useMarketStore = defineStore('market', {
     },
 
     /**
+     * 用 24hr 接口全量数据填充初始 tickers，避免 WS 连接前表格空档
+     * @param {Array} list - GET /ticker/24hr 返回的 data 数组，项含 t,a,b,s,c,o,h,l,v,qv,pc,pcp 等
+     */
+    setInitialTickersFrom24hr(list = []) {
+      if (!Array.isArray(list) || list.length === 0) return;
+      this.tickers = list.map(item => ({
+        t: item.t,
+        a: item.a,
+        b: item.b,
+        s: (item.s || '').toUpperCase(),
+        c: item.c != null ? String(item.c) : '',
+        o: item.o != null ? String(item.o) : '',
+        h: item.h != null ? String(item.h) : '',
+        l: item.l != null ? String(item.l) : '',
+        v: item.v != null ? String(item.v) : '0',
+        qv: item.qv != null ? String(item.qv) : '0',
+        pc: item.pc != null ? String(item.pc) : '0',
+        pcp: item.pcp != null ? Number(item.pcp) : 0,
+        op: item.op ?? '',
+      }));
+    },
+
+    /**
      * 更新订阅的 symbol 列表（翻页/改每页条数后调用）
      * @param {string[]} symbols - 当前展示页的 symbol 列表
      */
