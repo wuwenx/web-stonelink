@@ -47,6 +47,12 @@ const routes = [
         meta: { title: 'K 线图表' },
       },
       {
+        path: 'funding-rates',
+        name: 'FundingRates',
+        component: () => import('../pages/FundingRates.vue'),
+        meta: { title: '资金费率' },
+      },
+      {
         path: 'news',
         name: 'News',
         component: () => import('../pages/News.vue'),

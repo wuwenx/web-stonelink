@@ -30,7 +30,7 @@
           <ul class="rank-list">
             <li v-for="(row, i) in rankings.gainers" :key="row.s + i" class="rank-item">
               <router-link :to="`/symbol/${symbolIdForLink(row.s)}`" class="rank-symbol">{{ row.s }}</router-link>
-              <span class="rank-price" :style="priceChangeStyle(row)">{{ formatNum(row.c) }}</span>
+              <span class="rank-price" :style="priceChangeStyle(row)">{{ formatNum(row.c, getPrecisionForRow(row).min_price) }}</span>
               <span class="rank-pcp up">{{ formatPcpForRank(row.pcp) }}</span>
             </li>
             <li v-if="!rankings.gainers.length" class="rank-item empty">暂无</li>
@@ -41,7 +41,7 @@
           <ul class="rank-list">
             <li v-for="(row, i) in rankings.losers" :key="row.s + i" class="rank-item">
               <router-link :to="`/symbol/${symbolIdForLink(row.s)}`" class="rank-symbol">{{ row.s }}</router-link>
-              <span class="rank-price" :style="priceChangeStyle(row)">{{ formatNum(row.c) }}</span>
+              <span class="rank-price" :style="priceChangeStyle(row)">{{ formatNum(row.c, getPrecisionForRow(row).min_price) }}</span>
               <span class="rank-pcp down">{{ formatPcpForRank(row.pcp) }}</span>
             </li>
             <li v-if="!rankings.losers.length" class="rank-item empty">暂无</li>
@@ -52,8 +52,8 @@
           <ul class="rank-list">
             <li v-for="(row, i) in rankings.by_volume" :key="row.s + i" class="rank-item">
               <router-link :to="`/symbol/${symbolIdForLink(row.s)}`" class="rank-symbol">{{ row.s }}</router-link>
-              <span class="rank-price">{{ formatNum(row.c) }}</span>
-              <span class="rank-qv">{{ formatVol(row.qv) }}</span>
+              <span class="rank-price">{{ formatNum(row.c, getPrecisionForRow(row).min_price) }}</span>
+              <span class="rank-qv">{{ formatVol(row.qv, getPrecisionForRow(row).min_qty) }}</span>
             </li>
             <li v-if="!rankings.by_volume.length" class="rank-item empty">暂无</li>
           </ul>
@@ -89,37 +89,37 @@
           </el-table-column>
           <el-table-column prop="c" label="最新价" min-width="120" align="right" sortable>
             <template #default="{ row }">
-              <span class="num-text" :style="priceChangeStyle(row)">{{ formatNum(row.c) }}</span>
+              <span class="num-text" :style="priceChangeStyle(row)">{{ formatNum(row.c, getPrecisionForRow(row).min_price) }}</span>
             </template>
           </el-table-column>
           <el-table-column prop="o" label="开盘价" min-width="110" align="right" sortable>
             <template #default="{ row }">
-              <span class="num-text">{{ formatNum(row.o) }}</span>
+              <span class="num-text">{{ formatNum(row.o, getPrecisionForRow(row).min_price) }}</span>
             </template>
           </el-table-column>
           <el-table-column prop="h" label="最高价" min-width="110" align="right" sortable>
             <template #default="{ row }">
-              <span class="num-text up">{{ formatNum(row.h) }}</span>
+              <span class="num-text up">{{ formatNum(row.h, getPrecisionForRow(row).min_price) }}</span>
             </template>
           </el-table-column>
           <el-table-column prop="l" label="最低价" min-width="110" align="right" sortable>
             <template #default="{ row }">
-              <span class="num-text down">{{ formatNum(row.l) }}</span>
+              <span class="num-text down">{{ formatNum(row.l, getPrecisionForRow(row).min_price) }}</span>
             </template>
           </el-table-column>
           <el-table-column prop="v" label="成交量" min-width="120" align="right" sortable>
             <template #default="{ row }">
-              <span class="num-text">{{ formatVol(row.v) }}</span>
+              <span class="num-text">{{ formatVol(row.v, getPrecisionForRow(row).min_qty) }}</span>
             </template>
           </el-table-column>
           <el-table-column prop="qv" label="成交额" min-width="120" align="right" sortable>
             <template #default="{ row }">
-              <span class="num-text">{{ formatVol(row.qv) }}</span>
+              <span class="num-text">{{ formatVol(row.qv, getPrecisionForRow(row).min_qty) }}</span>
             </template>
           </el-table-column>
           <el-table-column prop="pc" label="涨跌额" min-width="100" align="right" sortable>
             <template #default="{ row }">
-              <span class="num-text" :style="priceChangeStyle(row)">{{ formatNum(row.pc) }}</span>
+              <span class="num-text" :style="priceChangeStyle(row)">{{ formatNum(row.pc, getPrecisionForRow(row).min_price) }}</span>
             </template>
           </el-table-column>
           <el-table-column prop="pcp" label="涨跌幅" min-width="100" align="right" sortable>
@@ -150,15 +150,18 @@
 </template>
 
 <script setup>
+import BigNumber from 'bignumber.js';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { toStandardSymbol } from '../config/exchanges';
 import { getSymbolsCcxtContracts } from '../services/symbolApi';
 import { getTicker24hr, getTickerRankings } from '../services/tickerApi';
 import { useDepthStore } from '../stores/depth';
 import { useMarketStore } from '../stores/market';
+import { useSymbolStore } from '../stores/symbol';
 
 const depthStore = useDepthStore();
 const marketStore = useMarketStore();
+const symbolStore = useSymbolStore();
 
 const apiType = computed(() =>
   depthStore.config.exchangeType === 'futures' ? 'contract' : 'spot'
@@ -258,48 +261,85 @@ function mergeTicker(row) {
 const tableData = computed(() => {
   const list = symbolItems.value || [];
   const merged = list.map(row => mergeTicker(row));
-  return [...merged].sort((a, b) => (Number(b.qv) || 0) - (Number(a.qv) || 0));
+  return [...merged].sort((a, b) => {
+    const qvB = new BigNumber(b.qv || 0);
+    const qvA = new BigNumber(a.qv || 0);
+    return qvB.comparedTo(qvA);
+  });
 });
 
-function formatNum(val) {
-  if (val == null || val === '' || val === undefined) return '--';
-  const n = Number(val);
-  if (Number.isNaN(n)) return String(val);
-  if (n >= 1e8) return (n / 1e8).toFixed(2) + '亿';
-  if (n >= 1e4) return n.toLocaleString('en-US', { maximumFractionDigits: 4 });
-  return n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 8 });
+/** 从 store 的 api/v1/symbols 数据中取当前行的精度（min_price, min_qty）；表格行用 symbol/id，排行行用 s */
+function getPrecisionForRow(row) {
+  const list = symbolStore.getSymbolsByExchangeAndType(exchange, apiType.value) || [];
+  const sym = row.symbol || row.id || row.s || '';
+  const key = toStandardSymbol(String(sym).toUpperCase());
+  const found = list.find(
+    s => toStandardSymbol(String(s.symbol || s.id || '').toUpperCase()) === key || (s.symbol || s.id || '') === sym
+  );
+  return found ? { min_price: found.min_price, min_qty: found.min_qty } : {};
 }
 
-function formatVol(val) {
+/** 去掉小数尾部多余的 0（如 1.200 -> 1.2） */
+function stripTrailingZeros(str) {
+  if (str == null || typeof str !== 'string') return str;
+  return str.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
+}
+
+/** 根据最小单位（如 0.1、0.001）计算小数位数 */
+function decimalPlacesFromMin(minVal) {
+  if (minVal == null || minVal === '') return null;
+  const bn = new BigNumber(minVal);
+  if (!bn.isFinite() || bn.lte(0)) return null;
+  if (bn.gte(1)) return 0;
+  const str = bn.toFixed();
+  const i = str.indexOf('.');
+  return i === -1 ? 0 : str.length - i - 1;
+}
+
+/** 价格：有 min_price 时按精度，否则沿用原逻辑；去掉尾部多余 0 */
+function formatNum(val, minPrice) {
   if (val == null || val === '' || val === undefined) return '--';
-  const n = Number(val);
-  if (Number.isNaN(n)) return String(val);
-  if (n >= 1e8) return (n / 1e8).toFixed(2) + '亿';
-  if (n >= 1e4) return (n / 1e4).toFixed(2) + '万';
-  return n.toLocaleString('en-US', { maximumFractionDigits: 4 });
+  const bn = new BigNumber(val);
+  if (!bn.isFinite()) return String(val);
+  const dp = minPrice != null && minPrice !== '' ? decimalPlacesFromMin(minPrice) : null;
+  if (bn.gte(1e8)) return stripTrailingZeros(bn.div(1e8).toFixed(2)) + '亿';
+  if (bn.gte(1e4)) return stripTrailingZeros(dp != null ? bn.toFixed(dp) : bn.toFormat(4, BigNumber.ROUND_DOWN));
+  const decimals = dp != null ? dp : 8;
+  return stripTrailingZeros(bn.toFormat(decimals, BigNumber.ROUND_DOWN, { groupSeparator: ',', decimalSeparator: '.' }));
+}
+
+/** 成交量/成交额：有 min_qty 时按精度，否则沿用原逻辑；去掉尾部多余 0 */
+function formatVol(val, minQty) {
+  if (val == null || val === '' || val === undefined) return '--';
+  const bn = new BigNumber(val);
+  if (!bn.isFinite()) return String(val);
+  const dp = minQty != null && minQty !== '' ? decimalPlacesFromMin(minQty) : null;
+  if (bn.gte(1e8)) return stripTrailingZeros(bn.div(1e8).toFixed(2)) + '亿';
+  if (bn.gte(1e4)) return stripTrailingZeros(bn.div(1e4).toFixed(dp != null ? dp : 2)) + '万';
+  return stripTrailingZeros(bn.toFormat(dp != null ? dp : 4, BigNumber.ROUND_DOWN, { groupSeparator: ',', decimalSeparator: '.' }));
 }
 
 function formatPcp(val) {
   if (val == null || val === '' || val === undefined) return '--';
-  const n = Number(val);
-  if (Number.isNaN(n)) return String(val);
-  const p = (n * 100).toFixed(2);
-  return (Number(p) >= 0 ? '+' : '') + p + '%';
+  const bn = new BigNumber(val);
+  if (!bn.isFinite()) return String(val);
+  const p = stripTrailingZeros(bn.times(100).toFixed(2));
+  return (bn.gte(0) ? '+' : '') + p + '%';
 }
 
-/** 排行用：后端可能直接返回百分比如 15.5，或小数 0.155 */
+/** 排行用：后端返回小数比例（如 0.155=15.5%、1.4424=144.24%），统一乘 100 再展示；去掉尾部多余 0 */
 function formatPcpForRank(val) {
   if (val == null || val === '' || val === undefined) return '--';
-  const n = Number(val);
-  if (Number.isNaN(n)) return String(val);
-  const p = Math.abs(n) > 0 && Math.abs(n) < 1 ? (n * 100).toFixed(2) : n.toFixed(2);
-  return (Number(p) >= 0 ? '+' : '') + p + '%';
+  const bn = new BigNumber(val);
+  if (!bn.isFinite()) return String(val);
+  const p = stripTrailingZeros(bn.times(100).toFixed(2));
+  return (bn.gte(0) ? '+' : '') + p + '%';
 }
 
 function priceChangeStyle(row) {
-  const pcp = row.pcp != null && row.pcp !== '' ? Number(row.pcp) : 0;
-  if (pcp > 0) return { color: '#00ff88', fontWeight: 600 };
-  if (pcp < 0) return { color: '#ff4757', fontWeight: 600 };
+  const pcp = row.pcp != null && row.pcp !== '' ? new BigNumber(row.pcp) : new BigNumber(0);
+  if (pcp.gt(0)) return { color: '#00ff88', fontWeight: 600 };
+  if (pcp.lt(0)) return { color: '#ff4757', fontWeight: 600 };
   return {};
 }
 
@@ -328,6 +368,8 @@ function onSizeChange(size) {
 let rankingsTimer = null;
 
 onMounted(async() => {
+  // 拉取 api/v1/symbols 以得到 min_price/min_qty，供表格精度展示
+  // symbolStore.fetchSymbols({ exchange, type: apiType.value }).catch(() => {});
   fetchRankings();
   await fetchSymbolsPage();
   await fillTickersFrom24hr();
@@ -337,6 +379,7 @@ onMounted(async() => {
 
 watch(() => depthStore.config.exchangeType, async() => {
   page.value = 1;
+  // symbolStore.fetchSymbols({ exchange, type: apiType.value }).catch(() => {});
   fetchRankings();
   await fetchSymbolsPage();
   await fillTickersFrom24hr();
