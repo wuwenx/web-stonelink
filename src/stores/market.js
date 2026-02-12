@@ -42,6 +42,11 @@ function ccxtTickerToRow(symbolKey, item) {
   };
 }
 
+// 节流用：合并多次 WS 推送再更新 tickers，降低 Market 页 tableData 重算频率
+let pendingTickers = null;
+let tickerFlushTimer = null;
+const TICKER_THROTTLE_MS = 150;
+
 export const useMarketStore = defineStore('market', {
   state: () => ({
     exchange: 'toobit',
@@ -126,22 +131,32 @@ export const useMarketStore = defineStore('market', {
 
       ws.onMessage = msg => {
         if (msg.event !== 'tickers' || !msg.data || typeof msg.data !== 'object') return;
-        const list = [...this.tickers];
+        const base = pendingTickers ?? [...this.tickers];
         let changed = false;
         for (const [symbolKey, item] of Object.entries(msg.data)) {
           const row = ccxtTickerToRow(symbolKey, item);
           if (!row) continue;
           const key = normalizeSymbol(row.s);
-          const idx = list.findIndex(t => normalizeSymbol(t.s) === key || t.s === row.s);
+          const idx = base.findIndex(t => normalizeSymbol(t.s) === key || t.s === row.s);
           if (idx >= 0) {
-            list[idx] = { ...list[idx], ...row };
+            base[idx] = { ...base[idx], ...row };
             changed = true;
           } else {
-            list.push(row);
+            base.push(row);
             changed = true;
           }
         }
-        if (changed) this.tickers = list;
+        if (changed) {
+          pendingTickers = base;
+          if (!tickerFlushTimer) {
+            const store = this;
+            tickerFlushTimer = setTimeout(() => {
+              store.tickers = pendingTickers;
+              pendingTickers = null;
+              tickerFlushTimer = null;
+            }, TICKER_THROTTLE_MS);
+          }
+        }
       };
       ws.onStatusChange = status => {
         this.wsStatus = status;
@@ -156,6 +171,11 @@ export const useMarketStore = defineStore('market', {
     },
 
     stopWs() {
+      if (tickerFlushTimer) {
+        clearTimeout(tickerFlushTimer);
+        tickerFlushTimer = null;
+      }
+      pendingTickers = null;
       const ws = getBackendWebSocketService();
       const exchange = this.exchange ? `${this.exchange}` : this.exchange;
       const market_type = this.marketType === 'spot' ? 'spot' : 'contract';

@@ -258,6 +258,17 @@ function mergeTicker(row) {
   return ticker ? { ...row, ...ticker } : { ...row };
 }
 
+/** symbol -> { min_price, min_qty }，O(1) 查找，避免每格遍历列表 */
+const precisionBySymbol = computed(() => {
+  const list = symbolStore.getSymbolsByExchangeAndType(exchange, apiType.value) || [];
+  const map = new Map();
+  for (const s of list) {
+    const key = toStandardSymbol(String(s.symbol || s.id || '').toUpperCase());
+    map.set(key, { min_price: s.min_price, min_qty: s.min_qty });
+  }
+  return map;
+});
+
 const tableData = computed(() => {
   const list = symbolItems.value || [];
   const merged = list.map(row => mergeTicker(row));
@@ -268,15 +279,11 @@ const tableData = computed(() => {
   });
 });
 
-/** 从 store 的 api/v1/symbols 数据中取当前行的精度（min_price, min_qty）；表格行用 symbol/id，排行行用 s */
+/** 从 precisionBySymbol Map 取精度，O(1)；表格行用 symbol/id，排行行用 s */
 function getPrecisionForRow(row) {
-  const list = symbolStore.getSymbolsByExchangeAndType(exchange, apiType.value) || [];
   const sym = row.symbol || row.id || row.s || '';
   const key = toStandardSymbol(String(sym).toUpperCase());
-  const found = list.find(
-    s => toStandardSymbol(String(s.symbol || s.id || '').toUpperCase()) === key || (s.symbol || s.id || '') === sym
-  );
-  return found ? { min_price: found.min_price, min_qty: found.min_qty } : {};
+  return precisionBySymbol.value.get(key) || {};
 }
 
 /** 去掉小数尾部多余的 0（如 1.200 -> 1.2） */
@@ -336,18 +343,26 @@ function formatPcpForRank(val) {
   return (bn.gte(0) ? '+' : '') + p + '%';
 }
 
+// 稳定引用，减少 Vue  diff 与 GC
+const STYLE_PRICE_UP = { color: '#00ff88', fontWeight: 600 };
+const STYLE_PRICE_DOWN = { color: '#ff4757', fontWeight: 600 };
+const STYLE_PRICE_NEUTRAL = {};
+const STYLE_PCP_UP = { padding: '2px 6px', borderRadius: '4px', color: '#00ff88', backgroundColor: 'rgba(0, 255, 136, 0.08)' };
+const STYLE_PCP_DOWN = { padding: '2px 6px', borderRadius: '4px', color: '#ff4757', backgroundColor: 'rgba(255, 71, 87, 0.08)' };
+const STYLE_PCP_NEUTRAL = { padding: '2px 6px', borderRadius: '4px' };
+
 function priceChangeStyle(row) {
-  const pcp = row.pcp != null && row.pcp !== '' ? new BigNumber(row.pcp) : new BigNumber(0);
-  if (pcp.gt(0)) return { color: '#00ff88', fontWeight: 600 };
-  if (pcp.lt(0)) return { color: '#ff4757', fontWeight: 600 };
-  return {};
+  const pcp = Number(row.pcp);
+  if (pcp > 0) return STYLE_PRICE_UP;
+  if (pcp < 0) return STYLE_PRICE_DOWN;
+  return STYLE_PRICE_NEUTRAL;
 }
 
 function pcpCellStyle(row) {
-  const style = { ...priceChangeStyle(row), padding: '2px 6px', borderRadius: '4px' };
-  if (style.color === '#00ff88') style.backgroundColor = 'rgba(0, 255, 136, 0.08)';
-  if (style.color === '#ff4757') style.backgroundColor = 'rgba(255, 71, 87, 0.08)';
-  return style;
+  const pcp = Number(row.pcp);
+  if (pcp > 0) return STYLE_PCP_UP;
+  if (pcp < 0) return STYLE_PCP_DOWN;
+  return STYLE_PCP_NEUTRAL;
 }
 
 function onPageChange(p) {
