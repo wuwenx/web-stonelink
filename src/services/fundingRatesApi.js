@@ -5,7 +5,7 @@
 import { API_BASE_URL } from '@/config/api';
 import axios from 'axios';
 // 'okx', 'bybit', 'gateio', 'bitget'
-const SUPPORTED_EXCHANGES = ['binance_usdm', 'toobit',"okx","bybit"];
+const SUPPORTED_EXCHANGES = ['binance_usdm', 'toobit'];
 
 /**
  * 获取资金费率
@@ -22,7 +22,7 @@ export function getFundingRates(params = {}) {
     url,
     method: 'get',
     params: { exchange, symbol: params.symbol || undefined },
-    timeout: 15000,
+    timeout: 30000,
   })
     .then(response => {
       const res = response.data;

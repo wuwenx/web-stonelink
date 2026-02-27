@@ -28,7 +28,7 @@
         <div class="rank-column">
           <h4 class="rank-title gainers-title">涨幅榜</h4>
           <ul class="rank-list">
-            <li v-for="(row, i) in rankings.gainers" :key="row.s + i" class="rank-item">
+            <li v-for="(row, i) in rankings.gainers.slice(0, 5)" :key="row.s + i" class="rank-item">
               <router-link :to="`/symbol/${symbolIdForLink(row.s)}`" class="rank-symbol">{{ row.s }}</router-link>
               <span class="rank-price" :style="priceChangeStyle(row)">{{ formatNum(row.c, getPrecisionForRow(row).min_price) }}</span>
               <span class="rank-pcp up">{{ formatPcpForRank(row.pcp) }}</span>
@@ -39,7 +39,7 @@
         <div class="rank-column">
           <h4 class="rank-title losers-title">跌幅榜</h4>
           <ul class="rank-list">
-            <li v-for="(row, i) in rankings.losers" :key="row.s + i" class="rank-item">
+            <li v-for="(row, i) in rankings.losers.slice(0, 5)" :key="row.s + i" class="rank-item">
               <router-link :to="`/symbol/${symbolIdForLink(row.s)}`" class="rank-symbol">{{ row.s }}</router-link>
               <span class="rank-price" :style="priceChangeStyle(row)">{{ formatNum(row.c, getPrecisionForRow(row).min_price) }}</span>
               <span class="rank-pcp down">{{ formatPcpForRank(row.pcp) }}</span>
@@ -50,7 +50,7 @@
         <div class="rank-column">
           <h4 class="rank-title volume-title">成交额榜</h4>
           <ul class="rank-list">
-            <li v-for="(row, i) in rankings.by_volume" :key="row.s + i" class="rank-item">
+            <li v-for="(row, i) in rankings.by_volume.slice(0, 5)" :key="row.s + i" class="rank-item">
               <router-link :to="`/symbol/${symbolIdForLink(row.s)}`" class="rank-symbol">{{ row.s }}</router-link>
               <span class="rank-price">{{ formatNum(row.c, getPrecisionForRow(row).min_price) }}</span>
               <span class="rank-qv">{{ formatVol(row.qv, getPrecisionForRow(row).min_qty) }}</span>
@@ -146,6 +146,32 @@
         </div>
       </div>
     </el-card>
+
+    <!-- 涨跌幅热力图：排行接口数据 -->
+    <el-card class="heatmap-card" shadow="hover">
+      <template #header>
+        <div class="card-header heatmap-card-header">
+          <span class="card-title">涨跌幅热力图</span>
+          <span class="exchange-label">交易所: toobit · {{ apiType === 'contract' ? '合约' : '现货' }}</span>
+        </div>
+      </template>
+      <div v-loading="rankingsLoading" class="heatmap-wrap">
+        <router-link
+          v-for="item in heatmapList"
+          :key="item.s"
+          :to="`/symbol/${symbolIdForLink(item.s)}`"
+          class="heatmap-block"
+          :class="item.pcpNum >= 0 ? 'up' : 'down'"
+          :style="heatmapBlockStyle(item)"
+        >
+          <span class="heatmap-symbol">{{ item.base }}</span>
+          <span class="heatmap-pcp">{{ formatPcpForRank(item.pcp) }}</span>
+        </router-link>
+      </div>
+      <div v-if="!rankingsLoading && heatmapList.length === 0" class="empty-tip">
+        暂无数据
+      </div>
+    </el-card>
   </div>
 </template>
 
@@ -192,7 +218,7 @@ async function fetchRankings() {
     const data = await getTickerRankings({
       exchange,
       type: apiType.value,
-      limit: 5,
+      limit: 20,
     });
     rankings.value = data;
   } catch (e) {
@@ -208,6 +234,53 @@ function symbolIdForLink(s) {
   const swapMatch = String(s).match(/^([A-Z0-9-]+)-SWAP-([A-Z]+)$/i);
   if (swapMatch) return `${swapMatch[1]}${swapMatch[2]}`;
   return s.replace(/-/g, '');
+}
+
+/** 热力图展示用：从 symbol 解析出短名称，如 BERA-SWAP-USDT -> BERA，BTC/USDT:USDT -> BTC */
+function heatmapBase(s) {
+  if (!s || typeof s !== 'string') return '';
+  const t = String(s).toUpperCase().trim();
+  if (t.includes('-SWAP-')) return t.split('-SWAP-')[0].trim() || '';
+  const part = t.split(':')[0].trim();
+  const slash = part.indexOf('/');
+  return slash > 0 ? part.slice(0, slash).trim() : part;
+}
+
+/** 涨跌幅热力图数据：合并涨幅榜与跌幅榜，按 |pcp| 排序取前 N 条 */
+const HEATMAP_LIMIT = 60;
+const heatmapList = computed(() => {
+  const gainers = rankings.value.gainers || [];
+  const losers = rankings.value.losers || [];
+  const list = [
+    ...gainers.map(row => ({ s: row.s, base: heatmapBase(row.s), pcp: row.pcp, pcpNum: Number(row.pcp) })),
+    ...losers.map(row => ({ s: row.s, base: heatmapBase(row.s), pcp: row.pcp, pcpNum: Number(row.pcp) })),
+  ];
+  const seen = new Set();
+  const deduped = list.filter(item => {
+    const key = item.base || item.s;
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  return deduped
+    .sort((a, b) => Math.abs(b.pcpNum) - Math.abs(a.pcpNum))
+    .slice(0, HEATMAP_LIMIT);
+});
+
+/** 热力图块大小：按 |涨跌幅| 映射，越大块越大 */
+const heatmapMaxAbs = computed(() => {
+  const list = heatmapList.value;
+  if (!list.length) return 1;
+  return Math.max(...list.map(item => Math.abs(item.pcpNum)), 0.0001);
+});
+
+function heatmapBlockStyle(item) {
+  const absPcp = Math.abs(item.pcpNum);
+  const ratio = heatmapMaxAbs.value > 0 ? absPcp / heatmapMaxAbs.value : 0;
+  const minSize = 72;
+  const maxSize = 128;
+  const size = Math.round(minSize + ratio * (maxSize - minSize));
+  return { width: `${size}px`, minHeight: `${size}px` };
 }
 
 async function fetchSymbolsPage() {
@@ -654,6 +727,80 @@ onUnmounted(() => {
 :deep(.pagination-wrap .el-pagination) {
   --el-pagination-button-bg-color: rgba(0, 0, 0, 0.3);
   --el-pagination-hover-color: #00d4ff;
+}
+
+/* 涨跌幅热力图 */
+.heatmap-card {
+  margin-bottom: 24px;
+  background: rgba(26, 31, 46, 0.6) !important;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(0, 212, 255, 0.15) !important;
+  border-radius: 16px !important;
+}
+
+.heatmap-card:hover {
+  border-color: rgba(0, 212, 255, 0.3) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.heatmap-card-header {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.heatmap-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.heatmap-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 8px;
+  border-radius: 10px;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  box-sizing: border-box;
+}
+
+.heatmap-block:hover {
+  transform: scale(1.03);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+.heatmap-block.up {
+  background: rgba(0, 255, 136, 0.18);
+  color: #00ff88;
+  border: 1px solid rgba(0, 255, 136, 0.35);
+}
+
+.heatmap-block.down {
+  background: rgba(255, 71, 87, 0.18);
+  color: #ff4757;
+  border: 1px solid rgba(255, 71, 87, 0.35);
+}
+
+.heatmap-symbol {
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.heatmap-pcp {
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  opacity: 0.95;
+}
+
+.heatmap-card .empty-tip {
+  text-align: center;
+  padding: 32px;
+  color: #718096;
 }
 
 :deep(.pagination-wrap .el-pagination .el-pager li.is-active) {
