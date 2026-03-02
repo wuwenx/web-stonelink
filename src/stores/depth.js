@@ -4,16 +4,18 @@
  * 以币种为维度组织数据，支持多币种多交易所对比
  */
 import { defineStore } from 'pinia';
-import { DEPTH_OPTIONS, SYMBOLS, getDepthTopic, toStandardSymbol } from '../config/exchanges';
+import { DEPTH_OPTIONS, SYMBOLS, toStandardSymbol } from '../config/exchanges';
 import { getUnifiedWebSocketService } from '../services/UnifiedWebSocketService';
 
-// 默认支持的币种（从统一配置获取，只使用前两个作为默认订阅）
-const DEFAULT_SYMBOLS = SYMBOLS.slice(0, 2);
+// 默认支持的币种：使用配置中的全部交易对
+const DEFAULT_SYMBOLS = [...SYMBOLS];
 
 // 默认对比的交易所（启用 Binance、Toobit、OKX、Bybit）
+  // futures: ['bnUM', 'toobitUM', 'okexUM', 'bybitUM'],
+  // spot: ['bnSpot', 'toobitSpot', 'okexSpot', 'bybitSpot'],
 const COMPARE_EXCHANGES = {
-  futures: ['bnUM', 'toobitUM', 'okexUM', 'bybitUM'],
-  spot: ['bnSpot', 'toobitSpot', 'okexSpot', 'bybitSpot'],
+  futures: ['bnUM', 'toobitUM'],
+  spot: ['bnSpot', 'toobitSpot'],
 };
 
 // 缓存 key
@@ -141,14 +143,22 @@ export const useDepthStore = defineStore('depth', {
         for (const exchangeId of exchanges) {
           const key = `${standardSymbol}_${exchangeId}`;
           const data = state.depthData[key];
-          const spread = data?.spreadPercent || 0;
+          const spread = data?.spreadPercent ?? 0;
 
           exchangeSpreads[exchangeId] = spread;
 
-          if (spread > 0 && spread < minSpread) {
+          if (spread >= 0 && spread < minSpread) {
             minSpread = spread;
             minExchange = exchangeId;
           }
+        }
+
+        // 价差一样时最优展示为 --：统计达到最小价差的交易所数量
+        if (minSpread !== Infinity) {
+          const countAtMin = exchanges.filter(
+            id => (exchangeSpreads[id] ?? 0) === minSpread
+          ).length;
+          if (countAtMin > 1) minExchange = '';
         }
 
         return {

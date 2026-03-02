@@ -141,7 +141,7 @@
         <el-table-column label="最优" width="100" align="center">
           <template #default="{ row }">
             <el-tag type="warning" size="small">
-              {{ getExchangeShortName(row.minExchange) }}
+              {{ row.minExchange ? getExchangeShortName(row.minExchange) : '--' }}
             </el-tag>
           </template>
         </el-table-column>

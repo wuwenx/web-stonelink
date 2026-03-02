@@ -143,6 +143,7 @@ export default { name: 'SimpleLayout' };
 import { ArrowDown } from '@element-plus/icons-vue';
 import { computed, onMounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
+import { SYMBOLS } from '../config/exchanges';
 import { useDepthStore, useSymbolStore } from '../stores/index.js';
 
 const route = useRoute();
@@ -218,7 +219,7 @@ async function initSymbols() {
       forceRefresh: true,
     });
     if (symbolStore.symbolList.length > 0) {
-      depthStore.updateSymbols(getDefaultSymbols(symbolStore.symbolList));
+      depthStore.updateSymbols([...SYMBOLS]);
     }
   } catch (error) {
     console.error('SimpleLayout: 初始化交易对列表失败:', error);
@@ -244,7 +245,7 @@ watch(
         forceRefresh: true,
       });
       if (symbolStore.symbolList.length > 0) {
-        depthStore.updateSymbols(getDefaultSymbols(symbolStore.symbolList));
+        depthStore.updateSymbols([...SYMBOLS]);
       }
     } catch (error) {
       console.error('SimpleLayout: 更新交易对列表失败:', error);
@@ -257,7 +258,7 @@ watch(
   () => symbolStore.symbolList,
   newList => {
     if (newList.length > 0 && depthStore.isConnected) {
-      depthStore.updateSymbols(getDefaultSymbols(newList));
+      depthStore.updateSymbols([...SYMBOLS]);
     }
   }
 );
