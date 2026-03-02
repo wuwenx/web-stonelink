@@ -17,9 +17,14 @@
       <template #header>
         <div class="card-header table-card-header">
           <span class="card-title">多交易所资金费率</span>
-          <el-button type="primary" size="small" :loading="loading" @click="fetchData">
-            刷新
-          </el-button>
+          <div class="header-actions">
+            <el-button type="primary" size="small" @click="downloadAllData">
+              下载全部数据
+            </el-button>
+            <el-button type="primary" size="small" :loading="loading" @click="fetchData">
+              刷新
+            </el-button>
+          </div>
         </div>
       </template>
 
@@ -33,6 +38,9 @@
               <th v-for="ex in exchangeColumns" :key="ex.id" class="col-exchange">
                 {{ ex.name }}
               </th>
+              <th v-if="showDiffColumn" class="col-exchange col-diff">
+                差值(Toobit-Binance)
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -44,6 +52,9 @@
                 <td v-for="ex in exchangeColumns" :key="ex.id" class="col-rate">
                   <span :class="rateCellClass(getRate(base, ex.id))">{{ formatRate(getRate(base, ex.id)) }}</span>
                 </td>
+                <td v-if="showDiffColumn" class="col-rate">
+                  <span :class="rateCellClass(getDiff(base))">{{ formatRate(getDiff(base)) }}</span>
+                </td>
               </tr>
               <tr v-if="hasPredictedRow(base)" class="predicted-row">
                 <td class="col-coin sub-label">
@@ -51,6 +62,9 @@
                 </td>
                 <td v-for="ex in exchangeColumns" :key="ex.id" class="col-rate">
                   <span :class="rateCellClass(getNextRate(base, ex.id))">{{ formatRate(getNextRate(base, ex.id)) }}</span>
+                </td>
+                <td v-if="showDiffColumn" class="col-rate">
+                  <span :class="rateCellClass(getNextDiff(base))">{{ formatRate(getNextDiff(base)) }}</span>
                 </td>
               </tr>
             </template>
@@ -88,6 +102,14 @@ const EXCHANGE_LABELS = {
 
 /** 从 store 取合约币种列表时使用的交易所（币种顺序以此为准） */
 const SYMBOLS_EXCHANGE = 'toobit';
+
+const BINANCE_ID = 'binance_usdm';
+const TOOBIT_ID = 'toobit';
+
+/** 是否有币安和 Toobit，用于显示差值列 */
+const showDiffColumn = computed(() =>
+  SUPPORTED_EXCHANGES.includes(BINANCE_ID) && SUPPORTED_EXCHANGES.includes(TOOBIT_ID)
+);
 
 const loading = ref(false);
 const rawData = ref({}); // { exchangeId: [ { symbol, funding_rate, next_funding_rate, ... } ] }
@@ -196,6 +218,28 @@ function getNextRate(base, exchangeId) {
   return item?.next_funding_rate != null ? item.next_funding_rate : null;
 }
 
+/** 差值 = Toobit - Binance（当前费率） */
+function getDiff(base) {
+  const toobit = getRate(base, TOOBIT_ID);
+  const binance = getRate(base, BINANCE_ID);
+  if (toobit == null && binance == null) return null;
+  const t = Number(toobit);
+  const b = Number(binance);
+  if (Number.isNaN(t) && Number.isNaN(b)) return null;
+  return (Number.isNaN(t) ? 0 : t) - (Number.isNaN(b) ? 0 : b);
+}
+
+/** 预测费率差值 = Toobit - Binance */
+function getNextDiff(base) {
+  const toobit = getNextRate(base, TOOBIT_ID);
+  const binance = getNextRate(base, BINANCE_ID);
+  if (toobit == null && binance == null) return null;
+  const t = Number(toobit);
+  const b = Number(binance);
+  if (Number.isNaN(t) && Number.isNaN(b)) return null;
+  return (Number.isNaN(t) ? 0 : t) - (Number.isNaN(b) ? 0 : b);
+}
+
 function hasPredictedRow(base) {
   return exchangeColumns.value.some(ex => getNextRate(base, ex.id) != null);
 }
@@ -229,6 +273,45 @@ async function fetchData() {
   } finally {
     loading.value = false;
   }
+}
+
+/** 下载全部数据为 CSV（含币种、各交易所费率、差值）；数值前加 \t 让 Excel 按文本显示，避免折叠/科学计数法 */
+function downloadAllData() {
+  const rows = symbolRows.value;
+  if (!rows.length) return;
+  const binanceLabel = EXCHANGE_LABELS[BINANCE_ID] || BINANCE_ID;
+  const toobitLabel = EXCHANGE_LABELS[TOOBIT_ID] || TOOBIT_ID;
+  const headers = showDiffColumn.value
+    ? ['币种', binanceLabel, toobitLabel, '差值(Toobit-Binance)']
+    : ['币种', ...exchangeColumns.value.map(ex => ex.name)];
+  const escapeCsv = (v) => {
+    const s = v == null ? '' : String(v);
+    return /[,"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  /** 费率单元格前加制表符，Excel 会当文本显示，完整展开不折叠 */
+  const escapeCsvRate = (v) => escapeCsv(v == null ? '' : '\t' + String(v));
+  const lines = [headers.map(escapeCsv).join(',')];
+  for (const base of rows) {
+    const binanceRate = getRate(base, BINANCE_ID);
+    const toobitRate = getRate(base, TOOBIT_ID);
+    const binanceStr = formatRate(binanceRate);
+    const toobitStr = formatRate(toobitRate);
+    if (showDiffColumn.value) {
+      const diff = getDiff(base);
+      lines.push([base, binanceStr, toobitStr, formatRate(diff)].map((s, i) => (i === 0 ? escapeCsv(s) : escapeCsvRate(s))).join(','));
+    } else {
+      const cells = [base, ...exchangeColumns.value.map(ex => formatRate(getRate(base, ex.id)))];
+      lines.push(cells.map((s, i) => (i === 0 ? escapeCsv(s) : escapeCsvRate(s))).join(','));
+    }
+  }
+  const csv = '\uFEFF' + lines.join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `资金费率-${new Date().toISOString().slice(0, 16).replace('T', '-').replace(':', '-')}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 onMounted(() => {
@@ -277,6 +360,12 @@ onMounted(() => {
 .table-card-header {
   flex-wrap: wrap;
   gap: 12px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .page-title {
@@ -334,6 +423,11 @@ onMounted(() => {
 
 .funding-table .col-exchange {
   min-width: 120px;
+}
+
+.funding-table .col-diff {
+  min-width: 140px;
+  color: #00d4ff;
 }
 
 .data-row .col-coin {
