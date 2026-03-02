@@ -284,12 +284,12 @@ function downloadAllData() {
   const headers = showDiffColumn.value
     ? ['币种', binanceLabel, toobitLabel, '差值(Toobit-Binance)']
     : ['币种', ...exchangeColumns.value.map(ex => ex.name)];
-  const escapeCsv = (v) => {
+  const escapeCsv = v => {
     const s = v == null ? '' : String(v);
     return /[,"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   /** 费率单元格前加制表符，Excel 会当文本显示，完整展开不折叠 */
-  const escapeCsvRate = (v) => escapeCsv(v == null ? '' : '\t' + String(v));
+  const escapeCsvRate = v => escapeCsv(v == null ? '' : '\t' + String(v));
   const lines = [headers.map(escapeCsv).join(',')];
   for (const base of rows) {
     const binanceRate = getRate(base, BINANCE_ID);

@@ -11,8 +11,8 @@ import { getUnifiedWebSocketService } from '../services/UnifiedWebSocketService'
 const DEFAULT_SYMBOLS = [...SYMBOLS];
 
 // 默认对比的交易所（启用 Binance、Toobit、OKX、Bybit）
-  // futures: ['bnUM', 'toobitUM', 'okexUM', 'bybitUM'],
-  // spot: ['bnSpot', 'toobitSpot', 'okexSpot', 'bybitSpot'],
+// futures: ['bnUM', 'toobitUM', 'okexUM', 'bybitUM'],
+// spot: ['bnSpot', 'toobitSpot', 'okexSpot', 'bybitSpot'],
 const COMPARE_EXCHANGES = {
   futures: ['bnUM', 'toobitUM'],
   spot: ['bnSpot', 'toobitSpot'],
