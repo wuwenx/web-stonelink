@@ -45,7 +45,7 @@ function ccxtTickerToRow(symbolKey, item) {
 // 节流用：合并多次 WS 推送再更新 tickers，降低 Market 页 tableData 重算频率
 let pendingTickers = null;
 let tickerFlushTimer = null;
-const TICKER_THROTTLE_MS = 150;
+const TICKER_THROTTLE_MS = 5000;
 
 export const useMarketStore = defineStore('market', {
   state: () => ({

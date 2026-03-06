@@ -35,11 +35,28 @@
               <th class="col-coin">
                 币种
               </th>
-              <th v-for="ex in exchangeColumns" :key="ex.id" class="col-exchange">
+              <th
+                v-for="ex in exchangeColumns"
+                :key="ex.id"
+                class="col-exchange sortable"
+                :class="{ sorted: sortColumn === ex.id, [sortOrder]: sortColumn === ex.id }"
+                @click="handleSort(ex.id)"
+              >
                 {{ ex.name }}
+                <span class="sort-icon" :class="{ active: sortColumn === ex.id }">
+                  {{ sortColumn === ex.id ? (sortOrder === 'asc' ? '↑' : '↓') : '⇅' }}
+                </span>
               </th>
-              <th v-if="showDiffColumn" class="col-exchange col-diff">
+              <th
+                v-if="showDiffColumn"
+                class="col-exchange col-diff sortable"
+                :class="{ sorted: sortColumn === 'diff', [sortOrder]: sortColumn === 'diff' }"
+                @click="handleSort('diff')"
+              >
                 差值(Toobit-Binance)
+                <span class="sort-icon" :class="{ active: sortColumn === 'diff' }">
+                  {{ sortColumn === 'diff' ? (sortOrder === 'asc' ? '↑' : '↓') : '⇅' }}
+                </span>
               </th>
             </tr>
           </thead>
@@ -197,8 +214,46 @@ const symbolRows = computed(() => {
 const DEFAULT_PAGE_SIZE = 50;
 /** 当前展示条数 */
 const displayCount = ref(DEFAULT_PAGE_SIZE);
-/** 当前页展示的币种（前 displayCount 条） */
-const displayRows = computed(() => symbolRows.value.slice(0, displayCount.value));
+
+/** 排序列：交易所 id 或 'diff'，null 表示不排序（保持 symbolRows 原序） */
+const sortColumn = ref(null);
+/** 排序方向 */
+const sortOrder = ref('asc');
+
+/** 根据当前排序列与方向排序后的币种列表 */
+const sortedRows = computed(() => {
+  const rows = symbolRows.value;
+  const col = sortColumn.value;
+  const order = sortOrder.value;
+  if (!col || !rows.length) return rows;
+  const isAsc = order === 'asc';
+  const getValue = col === 'diff' ? base => getDiff(base) : base => getRate(base, col);
+  return [...rows].sort((a, b) => {
+    const va = getValue(a);
+    const vb = getValue(b);
+    const na = va != null ? Number(va) : NaN;
+    const nb = vb != null ? Number(vb) : NaN;
+    const aNull = Number.isNaN(na);
+    const bNull = Number.isNaN(nb);
+    if (aNull && bNull) return 0;
+    if (aNull) return isAsc ? 1 : 1;
+    if (bNull) return isAsc ? -1 : -1;
+    if (na !== nb) return isAsc ? na - nb : nb - na;
+    return a.localeCompare(b);
+  });
+});
+
+/** 当前页展示的币种（排序后取前 displayCount 条） */
+const displayRows = computed(() => sortedRows.value.slice(0, displayCount.value));
+
+function handleSort(column) {
+  if (sortColumn.value === column) {
+    sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc';
+  } else {
+    sortColumn.value = column;
+    sortOrder.value = 'asc';
+  }
+}
 
 function loadMore() {
   displayCount.value = Math.min(displayCount.value + DEFAULT_PAGE_SIZE, symbolRows.value.length);
@@ -427,6 +482,27 @@ onMounted(() => {
 
 .funding-table .col-diff {
   min-width: 140px;
+  color: #00d4ff;
+}
+
+.funding-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.funding-table th.sortable:hover {
+  color: #00d4ff;
+}
+
+.funding-table th.sortable .sort-icon {
+  margin-left: 4px;
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+.funding-table th.sortable .sort-icon.active {
+  opacity: 1;
   color: #00d4ff;
 }
 
