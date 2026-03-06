@@ -19,7 +19,6 @@
     <!-- 控制面板 -->
     <el-card class="control-card" shadow="hover">
       <el-row :gutter="20" align="middle">
-        <!-- 买卖方向 -->
         <el-col :span="6">
           <div class="control-group">
             <label class="control-label">方向</label>
@@ -96,6 +95,14 @@
           </template>
         </el-table-column>
       </el-table>
+      <div class="depth-pagination">
+        <el-pagination
+          v-model:current-page="depthPage"
+          :page-size="depthStore.pageSize"
+          :total="depthStore.allSymbols.length"
+          layout="total, prev, pager, next"
+        />
+      </div>
     </el-card>
 
     <!-- 价差详情对比 -->
@@ -151,21 +158,25 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import { getExchangeName } from '../config/exchanges';
+import { getExchangeName, toStandardSymbol } from '../config/exchanges';
 import { useDepthStore } from '../stores/depth';
+import { useSymbolStore } from '../stores/symbol';
 
 const router = useRouter();
 
 const depthStore = useDepthStore();
+const symbolStore = useSymbolStore();
+
+// 计算属性 - 从全局 store 读取交易类型
+const exchangeType = computed(() => depthStore.config.exchangeType);
 
 // 响应式数据
 const orderSide = ref(depthStore.config.orderSide);
 const depthPercentage = ref(depthStore.config.depthPercentage);
 
-// 计算属性 - 从全局 store 读取交易类型
-const exchangeType = computed(() => depthStore.config.exchangeType);
+// 计算属性 - 从全局 store 读取
 const depthOptions = computed(() => depthStore.depthOptions);
 const isLoading = computed(() => depthStore.isLoading);
 
@@ -255,10 +266,46 @@ const getHeaderCellStyle = () => ({
   fontWeight: 'bold',
 });
 
-// 生命周期
-onMounted(() => {
-  depthStore.connect();
+// 分页器双向绑定（确保点击翻页生效）
+const depthPage = computed({
+  get: () => depthStore.currentPage,
+  set: p => depthStore.setCurrentPage(p),
 });
+
+// 根据当前交易类型从 symbolStore 拉取币对并写入 depth store（500+ 条，只订阅当前页）
+async function loadSymbolsIntoDepth() {
+  const type = depthStore.config.exchangeType === 'futures' ? 'contract' : 'spot';
+  await symbolStore.fetchSymbols({ exchange: 'toobit', type });
+  const list = symbolStore.getSymbolsByExchangeAndType('toobit', type) || [];
+  const standardList = [];
+  const seen = new Set();
+  for (const s of list) {
+    const raw = s.symbol || s.id || s.base;
+    if (!raw) continue;
+    const standard = toStandardSymbol(String(raw).toUpperCase());
+    if (standard && !seen.has(standard)) {
+      seen.add(standard);
+      standardList.push(standard);
+    }
+  }
+  if (standardList.length) {
+    depthStore.setAllSymbols(standardList);
+  }
+}
+
+// 生命周期
+onMounted(async() => {
+  depthStore.connect();
+  await loadSymbolsIntoDepth();
+});
+
+// 切换合约/现货时重新拉取对应币对列表
+watch(
+  () => depthStore.config.exchangeType,
+  () => {
+    loadSymbolsIntoDepth();
+  }
+);
 
 onUnmounted(() => {
   // 可选：离开页面时保持连接
@@ -293,6 +340,18 @@ onUnmounted(() => {
 .table-card:hover {
   border-color: rgba(0, 212, 255, 0.3) !important;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.depth-pagination {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.depth-pagination :deep(.el-pager li),
+.depth-pagination :deep(.btn-prev),
+.depth-pagination :deep(.btn-next) {
+  cursor: pointer;
 }
 
 :deep(.el-card__header) {

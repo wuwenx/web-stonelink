@@ -11,8 +11,6 @@ import { getUnifiedWebSocketService } from '../services/UnifiedWebSocketService'
 const DEFAULT_SYMBOLS = [...SYMBOLS];
 
 // 默认对比的交易所（启用 Binance、Toobit、OKX、Bybit）
-// futures: ['bnUM', 'toobitUM', 'okexUM', 'bybitUM'],
-// spot: ['bnSpot', 'toobitSpot', 'okexSpot', 'bybitSpot'],
 const COMPARE_EXCHANGES = {
   futures: ['bnUM', 'toobitUM'],
   spot: ['bnSpot', 'toobitSpot'],
@@ -47,8 +45,15 @@ export const useDepthStore = defineStore('depth', {
       depthPercentage: 0.0001, // 当前选择的深度百分比
     },
 
-    // 支持的币种列表
-    symbols: DEFAULT_SYMBOLS,
+    // 全部已选币种（用于分页展示）
+    allSymbols: [...DEFAULT_SYMBOLS],
+
+    // 当前页的币种（仅此列表参与深度订阅）
+    symbols: DEFAULT_SYMBOLS.slice(0, 10),
+
+    // 分页：当前页（从 1 起）、每页条数
+    currentPage: 1,
+    pageSize: 10,
 
     // 深度数据 - 按 symbol_exchange 分组
     // { 'BTCUSDT_bnUM': { ... }, 'BTCUSDT_toobitUM': { ... }, ... }
@@ -89,13 +94,17 @@ export const useDepthStore = defineStore('depth', {
       );
     },
 
-    // 获取深度对比数据（以币种为维度，支持多交易所）
+    // 获取深度对比数据（以币种为维度，按 store 的 allSymbols 分页展示当前页）
     depthComparisonBySymbol: state => {
       const pctKey = `${state.config.depthPercentage}`;
       const exchanges = COMPARE_EXCHANGES[state.config.exchangeType] || [];
       const isBuy = state.config.orderSide === 'buy';
+      const list = state.allSymbols || [];
+      const size = state.pageSize || 10;
+      const start = (state.currentPage - 1) * size;
+      const symbols = list.slice(start, start + size);
 
-      return state.symbols.map(symbol => {
+      return symbols.map(symbol => {
         // 将 symbol 转换为标准格式，确保能正确匹配存储的 key
         const standardSymbol = toStandardSymbol(symbol);
         const exchangeDepths = {};
@@ -128,11 +137,15 @@ export const useDepthStore = defineStore('depth', {
       });
     },
 
-    // 获取价差对比数据（以币种为维度，支持多交易所）
+    // 获取价差对比数据（以币种为维度，按 store 的 allSymbols 分页展示当前页）
     spreadComparisonBySymbol: state => {
       const exchanges = COMPARE_EXCHANGES[state.config.exchangeType] || [];
+      const list = state.allSymbols || [];
+      const size = state.pageSize || 10;
+      const start = (state.currentPage - 1) * size;
+      const symbols = list.slice(start, start + size);
 
-      return state.symbols.map(symbol => {
+      return symbols.map(symbol => {
         // 将 symbol 转换为标准格式，确保能正确匹配存储的 key
         const standardSymbol = toStandardSymbol(symbol);
         const exchangeSpreads = {};
@@ -173,6 +186,18 @@ export const useDepthStore = defineStore('depth', {
 
     // 判断是否已连接
     isConnected: state => state.connectionStatus === 'connected',
+
+    // 总页数（供分页器使用）
+    totalPages: state =>
+      Math.max(1, Math.ceil((state.allSymbols?.length || 0) / (state.pageSize || 10))),
+
+    // 当前页的币对（按 store 的 allSymbols 分页切片，用于表格展示）
+    currentPageSymbols: state => {
+      const list = state.allSymbols || [];
+      const size = state.pageSize || 10;
+      const start = (state.currentPage - 1) * size;
+      return list.slice(start, start + size);
+    },
   },
 
   actions: {
@@ -225,13 +250,12 @@ export const useDepthStore = defineStore('depth', {
       setTimeout(checkAndSubscribe, 100);
     },
 
-    // 订阅所有币种和交易所
+    // 订阅当前页币种（仅订阅 symbols，不订阅全部 allSymbols）
     subscribeAll() {
       if (!this.wsService) return;
 
       const exchanges = COMPARE_EXCHANGES[this.config.exchangeType] || [];
 
-      // 为每个币种订阅两个交易所
       for (const symbol of this.symbols) {
         this.wsService.subscribeDepthBatch(exchanges, symbol);
       }
@@ -315,14 +339,12 @@ export const useDepthStore = defineStore('depth', {
       await this.connect();
     },
 
-    // 更新交易对列表并重新订阅
+    // 更新当前页交易对并同步订阅（切换页时：取消当前页订阅，订阅新页）
     updateSymbols(newSymbols) {
-      if (!Array.isArray(newSymbols) || newSymbols.length === 0) {
-        console.warn('[DepthStore] 交易对列表为空，跳过更新');
+      if (!Array.isArray(newSymbols)) {
         return;
       }
 
-      // 如果列表没有变化，不需要更新
       const symbolListStr = JSON.stringify([...this.symbols].sort());
       const newSymbolListStr = JSON.stringify([...newSymbols].sort());
       if (symbolListStr === newSymbolListStr) {
@@ -330,41 +352,63 @@ export const useDepthStore = defineStore('depth', {
       }
 
       const oldSymbols = [...this.symbols];
-      this.symbols = newSymbols;
+      this.symbols = newSymbols.length ? newSymbols : [];
 
-      // 如果 WebSocket 已连接，需要重新订阅
-      if (this.wsService && this.wsService.getStatus() === 'connected') {
-        // 取消旧交易对的订阅（只取消不在新列表中的）
-        const exchanges = COMPARE_EXCHANGES[this.config.exchangeType] || [];
-        const symbolsToUnsubscribe = oldSymbols.filter(s => !newSymbols.includes(s));
-        
-        for (const symbol of symbolsToUnsubscribe) {
-          for (const exchange of exchanges) {
-            this.wsService.unsubscribeDepth(exchange, symbol);
-          }
-        }
+      if (!this.wsService || this.wsService.getStatus() !== 'connected') {
+        return;
+      }
 
-        // 订阅新交易对（只订阅不在旧列表中的）
-        const symbolsToSubscribe = newSymbols.filter(s => !oldSymbols.includes(s));
-        for (const symbol of symbolsToSubscribe) {
-          this.wsService.subscribeDepthBatch(exchanges, symbol);
+      const exchanges = COMPARE_EXCHANGES[this.config.exchangeType] || [];
+      const toUnsubscribe = oldSymbols.filter(s => !newSymbols.includes(s));
+      const toSubscribe = newSymbols.filter(s => !oldSymbols.includes(s));
+
+      for (const symbol of toUnsubscribe) {
+        for (const exchange of exchanges) {
+          this.wsService.unsubscribeDepth(exchange, symbol);
         }
+      }
+      for (const symbol of toSubscribe) {
+        this.wsService.subscribeDepthBatch(exchanges, symbol);
       }
     },
 
     /**
-     * 按需订阅单个交易对（用户切换交易对时调用）
-     * 若该交易对尚未在订阅列表中，则加入并订阅
+     * 用完整币对列表初始化 allSymbols（如从 symbolStore 拉取的 500+），只订阅第一页
+     */
+    setAllSymbols(symbols) {
+      if (!Array.isArray(symbols) || symbols.length === 0) return;
+      this.allSymbols = symbols;
+      this.currentPage = 1;
+      const pageSymbols = symbols.slice(0, this.pageSize);
+      this.updateSymbols(pageSymbols);
+    },
+
+    /**
+     * 切换当前页：取消当前页深度订阅，只订阅新页的币对
+     */
+    setCurrentPage(page) {
+      const pageNum = Math.max(1, Math.min(page, this.totalPages));
+      if (this.currentPage === pageNum) return;
+
+      const newSymbols = this.allSymbols.slice(
+        (pageNum - 1) * this.pageSize,
+        pageNum * this.pageSize
+      );
+      this.updateSymbols(newSymbols);
+      this.currentPage = pageNum;
+    },
+
+    /**
+     * 添加币对到全部列表；若落在当前页则加入订阅
      */
     subscribeSymbol(symbol) {
       if (!symbol) return;
-      if (this.symbols.includes(symbol)) return;
+      if (this.allSymbols.includes(symbol)) return;
 
-      this.symbols = [...this.symbols, symbol];
-      if (this.wsService && this.wsService.getStatus() === 'connected') {
-        const exchanges = COMPARE_EXCHANGES[this.config.exchangeType] || [];
-        this.wsService.subscribeDepthBatch(exchanges, symbol);
-      }
+      this.allSymbols = [...this.allSymbols, symbol];
+      const start = (this.currentPage - 1) * this.pageSize;
+      const newPageSymbols = this.allSymbols.slice(start, start + this.pageSize);
+      this.updateSymbols(newPageSymbols);
     },
   },
 });
