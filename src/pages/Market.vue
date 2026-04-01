@@ -26,36 +26,54 @@
       </template>
       <div v-loading="rankingsLoading" class="rankings-grid">
         <div class="rank-column">
-          <h4 class="rank-title gainers-title">涨幅榜</h4>
+          <h4 class="rank-title gainers-title">
+            涨幅榜
+          </h4>
           <ul class="rank-list">
             <li v-for="(row, i) in rankings.gainers.slice(0, 5)" :key="row.s + i" class="rank-item">
-              <router-link :to="`/symbol/${symbolIdForLink(row.s)}`" class="rank-symbol">{{ row.s }}</router-link>
+              <router-link :to="`/symbol/${symbolIdForLink(row.s)}`" class="rank-symbol">
+                {{ row.s }}
+              </router-link>
               <span class="rank-price" :style="priceChangeStyle(row)">{{ formatNum(row.c, getPrecisionForRow(row).min_price) }}</span>
               <span class="rank-pcp up">{{ formatPcpForRank(row.pcp) }}</span>
             </li>
-            <li v-if="!rankings.gainers.length" class="rank-item empty">暂无</li>
+            <li v-if="!rankings.gainers.length" class="rank-item empty">
+              暂无
+            </li>
           </ul>
         </div>
         <div class="rank-column">
-          <h4 class="rank-title losers-title">跌幅榜</h4>
+          <h4 class="rank-title losers-title">
+            跌幅榜
+          </h4>
           <ul class="rank-list">
             <li v-for="(row, i) in rankings.losers.slice(0, 5)" :key="row.s + i" class="rank-item">
-              <router-link :to="`/symbol/${symbolIdForLink(row.s)}`" class="rank-symbol">{{ row.s }}</router-link>
+              <router-link :to="`/symbol/${symbolIdForLink(row.s)}`" class="rank-symbol">
+                {{ row.s }}
+              </router-link>
               <span class="rank-price" :style="priceChangeStyle(row)">{{ formatNum(row.c, getPrecisionForRow(row).min_price) }}</span>
               <span class="rank-pcp down">{{ formatPcpForRank(row.pcp) }}</span>
             </li>
-            <li v-if="!rankings.losers.length" class="rank-item empty">暂无</li>
+            <li v-if="!rankings.losers.length" class="rank-item empty">
+              暂无
+            </li>
           </ul>
         </div>
         <div class="rank-column">
-          <h4 class="rank-title volume-title">成交额榜</h4>
+          <h4 class="rank-title volume-title">
+            成交额榜
+          </h4>
           <ul class="rank-list">
             <li v-for="(row, i) in rankings.by_volume.slice(0, 5)" :key="row.s + i" class="rank-item">
-              <router-link :to="`/symbol/${symbolIdForLink(row.s)}`" class="rank-symbol">{{ row.s }}</router-link>
+              <router-link :to="`/symbol/${symbolIdForLink(row.s)}`" class="rank-symbol">
+                {{ row.s }}
+              </router-link>
               <span class="rank-price">{{ formatNum(row.c, getPrecisionForRow(row).min_price) }}</span>
               <span class="rank-qv">{{ formatVol(row.qv, getPrecisionForRow(row).min_qty) }}</span>
             </li>
-            <li v-if="!rankings.by_volume.length" class="rank-item empty">暂无</li>
+            <li v-if="!rankings.by_volume.length" class="rank-item empty">
+              暂无
+            </li>
           </ul>
         </div>
       </div>

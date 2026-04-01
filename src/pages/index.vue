@@ -99,8 +99,12 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
             </svg>
           </div>
-          <h3 class="feature-title">多交易所深度对比</h3>
-          <p class="feature-desc">实时对比 Binance、Toobit 等交易所深度数据，快速发现套利机会</p>
+          <h3 class="feature-title">
+            多交易所深度对比
+          </h3>
+          <p class="feature-desc">
+            实时对比 Binance、Toobit 等交易所深度数据，快速发现套利机会
+          </p>
           <div class="feature-tags">
             <span class="tag">实时数据</span>
             <span class="tag">多维分析</span>
@@ -118,8 +122,12 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
             </svg>
           </div>
-          <h3 class="feature-title">滑点模拟计算</h3>
-          <p class="feature-desc">模拟大额交易滑点，精准计算成交均价与预期损耗</p>
+          <h3 class="feature-title">
+            滑点模拟计算
+          </h3>
+          <p class="feature-desc">
+            模拟大额交易滑点，精准计算成交均价与预期损耗
+          </p>
           <div class="feature-tags">
             <span class="tag">精准计算</span>
             <span class="tag">风险评估</span>
@@ -137,8 +145,12 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
             </svg>
           </div>
-          <h3 class="feature-title">流动性深度分析</h3>
-          <p class="feature-desc">多层级流动性分析，从万分之一到 10% 价差范围全覆盖</p>
+          <h3 class="feature-title">
+            流动性深度分析
+          </h3>
+          <p class="feature-desc">
+            多层级流动性分析，从万分之一到 10% 价差范围全覆盖
+          </p>
           <div class="feature-tags">
             <span class="tag">8档深度</span>
             <span class="tag">全面分析</span>
@@ -156,8 +168,12 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
             </svg>
           </div>
-          <h3 class="feature-title">实时订单簿</h3>
-          <p class="feature-desc">可视化买卖深度图表、市场压力分析、大单追踪与实时订单簿监控</p>
+          <h3 class="feature-title">
+            实时订单簿
+          </h3>
+          <p class="feature-desc">
+            可视化买卖深度图表、市场压力分析、大单追踪与实时订单簿监控
+          </p>
           <div class="feature-tags">
             <span class="tag">深度图表</span>
             <span class="tag">大单追踪</span>
@@ -176,8 +192,12 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
             </svg>
           </div>
-          <h3 class="feature-title">K 线图表</h3>
-          <p class="feature-desc">蜡烛/折线/面积多种图表类型，实时 WebSocket 推送，支持多周期切换</p>
+          <h3 class="feature-title">
+            K 线图表
+          </h3>
+          <p class="feature-desc">
+            蜡烛/折线/面积多种图表类型，实时 WebSocket 推送，支持多周期切换
+          </p>
           <div class="feature-tags">
             <span class="tag">实时推送</span>
             <span class="tag">多周期</span>
@@ -195,8 +215,12 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 7h8m0 0v8m0-8v8M3 21h18M3 10h18M3 7l9-4 9 4M3 21V7M21 21V7l-9 4" />
             </svg>
           </div>
-          <h3 class="feature-title">市场行情</h3>
-          <p class="feature-desc">多交易所行情概览，涨跌幅排行与实时价格监控</p>
+          <h3 class="feature-title">
+            市场行情
+          </h3>
+          <p class="feature-desc">
+            多交易所行情概览，涨跌幅排行与实时价格监控
+          </p>
           <div class="feature-tags">
             <span class="tag">行情概览</span>
             <span class="tag">涨跌排行</span>
@@ -214,8 +238,12 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
             </svg>
           </div>
-          <h3 class="feature-title">快讯</h3>
-          <p class="feature-desc">行业资讯与市场动态，第一时间掌握重要信息</p>
+          <h3 class="feature-title">
+            快讯
+          </h3>
+          <p class="feature-desc">
+            行业资讯与市场动态，第一时间掌握重要信息
+          </p>
           <div class="feature-tags">
             <span class="tag">行业资讯</span>
             <span class="tag">市场动态</span>
@@ -237,27 +265,35 @@
             <span class="counter">250</span>
             <span class="unit">+</span>
           </div>
-          <div class="metric-label">深度档位</div>
+          <div class="metric-label">
+            深度档位
+          </div>
         </div>
         <div class="metric-card">
           <div class="metric-number">
             <span class="counter">&lt;50</span>
             <span class="unit">ms</span>
           </div>
-          <div class="metric-label">数据延迟</div>
+          <div class="metric-label">
+            数据延迟
+          </div>
         </div>
         <div class="metric-card">
           <div class="metric-number">
             <span class="counter">8</span>
             <span class="unit">级</span>
           </div>
-          <div class="metric-label">深度范围</div>
+          <div class="metric-label">
+            深度范围
+          </div>
         </div>
         <div class="metric-card">
           <div class="metric-number">
             <span class="counter">24/7</span>
           </div>
-          <div class="metric-label">全天候监控</div>
+          <div class="metric-label">
+            全天候监控
+          </div>
         </div>
       </div>
     </section>
@@ -265,8 +301,12 @@
     <!-- 底部 CTA -->
     <section class="cta-section">
       <div class="cta-content">
-        <h2 class="cta-title">开始您的专业深度分析</h2>
-        <p class="cta-desc">深度对比 · K 线图表 · 订单簿 · 市场快讯 · 实时数据</p>
+        <h2 class="cta-title">
+          开始您的专业深度分析
+        </h2>
+        <p class="cta-desc">
+          深度对比 · K 线图表 · 订单簿 · 市场快讯 · 实时数据
+        </p>
         <router-link to="/multi-depth" class="cta-btn">
           深度对比
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">

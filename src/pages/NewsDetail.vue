@@ -32,7 +32,9 @@
         </a>
       </template>
       <div v-else-if="!loading && error" class="error-wrap">
-        <p class="error-text">{{ error }}</p>
+        <p class="error-text">
+          {{ error }}
+        </p>
         <el-button type="primary" @click="fetchDetail">
           重试
         </el-button>

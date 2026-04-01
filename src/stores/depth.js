@@ -16,6 +16,11 @@ const COMPARE_EXCHANGES = {
   spot: ['bnSpot', 'toobitSpot'],
 };
 
+/** 每批订阅的币对数量（一次发太多 subscribe 可能导致服务端断开） */
+const DEPTH_SUBSCRIBE_BATCH_SIZE = 5;
+/** 每批之间的间隔（毫秒），下一批单独再发 */
+const DEPTH_SUBSCRIBE_BATCH_DELAY_MS = 200;
+
 // 缓存 key
 const EXCHANGE_TYPE_CACHE_KEY = 'stonelink_exchange_type';
 
@@ -236,9 +241,9 @@ export const useDepthStore = defineStore('depth', {
 
     // 等待连接成功后订阅
     waitAndSubscribe() {
-      const checkAndSubscribe = () => {
+      const checkAndSubscribe = async() => {
         if (this.wsService.getStatus() === 'connected') {
-          this.subscribeAll();
+          await this.subscribeAll();
           this.isLoading = false;
         } else if (this.wsService.getStatus() === 'connecting') {
           setTimeout(checkAndSubscribe, 100);
@@ -250,15 +255,29 @@ export const useDepthStore = defineStore('depth', {
       setTimeout(checkAndSubscribe, 100);
     },
 
-    // 订阅当前页币种（仅订阅 symbols，不订阅全部 allSymbols）
-    subscribeAll() {
-      if (!this.wsService) return;
-
+    /**
+     * 分批次订阅深度：每批 DEPTH_SUBSCRIBE_BATCH_SIZE 个币对，批次间隔后再发下一批
+     */
+    async subscribeSymbolsInBatches(symbols) {
+      if (!this.wsService || !symbols?.length) return;
       const exchanges = COMPARE_EXCHANGES[this.config.exchangeType] || [];
-
-      for (const symbol of this.symbols) {
-        this.wsService.subscribeDepthBatch(exchanges, symbol);
+      const batchSize = DEPTH_SUBSCRIBE_BATCH_SIZE;
+      const delayMs = DEPTH_SUBSCRIBE_BATCH_DELAY_MS;
+      for (let i = 0; i < symbols.length; i += batchSize) {
+        const chunk = symbols.slice(i, i + batchSize);
+        for (const symbol of chunk) {
+          this.wsService.subscribeDepthBatch(exchanges, symbol);
+        }
+        if (i + batchSize < symbols.length) {
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
       }
+    },
+
+    // 订阅当前页币种（仅订阅 symbols，不订阅全部 allSymbols）
+    async subscribeAll() {
+      if (!this.wsService) return;
+      await this.subscribeSymbolsInBatches(this.symbols);
     },
 
     // 处理深度数据更新
@@ -309,7 +328,7 @@ export const useDepthStore = defineStore('depth', {
 
       // 重新订阅
       if (this.wsService && this.wsService.getStatus() === 'connected') {
-        this.subscribeAll();
+        void this.subscribeAll();
       }
     },
 
@@ -339,8 +358,8 @@ export const useDepthStore = defineStore('depth', {
       await this.connect();
     },
 
-    // 更新当前页交易对并同步订阅（切换页时：取消当前页订阅，订阅新页）
-    updateSymbols(newSymbols) {
+    // 更新当前页交易对并同步订阅（切换页时：取消当前页订阅，订阅新页；新增订阅分批发）
+    async updateSymbols(newSymbols) {
       if (!Array.isArray(newSymbols)) {
         return;
       }
@@ -367,9 +386,7 @@ export const useDepthStore = defineStore('depth', {
           this.wsService.unsubscribeDepth(exchange, symbol);
         }
       }
-      for (const symbol of toSubscribe) {
-        this.wsService.subscribeDepthBatch(exchanges, symbol);
-      }
+      await this.subscribeSymbolsInBatches(toSubscribe);
     },
 
     /**
